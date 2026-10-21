@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, fmt, OPCOES, rotulo, tecnico } from '../api'
-import { Carregando, Erro, Painel } from '../components/ui'
+import { CabecalhoPagina, Carregando, Erro, Painel } from '../components/ui'
 import { EscalaEscore } from '../components/Escala'
 import { ResultadoAvaliacao } from './Lote'
 
@@ -33,16 +33,22 @@ export default function ConsultaPagina() {
 
   if (!estado) {
     return (
-      <Painel titulo="Consulta guiada" subtitulo="Descreva um lote respondendo às perguntas. O motor de inferência faz encadeamento regressivo: a partir do objetivo (exigências do lote) ele procura as regras que concluem cada fato e pergunta só o que ainda falta. Respostas anteriores podam o que não é mais necessário.">
-        {erro && <Erro msg={erro} />}
-        <button className="btn-primario mt-2" onClick={iniciar} disabled={carregando}>Começar</button>
-      </Painel>
+      <div className="space-y-6">
+        <CabecalhoPagina titulo="Consulta guiada" contexto="Descreva um lote respondendo a perguntas, uma de cada vez. O sistema pergunta só o que falta para calcular o que o lote precisa." />
+        <Painel titulo="Como funciona" subtitulo="O motor de inferência faz encadeamento regressivo: a partir do objetivo (exigências do lote) ele procura as regras que concluem cada fato e pergunta só o que ainda falta. Respostas anteriores podam o que não é mais necessário. Se não souber uma resposta, use o valor padrão: a conclusão sai com certeza menor.">
+          {erro && <Erro msg={erro} />}
+          <button className="btn-primario mt-1" onClick={iniciar} disabled={carregando}>{carregando ? 'Começando…' : 'Começar a consulta'}</button>
+        </Painel>
+      </div>
     )
   }
 
   const p = estado.pergunta
   const respondidas = Object.entries(estado.fatos)
   return (
+    <div className="space-y-6">
+    <CabecalhoPagina titulo="Consulta guiada" contexto={p ? 'Responda a pergunta abaixo. Se não souber, use o valor padrão.' : 'Consulta concluída.'}
+      acoes={<button className="btn-secundario" onClick={() => { setEstado(null); setValor('') }}>Recomeçar</button>} />
     <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
       <div className="space-y-5">
         {p && (
@@ -121,6 +127,7 @@ export default function ConsultaPagina() {
           ))}
         </dl>
       </aside>
+    </div>
     </div>
   )
 }

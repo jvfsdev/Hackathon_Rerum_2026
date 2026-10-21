@@ -280,7 +280,7 @@ function Traco({ r }: { r: Resultado }) {
   if (!tecnico()) return null
   return (
     <Painel titulo="Traço de inferência" subtitulo={`${r.traco.length} regras disparadas · base v${r.kb_version}`}
-      acoes={<button className="btn-secundario" onClick={() => setAberto(!aberto)}>{aberto ? 'Ocultar' : 'Mostrar'}</button>}>
+      acoes={<button className="btn-secundario py-1.5" aria-expanded={aberto} onClick={() => setAberto(!aberto)}>{aberto ? 'Ocultar' : 'Mostrar'}</button>}>
       {aberto && (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -540,7 +540,7 @@ function CalculadoraPearson({ alimentos }: { alimentos: Alimento[] }) {
   }
   return (
     <Painel titulo="Quadrado de Pearson" subtitulo="Proporção de dois ingredientes para chegar a um teor de proteína bruta na mistura (ex.: concentrado com 18% PB)."
-      acoes={<button className="text-sm text-campo-600 hover:underline" onClick={() => setAberto(!aberto)}>{aberto ? 'fechar' : 'abrir'}</button>}>
+      acoes={<button className="btn-secundario py-1.5" aria-expanded={aberto} onClick={() => setAberto(!aberto)}>{aberto ? 'Fechar' : 'Abrir calculadora'}</button>}>
       {aberto && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-end gap-2">
@@ -848,7 +848,7 @@ function AbaRegistro({ lote }: { lote: Lote }) {
   return (
     <div className="space-y-4">
     <BannerAcao alerta={alerta} onCancelar={concluir} />
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
       <div className="space-y-4">
         <Painel titulo="Registro do dia" subtitulo="O mínimo é nº de vacas, litros e concentrado. O resto é opcional e entra quando houver.">
           <div className="mb-3 flex flex-wrap items-end gap-2">
@@ -864,19 +864,6 @@ function AbaRegistro({ lote }: { lote: Lote }) {
           {ok && <div className="mt-3 rounded-lg bg-campo-50 p-2 text-sm text-campo-700">{ok}</div>}
           <button className="btn-primario mt-4" onClick={enviar}>Salvar e analisar</button>
         </Painel>
-        <ImportarPlanilha lote={lote} />
-        <Painel titulo={alerta ? 'Registrar o que foi feito' : 'Registrar evento'} subtitulo="Eventos explicam variações, evitam alarmes falsos e ficam no histórico dos alertas."
-          className={eventoSugerido && alerta ? 'ring-2 ring-campo-500' : ''}>
-          <div className="flex flex-wrap gap-2">
-            <select className="input max-w-52" value={evento.tipo} onChange={(e) => setEvento({ ...evento, tipo: e.target.value })}>
-              {Object.entries(ROTULO_EVENTO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-            <input className="input flex-1" placeholder={alerta ? 'O que foi feito (ex.: aspersão ligada 11h–16h)' : 'Descrição'} value={evento.descricao} onChange={(e) => setEvento({ ...evento, descricao: e.target.value })} />
-            <button className="btn-secundario" onClick={enviarEvento}>Registrar</button>
-          </div>
-        </Painel>
-      </div>
-      <div>
         {res && (
           <Painel titulo={tecnico() ? 'Resultado do acompanhamento' : 'Como o lote está'} subtitulo={tecnico() ? `${res.traco.length} regras disparadas` : undefined}>
             {res.alertas.length === 0 && <p className="text-sm text-campo-700">Nenhum alerta: o lote está dentro do esperado.</p>}
@@ -886,6 +873,21 @@ function AbaRegistro({ lote }: { lote: Lote }) {
             ))}
           </Painel>
         )}
+      </div>
+      <div className="space-y-4">
+        <Painel titulo={alerta ? 'Registrar o que foi feito' : 'Registrar evento'} subtitulo="Eventos explicam variações, evitam alarmes falsos e ficam no histórico dos alertas."
+          className={eventoSugerido && alerta ? 'ring-2 ring-campo-500' : ''}>
+          <div className="space-y-2">
+            <label className="block"><span className="rotulo">Tipo</span>
+              <select className="input" value={evento.tipo} onChange={(e) => setEvento({ ...evento, tipo: e.target.value })}>
+                {Object.entries(ROTULO_EVENTO).map(([k, v]) => <option key={k} value={k}>{v[0].toUpperCase() + v.slice(1)}</option>)}
+              </select></label>
+            <label className="block"><span className="rotulo">{alerta ? 'O que foi feito' : 'Descrição'}</span>
+              <textarea className="input h-20" placeholder={alerta ? 'Ex.: aspersão ligada das 11h às 16h' : 'Ex.: abri o silo 3; 5 vacas entraram do lote 2'} value={evento.descricao} onChange={(e) => setEvento({ ...evento, descricao: e.target.value })} /></label>
+            <button className="btn-secundario" onClick={enviarEvento}>Registrar evento</button>
+          </div>
+        </Painel>
+        <ImportarPlanilha lote={lote} />
       </div>
     </div>
     </div>
@@ -918,7 +920,7 @@ function ImportarPlanilha({ lote }: { lote: Lote }) {
   }
   return (
     <Painel titulo="Importar planilha (CSV)" subtitulo="Registros diários, controle leiteiro ou laudo do laticínio. Uma linha por data; colunas com os nomes do modelo."
-      acoes={<button className="text-sm text-campo-600 hover:underline" onClick={() => setAberto(!aberto)}>{aberto ? 'fechar' : 'abrir'}</button>}>
+      acoes={<button className="btn-secundario py-1.5" aria-expanded={aberto} onClick={() => setAberto(!aberto)}>{aberto ? 'Fechar' : 'Importar'}</button>}>
       {aberto && (
         <div className="space-y-3">
           <p className="text-xs text-stone-500">Modelos: <a className="text-campo-600 hover:underline" href="/api/modelos/importacao/diario">registros diários</a> · <a className="text-campo-600 hover:underline" href="/api/modelos/importacao/laudo">laudo / controle leiteiro</a>. Separador ; ou , e vírgula decimal são aceitos.</p>

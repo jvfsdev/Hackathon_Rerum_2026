@@ -185,13 +185,13 @@ export function AbaTrato({ lote }: { lote: Lote }) {
       </Painel>
       {erro && <Erro msg={erro} />}
       {p && (
-        <section className="card p-4 print:border-0 print:shadow-none">
+        <section className="card p-4 sm:p-5 print:border-0 print:shadow-none">
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="titulo text-2xl font-semibold text-stone-900">Trato: {p.lote.nome}</h2>
             <span className="text-sm text-stone-500">{dataBR(p.data)} · {numero(p.vacas, 0)} vacas · dieta v{p.dieta_versao}{p.sobra_pct ? ` · folga ${numero(p.sobra_pct)}%` : ''}</span>
           </div>
           {p.observacoes.length > 0 && (
-            <ul className="mb-3 space-y-0.5 rounded-lg bg-amber-50 p-2 text-sm text-amber-900">{p.observacoes.map((o: string) => <li key={o}>• {o}</li>)}</ul>
+            <ul className="mb-3 space-y-0.5 rounded-md border-l-4 border-l-brinco bg-brinco-claro p-2.5 text-sm text-stone-800">{p.observacoes.map((o: string) => <li key={o}>• {o}</li>)}</ul>
           )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

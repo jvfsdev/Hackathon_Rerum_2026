@@ -46,7 +46,7 @@ function Bonificacao({ fazendaId }: { fazendaId: number }) {
   const total = Object.values(tabela).reduce((t, fs) => t + fs.length, 0)
   return (
     <Painel titulo="Bonificação do laticínio por qualidade" subtitulo={total ? `${total} faixa(s) cadastrada(s). Entra no preço efetivo do leite, no IOFC e no alerta de quanto a qualidade está custando.` : 'Cadastre as faixas do seu laticínio (cada um tem a sua): ex.: CCS até 200 mil = +R$ 0,03/L; acima de 400 mil = −R$ 0,03/L.'}
-      acoes={<button className="text-sm text-campo-600 hover:underline" onClick={() => setAberto(!aberto)}>{aberto ? 'fechar' : 'editar'}</button>}>
+      acoes={<button className="btn-secundario py-1.5" aria-expanded={aberto} onClick={() => setAberto(!aberto)}>{aberto ? 'Fechar' : 'Editar faixas'}</button>}>
       {aberto && (
         <div className="space-y-4">
           {Object.entries(PARAMS_BONIF).map(([p, [nome, un]]) => (
@@ -97,8 +97,8 @@ function FontesReferencia({ onAtualizado }: { onAtualizado: () => void }) {
     <Painel titulo="Fontes de referência (atualização diária)"
       subtitulo={`${comFonte.length} de ${d.itens.length} itens têm cotação pública. Os demais ficam com valor de demonstração até a fazenda informar o seu preço.`}
       acoes={<div className="flex items-center gap-2">
-        <button className="text-sm text-campo-600 hover:underline" onClick={() => setAberto(!aberto)}>{aberto ? 'ocultar' : 'detalhes'}</button>
-        <button className="btn-secundario" onClick={atualizar} disabled={rodando}>{rodando ? 'Coletando…' : 'Atualizar agora'}</button>
+        <button className="btn-secundario py-1.5" aria-expanded={aberto} onClick={() => setAberto(!aberto)}>{aberto ? 'Ocultar detalhes' : 'Ver detalhes'}</button>
+        <button className="btn-secundario py-1.5" onClick={atualizar} disabled={rodando}>{rodando ? 'Coletando…' : 'Atualizar agora'}</button>
       </div>}>
       <p className="mb-1 text-xs text-stone-500">Cotações oficiais/reconhecidas, acessadas sem login: Cepea/Esalq-USP (milho, diário; leite ao produtor MG, mensal — licença CC BY-NC 4.0) e Seab/Deral-PR via IPEADATA (farelo de soja, mensal). Silagens, capins, cana, núcleo mineral, polpa, farelo de trigo, caroço de algodão e ureia pecuária não têm cotação pública confiável e diária.</p>
       <p className="text-sm text-stone-600">

@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import LoteForm, { valoresDaConsulta } from '../components/LoteForm'
-import { Painel } from '../components/ui'
+import { CabecalhoPagina, Painel } from '../components/ui'
 import { rotulo } from '../api'
 
 /** Novo lote; vindo da consulta guiada, chega com as respostas em `state.fatos` e os valores padrão usados em `state.padroes`. */
@@ -10,7 +10,9 @@ export default function NovoLotePagina() {
   const daConsulta = !!estado?.fatos
   const padroes = (estado?.padroes ?? []).filter((f) => f.startsWith('lote.'))
   return (
-    <Painel titulo="Novo lote" subtitulo="Depois de criar, monte a dieta (ou peça a sugestão de custo mínimo) e comece os registros diários.">
+    <div className="space-y-6">
+    <CabecalhoPagina titulo="Novo lote" contexto="Depois de criar, monte a dieta (ou peça a sugestão de custo mínimo) e comece os registros diários." />
+    <Painel titulo="Dados do lote">
       {daConsulta && (
         <div className="mb-4 rounded-lg bg-campo-50 p-3 text-sm text-campo-900">
           Preenchido com as respostas da consulta guiada. Dê um nome ao lote, informe o nº de vacas e confira os campos.
@@ -19,5 +21,6 @@ export default function NovoLotePagina() {
       )}
       <LoteForm inicial={daConsulta ? valoresDaConsulta(estado!.fatos!) : undefined} onSalvo={(l) => navegar(`/lotes/${l.id}/dieta`)} />
     </Painel>
+    </div>
   )
 }

@@ -43,7 +43,7 @@ export default function RelatorioPagina() {
       </section>
 
       {r.previsao && (
-        <section className="card p-4 print:shadow-none">
+        <section className="card p-4 sm:p-5 print:shadow-none">
           <h2 className="titulo mb-1 text-xl font-semibold text-stone-900">Próximo mês (previsão)</h2>
           <p className="num text-sm text-stone-700">~{numero(r.previsao.totais.leite, 0)} L · {reais(r.previsao.totais.receita, 0)} do leite · {reais(r.previsao.totais.custo, 0)} de comida · sobra de {reais(r.previsao.totais.margem, 0)}</p>
           {r.previsao.marcos.length > 0 && <p className="mt-1 text-sm text-stone-700">Datas: {r.previsao.marcos.map((m: any) => `${m.texto.toLowerCase()} — ${m.lote} (${dataBR(m.data)})`).join('; ')}.</p>}
@@ -52,14 +52,14 @@ export default function RelatorioPagina() {
       )}
 
       {r.estoque.length > 0 && (
-        <section className="card p-4 print:shadow-none">
+        <section className="card p-4 sm:p-5 print:shadow-none">
           <h2 className="titulo mb-1 text-xl font-semibold text-stone-900">Estoque</h2>
           <ul className="space-y-0.5 text-sm">{r.estoque.map((e: any, i: number) => <li key={i}><b>{e.titulo}</b> — {e.acao}</li>)}</ul>
         </section>
       )}
 
       {r.lotes.map((l: any) => (
-        <section key={l.lote.id} className="card break-inside-avoid p-4 print:shadow-none">
+        <section key={l.lote.id} className="card break-inside-avoid p-4 sm:p-5 print:shadow-none">
           <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-stone-100 pb-2">
             <h2 className="titulo flex items-center gap-2.5 text-xl font-semibold text-stone-900"><Brinco nome={l.lote.nome} id={l.lote.id} tamanho="sm" />{l.lote.nome}</h2>
             <span className="text-sm text-stone-500">{numero(l.vacas, 0)} vacas</span>
