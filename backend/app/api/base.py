@@ -45,6 +45,14 @@ def alimentos():
     return list(services.kb().alimentos.values())
 
 
+@router.get("/kb/revisao")
+def revisao(dias: int = 120):
+    """Revisão da base pelo uso: regras recusadas, alertas que somem sozinhos, regras que nunca disparam."""
+    from ..revisao import revisar
+    with sessao() as s:
+        return revisar(s, services.kb(), dias)
+
+
 @router.post("/kb/testes")
 def rodar_testes():
     return executar_todos(services.kb())

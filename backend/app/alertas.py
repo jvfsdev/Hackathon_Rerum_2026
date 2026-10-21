@@ -104,7 +104,8 @@ def sincronizar(s: Session, kb: BaseConhecimento, lote_id: int, d: date, resulta
         if ep is None:
             ep = AlertaDB(lote_id=lote_id, regra=regra, problema=problema, modulo=modulo_de.get(regra, ""), origem=origem, nivel=a.nivel,
                           titulo=a.titulo, causa=a.causa, acao=a.acao, categoria=a.categoria, cf=a.cf, fonte=a.fonte,
-                          forca=a.forca, suprimido=a.status == "suprimido", nota=a.nota, aberto_em=d,
+                          forca=a.forca, suprimido=a.status == "suprimido", titulo_produtor=a.titulo_produtor,
+                          causa_produtor=a.causa_produtor, acao_produtor=a.acao_produtor, nota=a.nota, aberto_em=d,
                           ultima_ocorrencia=d, sessao_id=sessao_id, contexto=contexto)
             s.add(ep)
             s.flush()
@@ -123,6 +124,7 @@ def sincronizar(s: Session, kb: BaseConhecimento, lote_id: int, d: date, resulta
             ep.nivel = a.nivel
         ep.regra, ep.modulo = regra, modulo_de.get(regra, ep.modulo)
         ep.titulo, ep.causa, ep.acao, ep.cf = a.titulo, a.causa, a.acao, a.cf
+        ep.titulo_produtor, ep.causa_produtor, ep.acao_produtor = a.titulo_produtor, a.causa_produtor, a.acao_produtor
         ep.suprimido, ep.nota = a.status == "suprimido", a.nota
         ep.ultima_ocorrencia, ep.ocorrencias, ep.sessao_id = d, ep.ocorrencias + 1, sessao_id
         ep.contexto = contexto or ep.contexto

@@ -28,6 +28,7 @@ backend/app/api/        rotas FastAPI
 backend/app/services.py monta a memória de trabalho de cada fluxo (catálogo, preços, avaliação, formulação, monitor)
 backend/app/alertas.py  ciclo de vida dos alertas (episódios + histórico)
 backend/app/importacao.py  importação CSV;  backend/app/referencias/  preços de referência diários
+backend/app/estoque.py  saldo e dias de estoque;  app/revisao.py  revisão da base pelo uso;  app/relatorio.py  relatório semanal
 backend/scripts/        gerar_regras_md.py (docs/regras.md), importar_cqbal.py (foods.yaml)
 backend/app/db/         modelos + seed (fazenda demo com 60 dias)
 backend/kb/             BASE DE CONHECIMENTO: rules/*.yaml, params.yaml, foods.yaml, CHANGELOG.md
@@ -66,6 +67,13 @@ cd frontend && npm install && npm run dev   # UI em :5173  (npm run dev:rede par
 - **Modo campo** (`frontend/src/pages/Campo.tsx`, rota `/campo`): registro rápido + avisos para o celular; no celular a página inicial redireciona para ele. Sem conexão, registros/eventos vão para a fila `campo_fila` no localStorage e são reenviados em ordem quando a API volta (evento `online` e a cada 60 s). "Sem conexão" = falha de fetch ou 5xx sem corpo (`ErroApi.semConexao`).
 - **Importação CSV** (`app/importacao.py`): nomes de coluna em `ALIASES`, faixa plausível por indicador em `FAIXAS`; sempre prévia antes de gravar. **Bonificação do laticínio**: `Fazenda.bonificacao` (faixas por parâmetro, R$/L), entra no preço efetivo do leite e no IOFC.
 - Preço em `foods.yaml` é só **referência de demonstração**. O preço que vale é o da fazenda (`PrecoAlimento`, histórico com data e fonte; vigente = mais recente), aplicado por `services.alimento_com_preco` na verificação, na formulação e no painel. Nunca leia `preco_kg_mn` direto da base num fluxo de fazenda.
+- **Linguagem do produtor:** todo alerta novo traz `titulo_produtor`, `causa_produtor` e `acao_produtor` (sem jargão; números
+  saem com vírgula). A interface tem "visão do produtor" (padrão: sem IDs de regra, CF ou traço) e "visão técnica" (`?visao=tecnico`).
+  `tests/test_novidades.py` falha se um alerta ficar sem texto do produtor.
+- Módulos T (transição, `rules/transicao.yaml`) e E (estoque, `rules/estoque.yaml`) rodam fora do acompanhamento: a transição ao
+  salvar uma dieta nova (`services.planejar_transicao`), o estoque em `app/estoque.py`. Durante a troca, o que vai no cocho é
+  `services.itens_do_dia` (trato e estoque usam isso).
+- Ajuste mínimo e sensibilidade usam o MESMO modelo do PL (`lp._modelo`) só trocando o objetivo: o contrato com a verificação vale para eles.
 - Pergunta sem valor padrão seguro (peso vivo, temperatura) não tem `padrao`; se for dispensável, é `opcional: true` ("não sei" pula as regras que dependem dela).
 - Mudou regra ou parâmetro: suba `kb_version`, anote em `kb/CHANGELOG.md` e adicione ou ajuste o caso em `tests/cases.yaml`.
 - Valores ⚠ NV ou conflitantes (ver a última seção de `Inferências...md`) viram parâmetro com força explícita, nunca constante escondida.

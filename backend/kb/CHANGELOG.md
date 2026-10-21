@@ -1,5 +1,24 @@
 # Histórico da base de conhecimento
 
+## 1.6.0 — 21/10/2026
+- Módulo **P (previsão)**: projeção de 7 a 90 dias (app/previsao.py) pela curva ajustada ao lote, com faixa de 90%
+  (`@params.prev_z_faixa` × sigma robusto dos desvios), calor previsto (Open-Meteo, 16 dias), secagem em
+  `@params.dias_gestacao_secagem`, dieta do dia e preços vigentes. Regras PRV-01 (queda projetada), PRV-02 (secagem no
+  horizonte), PRV-03 (dieta mais cara que o leite), PRV-04 (energia sobrando para a produção projetada), PRV-10 (receita da
+  fazenda caindo), PRV-11 (margem da fazenda negativa).
+
+## 1.5.0 — 21/10/2026
+- **Linguagem do produtor**: todo alerta ganha `titulo_produtor`, `causa_produtor` e `acao_produtor` (mesmos fatos,
+  sem jargão, números com vírgula). A interface mostra esses textos na "visão do produtor" e os técnicos na "visão técnica".
+- VER-00D: leite que a energia consumida sustenta (`ver.leite_permitido`, NRC 2001) — usado no simulador "e se?".
+- Módulo **T (transição)**: TRN-01 (troca de volumoso → `@params.transicao_dias_volumoso`), TRN-02 (aumento de
+  concentrado em passos de `@params.transicao_passo_conc`), TRN-03 (mudança grande da MS), TRN-09 (duração = maior).
+  Adaptação no acompanhamento: ACP-TR1 (rejeição/sobras altas, problema `cocho_alto` junto com ACP-S04), ACP-TR2 (fezes
+  moles), ACP-TR3 (queda durante a adaptação).
+- Módulo **E (estoque)**: EST-01 (crítico até `@params.estoque_dias_critico`), EST-02 (programar compra até
+  `@params.estoque_dias_atencao`), EST-03 (contagem desatualizada).
+- Parâmetros novos: ajuste mínimo da dieta, sensibilidade, transição, ordem e notas do trato, estoque e revisão pelo uso.
+
 ## 1.4.1 — 21/10/2026
 - Alertas ganham a chave `problema`: regras que medem o mesmo problema em graus diferentes viram um alerta só
   (o mais grave, citando os demais em `tambem`) e um único episódio que agrava ou atenua.

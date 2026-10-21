@@ -1,0 +1,129 @@
+# Módulo P — Previsão dos próximos dias (app/previsao.py): leite pela curva ajustada ao lote, secagem/parto pelas datas
+# de gestação, custo pela dieta do dia e preços vigentes. As regras decidem o que da projeção merece aviso.
+- id: PRV-01
+  versao: 1
+  modulo: previsao
+  descricao: Produção projetada cai mais que o limiar no horizonte (avanço da lactação)
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: prev.lote.variacao_leite_pct, op: "<=", valor: "@params.prev_queda_alerta"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: previsao
+        titulo: "Produção projetada {prev.lote.variacao_leite_pct:+.0f}% em {prev.dias} dias"
+        causa: "Curva de lactação ajustada ao lote no DEL atual (fase de declínio)."
+        acao: "Reduzir o concentrado acompanhando a produção e planejar secagem/reagrupamento."
+        titulo_produtor: "O leite deste lote deve cair {prev.lote.variacao_leite_pct:+.0f}% no próximo mês"
+        causa_produtor: "As vacas estão avançando na lactação: é a queda natural."
+        acao_produtor: "Vá diminuindo o concentrado junto com o leite e planeje a secagem."
+  fonte: "Cobuci (curva de lactação); Inferências (economia do concentrado)"
+  forca: C
+
+- id: PRV-02
+  versao: 1
+  modulo: previsao
+  descricao: Secagem prevista dentro do horizonte — o leite do lote sai da receita
+  prioridade: 60
+  se:
+    - {fato: prev.lote.dias_para_secagem, op: existe}
+  entao:
+    - alerta:
+        nivel: informativo
+        categoria: previsao
+        titulo: "Secagem prevista em {prev.lote.dias_para_secagem} dias (~{prev.lote.leite_dia_antes_secagem:.0f} L/dia saem da produção)"
+        causa: "O lote chega a {@params.dias_gestacao_secagem} dias de gestação (secar ~60 dias antes do parto)."
+        acao: "Programar a secagem e o lote de vacas secas; verificar partos que reponham a produção."
+        titulo_produtor: "Secagem prevista em {prev.lote.dias_para_secagem} dias: saem uns {prev.lote.leite_dia_antes_secagem:.0f} L por dia"
+        causa_produtor: "As vacas chegam ao ponto de secar (60 dias antes do parto)."
+        acao_produtor: "Programe a secagem e veja se há vacas parindo para repor o leite."
+  fonte: "Inferências nº 36 (período seco de 60 dias)"
+  forca: A
+
+- id: PRV-03
+  versao: 1
+  modulo: previsao
+  descricao: Custo da dieta projetado acima da receita do leite do lote
+  prioridade: 70
+  cf: 0.8
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: prev.lote.dias_margem_negativa, op: ">", valor: 0}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: previsao
+        titulo: "Dieta mais cara que o leite a partir de {prev.lote.data_margem_negativa} ({prev.lote.dias_margem_negativa} dias no horizonte)"
+        causa: "A produção projetada cai e o custo da dieta continua o mesmo."
+        acao: "Reformular pelo custo mínimo com a produção projetada ou antecipar a secagem."
+        titulo_produtor: "A comida vai custar mais que o leite a partir de {prev.lote.data_margem_negativa}"
+        causa_produtor: "O leite cai e a dieta continua igual."
+        acao_produtor: "Peça a dieta mais barata para a produção que vem aí ou antecipe a secagem."
+  fonte: "Inferências (IOFC / margem sobre a alimentação)"
+  forca: C
+
+- id: PRV-04
+  versao: 1
+  modulo: previsao
+  descricao: Dieta sustenta mais leite do que o projetado — energia (e dinheiro) sobrando
+  prioridade: 50
+  cf: 0.6
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: prev.lote.sobra_energia_l, op: ">=", valor: "@params.prev_sobra_energia_l"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: previsao
+        titulo: "Dieta sustenta ~{prev.lote.sobra_energia_l:.1f} L/vaca a mais que a produção projetada"
+        causa: "Leite permitido pela energia (VER-00D) acima do leite previsto pela curva."
+        acao: "Reformular com a meta de leite projetada (custo mínimo ou ajuste mínimo) para reduzir custo."
+        titulo_produtor: "A dieta é mais forte do que o leite que vem por aí (~{prev.lote.sobra_energia_l:.1f} L por vaca de sobra)"
+        causa_produtor: "As vacas não vão produzir o que essa comida permite: o excesso vira gordura e custo."
+        acao_produtor: "Peça uma dieta mais barata para a produção prevista."
+  fonte: "NRC 2001 (leite permitido pela energia); Cobuci"
+  forca: C
+
+- id: PRV-10
+  versao: 1
+  modulo: previsao
+  descricao: Receita da fazenda projetada cai mais que o limiar no horizonte
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: prev.fazenda.variacao_receita_pct, op: "<=", valor: "@params.prev_queda_receita_fazenda"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: previsao
+        titulo: "Receita do leite projetada {prev.fazenda.variacao_receita_pct:+.0f}% em {prev.dias} dias"
+        causa: "Secagens e avanço da lactação dos lotes no horizonte."
+        acao: "Planejar partos/entrada de vacas e ajustar custos de alimentação ao novo volume."
+        titulo_produtor: "O dinheiro do leite deve cair {prev.fazenda.variacao_receita_pct:+.0f}% no próximo mês"
+        causa_produtor: "Vacas secando e lotes no fim da lactação."
+        acao_produtor: "Planeje a entrada de vacas paridas e ajuste o gasto com comida."
+  fonte: "Escolha de engenharia (planejamento de fluxo de caixa)"
+  forca: D
+
+- id: PRV-11
+  versao: 1
+  modulo: previsao
+  descricao: Fazenda projeta receita do leite abaixo do custo da alimentação
+  prioridade: 70
+  cf: 0.8
+  se:
+    - {fato: prev.fazenda.margem_total, op: "<", valor: 0}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: previsao
+        titulo: "Margem sobre a alimentação projetada negativa nos próximos {prev.dias} dias"
+        causa: "Custo das dietas maior que a receita projetada do leite."
+        acao: "Revisar dietas (custo mínimo), secagens e descarte."
+        titulo_produtor: "A comida vai custar mais que o leite no próximo mês"
+        causa_produtor: "Somando todos os lotes, o gasto com comida passa do dinheiro do leite."
+        acao_produtor: "Reveja as dietas, as secagens e as vacas de descarte."
+  fonte: "Inferências (IOFC)"
+  forca: C

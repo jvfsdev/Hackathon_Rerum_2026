@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, dataBR, fmt, rotulo, UNIDADES, type Alerta, type EstadoAlerta, type ItemHistorico, type NoComo, type Nivel } from '../api'
+import { api, certeza, dataBR, fmt, numero, reais, rotulo, tecnico, textoAlerta, UNIDADES, type Alerta, type EstadoAlerta, type ItemDieta, type ItemHistorico, type NoComo, type Nivel } from '../api'
 
 const COR_NIVEL: Record<Nivel, string> = {
   critico: 'bg-red-50 text-critico ring-red-200',
@@ -127,12 +127,53 @@ export function BotaoComo({ no, titulo }: { no?: NoComo; titulo?: string }) {
   if (!no) return null
   return (
     <>
-      <button onClick={() => setAberto(true)} className="text-xs font-medium text-campo-600 underline-offset-2 hover:underline">Como?</button>
-      <Gaveta aberta={aberto} onFechar={() => setAberto(false)} titulo={`Como o sistema chegou a: ${titulo ?? rotulo(no.fato)}`}>
-        <p className="mb-3 text-sm text-stone-500">Cada nível mostra a regra que concluiu o valor, a fonte e a força da evidência, e os fatos usados (com seu fator de certeza).</p>
-        <ComoArvore no={no} />
+      <button onClick={() => setAberto(true)} className="text-xs font-medium text-campo-600 underline-offset-2 hover:underline">{tecnico() ? 'Como?' : 'De onde vem?'}</button>
+      <Gaveta aberta={aberto} onFechar={() => setAberto(false)} titulo={`${tecnico() ? 'Como o sistema chegou a' : 'De onde vem'}: ${titulo ?? rotulo(no.fato)}`}>
+        {tecnico() ? (
+          <>
+            <p className="mb-3 text-sm text-stone-500">Cada nível mostra a regra que concluiu o valor, a fonte e a força da evidência, e os fatos usados (com seu fator de certeza).</p>
+            <ComoArvore no={no} />
+          </>
+        ) : <ComoSimples no={no} />}
       </Gaveta>
     </>
+  )
+}
+
+/** "De onde vem?" para o produtor: os dados que entraram na conta, sem regras nem fatores de certeza. */
+function ComoSimples({ no }: { no: NoComo }) {
+  const folhas = new Map<string, NoComo>()
+  const passos: string[] = []
+  const visita = (n: NoComo) => {
+    if (n.regras?.length) {
+      n.regras.forEach((r) => { if (!passos.includes(r.descricao)) passos.push(r.descricao); r.premissas.forEach(visita) })
+    } else if (n.conhecido !== false && n.valor !== undefined && !folhas.has(n.fato)) folhas.set(n.fato, n)
+  }
+  visita(no)
+  const padrao = [...folhas.values()].filter((f) => f.origem === 'padrao')
+  return (
+    <div className="space-y-4 text-sm">
+      <p className="rounded-lg bg-campo-50 p-3 text-campo-900"><b>{rotulo(no.fato)}: {fmt(no.valor, no.fato)} {UNIDADES[no.fato] ?? ''}</b> ({certeza(no.cf ?? 1)})</p>
+      <div>
+        <h4 className="mb-1 font-semibold text-stone-800">Dados usados na conta</h4>
+        <ul className="space-y-1">
+          {[...folhas.values()].map((f) => (
+            <li key={f.fato} className="flex justify-between gap-3 border-b border-stone-100 pb-1">
+              <span className="text-stone-600">{rotulo(f.fato)}</span>
+              <span className="num font-medium text-stone-900">{fmt(f.valor, f.fato)} {UNIDADES[f.fato] ?? ''}{f.origem === 'padrao' && <span className="ml-1 text-xs text-amber-700">(valor padrão)</span>}</span>
+            </li>
+          ))}
+        </ul>
+        {padrao.length > 0 && <p className="mt-2 text-xs text-amber-700">Valores padrão deixam a conta menos certa: informe {padrao.map((f) => rotulo(f.fato).toLowerCase()).join(', ')} para melhorar.</p>}
+      </div>
+      {passos.length > 0 && (
+        <div>
+          <h4 className="mb-1 font-semibold text-stone-800">O que o sistema considerou</h4>
+          <ul className="ml-4 list-disc space-y-0.5 text-stone-600">{passos.slice(0, 8).map((p) => <li key={p}>{p}</li>)}</ul>
+        </div>
+      )}
+      <p className="text-xs text-stone-400">Na visão técnica aparecem as regras, as fontes e os fatores de certeza.</p>
+    </div>
   )
 }
 
@@ -156,13 +197,26 @@ export function ExplicacaoAlerta({ alerta: inicial }: { alerta: Alerta }) {
       <AlertaAcoes alerta={alerta} onMudou={carregarHist} />
       {hist && (
         <div>
-          <h4 className="mb-2 text-sm font-semibold text-stone-800">Histórico do alerta e ações</h4>
+          <h4 className="mb-2 text-sm font-semibold text-stone-800">{tecnico() ? 'Histórico do alerta e ações' : 'O que já aconteceu com este aviso'}</h4>
           <LinhaDoTempo itens={hist} />
         </div>
       )}
-      {erro && <Erro msg={erro} />}
-      {!dados && !erro && alerta.sessao_id && <Carregando />}
-      {dados && (
+      {!tecnico() && alerta.contexto && alerta.contexto.length > 0 && (
+        <div>
+          <h4 className="mb-1 text-sm font-semibold text-stone-800">O que o sistema viu</h4>
+          <ul className="space-y-1 text-sm">
+            {alerta.contexto.map((c) => (
+              <li key={c.fato} className="flex justify-between gap-3 border-b border-stone-100 pb-1">
+                <span className="text-stone-600">{rotulo(c.fato)}</span><span className="num font-medium text-stone-900">{fmt(c.valor, c.fato)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {alerta.sessao_id && <Contrafactual sessaoId={alerta.sessao_id} regra={alerta.regra} />}
+      {erro && tecnico() && <Erro msg={erro} />}
+      {!dados && !erro && alerta.sessao_id && tecnico() && <Carregando />}
+      {dados && tecnico() && (
         <>
           <RegraCartao regra={dados.regra_def} />
           <div>
@@ -190,15 +244,20 @@ export function EstadoBadge({ estado }: { estado?: EstadoAlerta }) {
 
 export function AlertaCorpo({ alerta }: { alerta: Alerta }) {
   const encerrado = alerta.estado === 'resolvido' || alerta.estado === 'expirado' || alerta.estado === 'recusado'
+  const t = textoAlerta(alerta)
+  const tec = tecnico()
   return (
     <div className={alerta.status === 'suprimido' || encerrado ? 'opacity-80' : ''}>
       <div className="flex flex-wrap items-center gap-2">
         <NivelBadge nivel={alerta.nivel} />
         <EstadoBadge estado={alerta.estado} />
-        {alerta.status === 'suprimido' && <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs font-semibold text-stone-600">Suprimido</span>}
-        <span className="font-mono text-xs text-stone-500">{alerta.regra}</span>
-        <ForcaBadge forca={alerta.forca} />
-        <CfBarra cf={alerta.cf} />
+        {alerta.status === 'suprimido' && <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs font-semibold text-stone-600">{tec ? 'Suprimido' : 'Em segundo plano'}</span>}
+        {tec ? <>
+          <span className="font-mono text-xs text-stone-500">{alerta.regra}</span>
+          <ForcaBadge forca={alerta.forca} />
+          <CfBarra cf={alerta.cf} />
+          {alerta.tambem?.length ? <span className="text-xs text-stone-400">agrupa {alerta.tambem.join(', ')}</span> : null}
+        </> : <span className="text-xs text-stone-400">{certeza(alerta.cf)}</span>}
         {alerta.aberto_em ? (
           <span className="text-xs text-stone-400">
             desde {dataBR(alerta.aberto_em)}{alerta.ultima_ocorrencia && alerta.ultima_ocorrencia !== alerta.aberto_em && ` · última ${dataBR(alerta.ultima_ocorrencia)}`}
@@ -206,10 +265,10 @@ export function AlertaCorpo({ alerta }: { alerta: Alerta }) {
           </span>
         ) : alerta.data && <span className="text-xs text-stone-400">{dataBR(alerta.data)}</span>}
       </div>
-      <p className="mt-1.5 font-medium text-stone-900">{alerta.titulo}</p>
-      {alerta.causa && <p className="mt-1 text-sm text-stone-600"><span className="font-medium text-stone-700">Causa provável: </span>{alerta.causa}</p>}
-      {alerta.acao && <p className="mt-1 text-sm text-stone-600"><span className="font-medium text-campo-700">Ação sugerida: </span>{alerta.acao}</p>}
-      {alerta.nota && <p className="mt-1 rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">Meta-regra {alerta.nota}</p>}
+      <p className="mt-1.5 font-medium text-stone-900">{t.titulo}</p>
+      {t.causa && <p className="mt-1 text-sm text-stone-600"><span className="font-medium text-stone-700">{tec ? 'Causa provável: ' : 'Por quê: '}</span>{t.causa}</p>}
+      {t.acao && <p className="mt-1 text-sm text-stone-600"><span className="font-medium text-campo-700">{tec ? 'Ação sugerida: ' : 'O que fazer: '}</span>{t.acao}</p>}
+      {alerta.nota && <p className="mt-1 rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">{tec ? `Meta-regra ${alerta.nota}` : `Observação: ${alerta.nota.replace(/^[A-Z]+-[\w]+: /, '')}`}</p>}
       {alerta.resolucao && (
         <p className={`mt-1.5 rounded-lg px-2 py-1.5 text-sm ${alerta.estado === 'resolvido' ? 'bg-campo-50 text-campo-900' : 'bg-stone-100 text-stone-700'}`}>
           <b>{alerta.estado === 'resolvido' ? 'Resolvido' : 'Encerrado'} em {dataBR(alerta.estado_em)}:</b> {alerta.resolucao}
@@ -283,7 +342,7 @@ export function LinhaDoTempo({ itens, mostrarAlerta = false, onAbrirAlerta }: { 
               <span>{h.automatico ? 'sistema' : 'usuário'}</span>
               {mostrarAlerta && h.alerta && (
                 <button className="text-campo-600 hover:underline" onClick={() => onAbrirAlerta?.(h.alerta!.id)}>
-                  <span className="font-mono">{h.alerta.regra}</span> {h.alerta.titulo.slice(0, 70)}
+                  {tecnico() && <span className="font-mono">{h.alerta.regra} </span>}{(tecnico() ? h.alerta.titulo : h.alerta.titulo_produtor || h.alerta.titulo).slice(0, 80)}
                 </button>
               )}
             </div>
@@ -300,7 +359,7 @@ export function AlertaItem({ alerta, onAbrir, onMudou }: { alerta: Alerta; onAbr
     <div className="border-b border-stone-100 py-3 last:border-0">
       <AlertaCorpo alerta={alerta} />
       <AlertaAcoes alerta={alerta} onMudou={onMudou} />
-      {onAbrir && <button onClick={onAbrir} className="mt-1.5 text-xs font-medium text-campo-600 hover:underline">Por que este alerta? · histórico</button>}
+      {onAbrir && <button onClick={onAbrir} className="mt-1.5 text-xs font-medium text-campo-600 hover:underline">{tecnico() ? 'Por que este alerta? · histórico' : 'Entender este aviso · o que precisaria mudar'}</button>}
     </div>
   )
 }
@@ -336,3 +395,98 @@ export function RegraCartao({ regra }: { regra: any }) {
     </div>
   )
 }
+
+// ------------------------------------------------------------------ "o que precisaria mudar?"
+const OP_TEXTO: Record<string, string> = { '>=': 'chegar a pelo menos', '>': 'passar de', '<=': 'ficar em no máximo', '<': 'ficar abaixo de' }
+
+function faixa(f: any, fato: string) { return Array.isArray(f) ? `${fmt(f[0], fato)} a ${fmt(f[1], fato)}` : fmt(f, fato) }
+
+function OpcaoMudanca({ o }: { o: any }) {
+  const un = UNIDADES[o.fato] ? ` ${UNIDADES[o.fato]}` : ''
+  if (o.tipo === 'limite') return <li><b>{rotulo(o.fato)}</b> {OP_TEXTO[o.op]} <b className="num">{fmt(o.limite, o.fato)}{un}</b> <span className="text-stone-500">(hoje {fmt(o.valor, o.fato)}{un})</span></li>
+  if (o.tipo === 'sair_da_faixa') return <li><b>{rotulo(o.fato)}</b> sair da faixa {faixa(o.faixa, o.fato)} <span className="text-stone-500">(hoje {fmt(o.valor, o.fato)})</span></li>
+  if (o.tipo === 'voltar_para_faixa') return <li><b>{rotulo(o.fato)}</b> voltar para {faixa(o.faixa, o.fato)} <span className="text-stone-500">(hoje {fmt(o.valor, o.fato)})</span></li>
+  if (o.tipo === 'conclusao') return (
+    <li>
+      <b>{rotulo(o.fato)}</b> deixar de valer{o.grupos.length > 1 ? ' — o sistema chegou a isso por mais de um caminho, e todos precisam deixar de valer:' : ':'}
+      <ul className="ml-4 mt-1 space-y-1">
+        {o.grupos.map((g: any, i: number) => (
+          <li key={g.regra} className="rounded bg-stone-50 px-2 py-1">
+            <span className="text-xs text-stone-500">{tecnico() ? <><span className="font-mono">{g.regra} </span>{g.descricao}</> : o.grupos.length > 1 ? `Caminho ${i + 1} — basta uma destas:` : 'Basta uma destas:'}</span>
+            {g.opcoes.length > 0
+              ? <ul className="ml-4 list-disc">{g.opcoes.map((x: any, i: number) => <OpcaoMudanca key={i} o={x} />)}</ul>
+              : <p className="text-xs text-stone-400">depende só da situação do lote</p>}
+          </li>
+        ))}
+      </ul>
+    </li>
+  )
+  return null
+}
+
+/** Contrafactual: o que faria o aviso deixar de valer (basta uma das mudanças). */
+export function Contrafactual({ sessaoId, regra }: { sessaoId: number; regra: string }) {
+  const [d, setD] = useState<any>(null)
+  const [erro, setErro] = useState('')
+  useEffect(() => { api.get(`/inferencia/sessoes/${sessaoId}/contrafactual/${regra}`).then(setD).catch((e) => setErro(e.message)) }, [sessaoId, regra])
+  if (erro) return null
+  if (!d) return <Carregando texto="Calculando o que precisaria mudar…" />
+  return (
+    <div className="rounded-lg border border-campo-100 bg-white p-3">
+      <h4 className="mb-1 text-sm font-semibold text-stone-800">O que precisaria mudar para este aviso sumir?</h4>
+      {d.opcoes.length === 0 ? (
+        <p className="text-sm text-stone-600">Este aviso depende só da situação do lote (fase, sistema, raça): não há um número a corrigir.</p>
+      ) : (
+        <>
+          <p className="mb-1 text-xs text-stone-500">Basta <b>uma</b> destas mudanças:</p>
+          <ul className="ml-4 list-disc space-y-1 text-sm text-stone-700">{d.opcoes.map((o: any, i: number) => <OpcaoMudanca key={i} o={o} />)}</ul>
+        </>
+      )}
+      {d.contexto?.length > 0 && tecnico() && (
+        <p className="mt-2 text-xs text-stone-400">Condições de contexto (não mudam com manejo): {d.contexto.map((c: any) => `${rotulo(c.fato)} = ${fmt(c.valor, c.fato)}`).join('; ')}</p>
+      )}
+      {d.modulo === 'verificacao' && d.lote_id && <AjusteMinimo loteId={d.lote_id} />}
+    </div>
+  )
+}
+
+/** Menor mudança na dieta que a faz passar em todas as verificações (PL com objetivo de mexer o mínimo). */
+export function AjusteMinimo({ loteId, itens, onUsar }: { loteId: number; itens?: ItemDieta[]; onUsar?: (itens: ItemDieta[], custo: number) => void }) {
+  const navegar = useNavigate()
+  const [r, setR] = useState<any>(null)
+  const [ocupado, setOcupado] = useState(false)
+  const [erro, setErro] = useState('')
+  const calcular = async () => {
+    setOcupado(true); setErro('')
+    try { setR(await api.post(`/inferencia/lotes/${loteId}/ajuste`, itens ? { itens } : {})) } catch (e: any) { setErro(e.message) }
+    setOcupado(false)
+  }
+  const ok = r && (r.pl.status === 'otimo' || r.pl.status === 'parcial')
+  return (
+    <div className="mt-3 border-t border-stone-100 pt-3">
+      {!r && <button className="btn-secundario" onClick={calcular} disabled={ocupado}>{ocupado ? 'Calculando…' : 'Calcular a menor mudança na dieta'}</button>}
+      {erro && <Erro msg={erro} />}
+      {r && !ok && <p className="text-sm text-critico">Não há ajuste possível só com os alimentos cadastrados: {(r.alertas ?? []).map((a: Alerta) => textoAlerta(a).titulo).join('; ') || r.pl.status}.</p>}
+      {ok && (
+        <div className="space-y-2 text-sm">
+          <p className="font-medium text-stone-800">Menor mudança que deixa a dieta {r.pl.status === 'otimo' ? 'adequada' : 'o mais perto possível do necessário'}:</p>
+          <ul className="space-y-0.5">
+            {r.mudancas.map((m: any) => (
+              <li key={m.alimento} className="num">
+                {m.nome}: {m.de === 0 ? <span className="font-medium text-campo-700">incluir {numero(m.para, 2)} kg</span>
+                  : m.para === 0 ? <span className="font-medium text-critico">tirar ({numero(m.de, 2)} kg)</span>
+                  : <>{numero(m.de, 2)} → <b>{numero(m.para, 2)} kg</b></>} por vaca/dia
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-stone-500">Custo: {reais(r.pl.custo)} por vaca/dia · conferido pelas regras: <b>{fmt(r.verificacao?.fatos?.['parecer.dieta']?.valor)}</b></p>
+          <button className="btn-primario" onClick={() => (onUsar ? onUsar(r.pl.itens, r.pl.custo)
+            : navegar(`/lotes/${loteId}/dieta`, { state: { itensAjuste: r.pl.itens, rotulo: 'Menor mudança calculada' } }))}>
+            Abrir no editor da dieta
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+

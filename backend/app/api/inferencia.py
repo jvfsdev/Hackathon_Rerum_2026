@@ -7,8 +7,8 @@ from fastapi import APIRouter, HTTPException
 from .. import services
 from ..db.models import Lote, SessaoInferencia, sessao
 from ..engine.engine import Motor
-from ..engine.explain import como, explicar_regra, por_que, resultado_de_dict
-from .schemas import AvaliarIn, AvaliarLoteIn, ConsultaIn, FormularIn, RespostaIn
+from ..engine.explain import como, contrafactual, explicar_regra, por_que, resultado_de_dict
+from .schemas import AjusteIn, AvaliarIn, AvaliarLoteIn, ConsultaIn, FormularIn, RespostaIn, SensibilidadeIn, SimularIn
 
 router = APIRouter(prefix="/inferencia")
 
@@ -41,6 +41,29 @@ def avaliar_lote(lote_id: int, dados: AvaliarLoteIn | None = None):
 def formular_lote(lote_id: int, dados: FormularIn):
     with sessao() as s:
         return services.formular_lote(s, _lote(s, lote_id), dados.alimentos, dados.precos)
+
+
+@router.post("/lotes/{lote_id}/ajuste")
+def ajuste_minimo(lote_id: int, dados: AjusteIn | None = None):
+    """Menor mudança na dieta (ativa ou informada) para ela passar em todas as verificações."""
+    with sessao() as s:
+        itens = [i.model_dump() for i in dados.itens] if dados and dados.itens else None
+        return services.ajustar_dieta_lote(s, _lote(s, lote_id), itens)
+
+
+@router.post("/lotes/{lote_id}/sensibilidade")
+def sensibilidade(lote_id: int, dados: SensibilidadeIn):
+    """Até que preço cada alimento fica na dieta de custo mínimo e quanto cada meta custa."""
+    with sessao() as s:
+        return services.sensibilidade_lote(s, _lote(s, lote_id), dados.alimentos)
+
+
+@router.post("/lotes/{lote_id}/simular")
+def simular(lote_id: int, dados: SimularIn):
+    """Cenário "e se?": compara a dieta ativa com outra dieta, meta de leite ou preços (nada é gravado)."""
+    with sessao() as s:
+        return services.simular(s, _lote(s, lote_id), [i.model_dump() for i in dados.itens], dados.leite,
+                                dados.preco_leite, dados.precos)
 
 
 @router.post("/lotes/{lote_id}/acompanhar")
@@ -136,6 +159,21 @@ def explicar_regra_sessao(sessao_id: int, regra_id: str):
         regra = services.kb().regra(regra_id) or {}
         supressoes = sess.resultado.get("supressoes", {})
         return exp | {"regra_def": regra, "kb_version": sess.kb_version, "supressoes": supressoes}
+
+
+@router.get("/sessoes/{sessao_id}/contrafactual/{regra_id}")
+def contrafactual_sessao(sessao_id: int, regra_id: str):
+    """O que precisaria mudar para a regra (e o alerta) deixar de valer."""
+    with sessao() as s:
+        sess = s.get(SessaoInferencia, sessao_id)
+        if not sess:
+            raise HTTPException(404, "sessão não encontrada")
+        out = contrafactual(resultado_de_dict(sess.resultado), regra_id)
+        if out is None:
+            raise HTTPException(404, "regra não disparou nesta sessão")
+        regra = services.kb().regra(regra_id) or {}
+        return out | {"regra": regra_id, "modulo": regra.get("modulo"), "sessao_tipo": sess.tipo,
+                      "lote_id": sess.lote_id}
 
 
 @router.get("/por-que")

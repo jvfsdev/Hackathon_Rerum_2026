@@ -123,6 +123,20 @@ class Dieta(SQLModel, table=True):
     ativa: bool = True
     ms_silagem_ref: float | None = None  # MS da silagem usada na formulação
     parecer: dict | None = Field(default=None, sa_column=Column(JSON))
+    # troca gradual da versão anterior para esta: {dias, de_versao, plano: [{dia, data, pct_nova, itens}], ...}
+    transicao: dict | None = Field(default=None, sa_column=Column(JSON))
+
+
+class MovimentoEstoque(SQLModel, table=True):
+    """Estoque de insumos da fazenda: contagens (quanto há) e entradas (compras). O consumo é estimado pelas dietas."""
+    id: int | None = Field(default=None, primary_key=True)
+    fazenda_id: int = Field(foreign_key="fazenda.id", index=True)
+    item: str = Field(index=True)          # id do alimento no catálogo da fazenda
+    data: date
+    tipo: str                              # contagem | entrada
+    kg: float                              # kg de matéria natural
+    obs: str = ""
+    criado_em: NaiveDatetime = Field(default_factory=datetime.now)
 
 
 class Registro(SQLModel, table=True):
@@ -158,6 +172,9 @@ class AlertaDB(SQLModel, table=True):
     titulo: str
     causa: str = ""
     acao: str = ""
+    titulo_produtor: str = ""             # textos em linguagem do produtor (vazio = usar os técnicos)
+    causa_produtor: str = ""
+    acao_produtor: str = ""
     categoria: str = ""
     cf: float = 1.0
     fonte: str = ""

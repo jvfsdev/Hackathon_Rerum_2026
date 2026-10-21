@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, fmt, OPCOES, rotulo } from '../api'
+import { api, fmt, OPCOES, rotulo, tecnico } from '../api'
 import { Carregando, Erro, Painel } from '../components/ui'
 import { EscalaEscore } from '../components/Escala'
 import { ResultadoAvaliacao } from './Lote'
@@ -83,7 +83,7 @@ export default function ConsultaPagina() {
                 <ol className="space-y-1">
                   {p.por_que.map((r: any, i: number) => (
                     <li key={r.regra} className="flex gap-2" style={{ paddingLeft: i * 12 }}>
-                      <span className="font-mono text-xs font-semibold text-campo-700">{r.regra}</span>
+                      {tecnico() && <span className="font-mono text-xs font-semibold text-campo-700">{r.regra}</span>}
                       <span className="text-stone-700">{r.descricao}</span>
                     </li>
                   ))}

@@ -1,0 +1,66 @@
+# Módulo E — Estoque de insumos: dias restantes = saldo estimado ÷ consumo das dietas em uso.
+# Os fatos estoque.* vêm de app/estoque.py (contagens, entradas e consumo calculado pelas dietas dos lotes).
+- id: EST-01
+  versao: 1
+  modulo: estoque
+  descricao: Estoque acaba antes do prazo seguro de compra
+  prioridade: 70
+  se:
+    - {fato: estoque.saldo_kg, op: ">", valor: 0}
+    - {fato: estoque.dias_restantes, op: "<=", valor: "@params.estoque_dias_critico"}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: estoque
+        problema: estoque_baixo
+        titulo: "Estoque de {estoque.item_nome} para {estoque.dias_restantes:.0f} dia(s)"
+        causa: "Saldo estimado de {estoque.saldo_texto}; consumo das dietas de {estoque.consumo_texto} por dia."
+        acao: "Comprar já: o prazo de entrega é de {@params.estoque_prazo_compra} dias."
+        titulo_produtor: "{estoque.item_nome} acaba em {estoque.dias_restantes:.0f} dia(s)"
+        causa_produtor: "Tem cerca de {estoque.saldo_texto} e os lotes usam {estoque.consumo_texto} por dia."
+        acao_produtor: "Compre hoje: a entrega leva uns {@params.estoque_prazo_compra} dias."
+  fonte: "Escolha de engenharia (prazo de compra)"
+  forca: D
+
+- id: EST-02
+  versao: 1
+  modulo: estoque
+  descricao: Estoque para poucos dias — programar a compra
+  prioridade: 60
+  se:
+    - {fato: estoque.dias_restantes, op: ">", valor: "@params.estoque_dias_critico"}
+    - {fato: estoque.dias_restantes, op: "<=", valor: "@params.estoque_dias_atencao"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: estoque
+        problema: estoque_baixo
+        titulo: "Estoque de {estoque.item_nome} para {estoque.dias_restantes:.0f} dias"
+        causa: "Saldo estimado de {estoque.saldo_texto}; consumo das dietas de {estoque.consumo_texto} por dia."
+        acao: "Fazer o pedido até {estoque.data_pedido}."
+        titulo_produtor: "Programe a compra de {estoque.item_nome}: dá para {estoque.dias_restantes:.0f} dias"
+        causa_produtor: "Tem cerca de {estoque.saldo_texto} e os lotes usam {estoque.consumo_texto} por dia."
+        acao_produtor: "Faça o pedido até {estoque.data_pedido}."
+  fonte: "Escolha de engenharia (prazo de compra)"
+  forca: D
+
+- id: EST-03
+  versao: 1
+  modulo: estoque
+  descricao: Consumo estimado já passou do estoque contado — contagem desatualizada ou dieta diferente da registrada
+  prioridade: 60
+  se:
+    - {fato: estoque.saldo_kg, op: "<=", valor: 0}
+    - {fato: estoque.consumo_kg_dia, op: ">", valor: 0}
+  entao:
+    - alerta:
+        nivel: informativo
+        categoria: estoque
+        titulo: "Contagem de {estoque.item_nome} desatualizada"
+        causa: "Pelas dietas registradas, o consumo desde a última contagem já passou do estoque."
+        acao: "Fazer nova contagem e conferir se a dieta registrada é a que está sendo dada."
+        titulo_produtor: "Conte de novo o estoque de {estoque.item_nome}"
+        causa_produtor: "Pelas dietas anotadas, já teria acabado."
+        acao_produtor: "Faça uma nova contagem e confira se a dieta anotada é a que vai para o cocho."
+  fonte: "Escolha de engenharia"
+  forca: D

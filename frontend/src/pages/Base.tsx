@@ -5,7 +5,47 @@ import { Carregando, Erro, ForcaBadge, Painel, RegraCartao } from '../components
 const NOME_MODULO: Record<string, string> = {
   classificacao: 'A · Classificação', exigencias: 'B · Exigências', verificacao: 'C · Verificação', formulacao: 'F · Formulação (PL)',
   acompanhamento_diario: 'D1 · Acompanhamento diário', acompanhamento_semanal: 'D2 · Acompanhamento semanal',
-  acompanhamento_mensal: 'D3 · Acompanhamento mensal', meta: 'M · Meta-regras',
+  acompanhamento_mensal: 'D3 · Acompanhamento mensal', meta: 'M · Meta-regras', transicao: 'T · Transição de dieta',
+  estoque: 'E · Estoque',
+}
+
+/** Revisão da base pelo uso real: o especialista vê o que os usuários recusam e o que some sozinho. */
+function RevisaoUso() {
+  const [r, setR] = useState<any>(null)
+  const [verTodas, setVerTodas] = useState(false)
+  useEffect(() => { api.get('/kb/revisao').then(setR).catch(() => {}) }, [])
+  if (!r) return null
+  return (
+    <Painel titulo="Revisão pelo uso" subtitulo={`O que aconteceu com os avisos nos últimos ${r.dias} dias (${r.sessoes_analisadas} execuções do motor). Não muda a base: aponta ao especialista onde olhar.`}>
+      {r.sugestoes.length === 0 && <p className="text-sm text-stone-500">Nenhuma regra com sinal de revisão.</p>}
+      <div className="space-y-2">
+        {r.sugestoes.map((s: any) => (
+          <div key={s.tipo + s.regra} className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+            <p className="font-medium text-stone-900"><span className="font-mono text-xs text-campo-700">{s.regra}</span> {s.titulo}</p>
+            <p className="text-stone-700">{s.texto}</p>
+            {s.parametros.length > 0 && <p className="mt-1 text-xs text-stone-600">Parâmetros citados pela regra: {s.parametros.map((p: string) => <code key={p} className="mr-1 rounded bg-white px-1">{p}</code>)}</p>}
+            {s.motivos.length > 0 && <ul className="mt-1 ml-4 list-disc text-xs text-stone-600">{s.motivos.map((m: string, i: number) => <li key={i}>“{m}”</li>)}</ul>}
+          </div>
+        ))}
+      </div>
+      <button className="mt-3 text-sm text-campo-600 hover:underline" onClick={() => setVerTodas(!verTodas)}>{verTodas ? 'ocultar tabela' : 'ver uso de todas as regras'}</button>
+      {verTodas && (
+        <div className="mt-2 overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="text-stone-500"><tr><th className="py-1 pr-2">Regra</th><th className="pr-2">Episódios</th><th className="pr-2">Aceitos</th><th className="pr-2">Recusados</th><th className="pr-2">Sumiram sozinhos</th><th>Duração mediana</th></tr></thead>
+            <tbody>{r.regras.map((l: any) => (
+              <tr key={l.regra} className="border-t border-stone-100"><td className="py-1 pr-2"><span className="font-mono text-campo-700">{l.regra}</span> {l.titulo}</td>
+                <td className="num pr-2">{l.episodios}</td><td className="num pr-2">{l.aceitos}</td><td className="num pr-2">{l.recusados}</td><td className="num pr-2">{l.resolvidos_sozinhos}</td>
+                <td className="num">{l.duracao_mediana === null ? '—' : `${l.duracao_mediana} d`}</td></tr>
+            ))}</tbody>
+          </table>
+          {r.nunca_dispararam.length > 0 && (
+            <p className="mt-2 text-xs text-stone-500">Regras de aviso que não dispararam no período ({r.nunca_dispararam.length}): {r.nunca_dispararam.map((n: any) => n.regra).join(', ')}. Pode ser falta do dado (ex.: laudo, ruminação) ou situação que não ocorreu.</p>
+          )}
+        </div>
+      )}
+    </Painel>
+  )
 }
 
 export default function BasePagina() {
@@ -70,6 +110,8 @@ export default function BasePagina() {
           </div>
         </Painel>
       )}
+
+      <RevisaoUso />
 
       <div className="flex flex-wrap gap-2">
         <button onClick={() => setModulo('todos')} className={`btn ${modulo === 'todos' ? 'bg-campo-600 text-white' : 'border border-stone-300 bg-white'}`}>Todos ({regras.length})</button>

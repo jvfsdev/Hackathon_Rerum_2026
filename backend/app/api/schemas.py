@@ -52,6 +52,7 @@ class DietaIn(BaseModel):
     motivo: str = ""
     origem: str = "usuario"
     alerta_id: int | None = None      # alerta aceito que levou a esta ação
+    gradual: bool = True              # deixar as regras TRN decidirem a troca gradual a partir da versão anterior
 
 
 class RegistroIn(BaseModel):
@@ -131,3 +132,27 @@ class BonificacaoIn(BaseModel):
 class ImportacaoIn(BaseModel):
     conteudo: str                      # texto do CSV (separador ; , ou tab; decimal com vírgula ou ponto)
     confirmar: bool = False            # False = só prévia
+
+
+class SimularIn(BaseModel):
+    itens: list[ItemDieta]             # dieta do cenário (kg MN/vaca/dia)
+    leite: float | None = None         # meta de leite do cenário (kg/vaca/dia); padrão = o atual do lote
+    preco_leite: float | None = None   # R$/L do cenário
+    precos: dict[str, float] | None = None   # preços de alimentos do cenário (R$/kg MN)
+
+
+class AjusteIn(BaseModel):
+    itens: list[ItemDieta] | None = None     # dieta a ajustar; padrão = dieta ativa
+
+
+class SensibilidadeIn(BaseModel):
+    alimentos: list[str]
+
+
+class MovimentoEstoqueIn(BaseModel):
+    item: str
+    tipo: str                          # contagem | entrada
+    kg: float                          # kg de matéria natural
+    data: date | None = None
+    obs: str = ""
+

@@ -55,3 +55,11 @@ def fator_mobilizacao(ell_total: float, mcal_por_ponto: float, pv: float, pv_ref
 
 def soma(*partes: float | None) -> float:
     return sum(p for p in partes if p is not None)
+
+
+def leite_permitido(ell_consumida: float, ell_total: float, ell_leite: float, leite: float) -> float | None:
+    """Leite que a energia consumida sustenta (NRC 2001, "milk allowable by energy"): a energia que sobra (ou falta)
+    depois das demais exigências, dividida pela energia de 1 kg de leite deste lote."""
+    if not leite or not ell_leite:
+        return None
+    return max(0.0, leite + (ell_consumida - ell_total) / (ell_leite / leite))

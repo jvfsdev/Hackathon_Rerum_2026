@@ -242,6 +242,8 @@
         titulo: "Risco de estresse térmico (ITU {clima.itu:.1f})"
         causa: "ITU acima do limiar do grupo genético: consumo e produção tendem a cair."
         acao: "Garantir sombra, água à vontade e tratos nas horas mais frescas; acompanhar as sobras (consumo pode ficar abaixo do previsto)."
+        titulo_produtor: "Calor incomodando as vacas"
+        causa_produtor: "Com esse calor e umidade as vacas comem e produzem menos."
   fonte: "Embrapa COT42; Negri 2021; LUME UFRGS"
   forca: B
 
@@ -261,6 +263,9 @@
         titulo: "Estresse térmico forte (ITU {clima.itu:.1f})"
         causa: "ITU acima de {@params.itu_forte}: queda forte de consumo, leite e fertilidade."
         acao: "Aspersão/ventilação, sombra, água, tratos à noite e de madrugada; priorizar IATF."
+        titulo_produtor: "Calor forte para as vacas"
+        causa_produtor: "Calor nesse nível derruba a comida, o leite e o cio."
+        acao_produtor: "Molhar e ventilar, sombra, água, trato à noite e de madrugada."
   fonte: "Embrapa COT42"
   forca: B
 

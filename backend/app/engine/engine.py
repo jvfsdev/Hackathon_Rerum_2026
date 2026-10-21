@@ -157,7 +157,8 @@ class Motor:
                       titulo=formatar(spec["titulo"], res), causa=formatar(spec.get("causa", ""), res),
                       acao=formatar(spec.get("acao", ""), res), categoria=spec.get("categoria", "geral"),
                       cf=cf, fonte=regra.get("fonte", ""), forca=regra.get("forca", ""),
-                      problema=spec.get("problema", regra["id"]))
+                      problema=spec.get("problema", regra["id"]),
+                      **{f"{c}_produtor": formatar(spec.get(f"{c}_produtor", ""), res, br=True) for c in ("titulo", "causa", "acao")})
 
     def _agrupar_problemas(self, resultado: Resultado) -> None:
         """Regras com o mesmo `problema` (graus do mesmo problema) viram um alerta só: fica o de nível mais alto
@@ -249,9 +250,16 @@ class Motor:
 _PADRAO = re.compile(r"\{([@a-z_][\w\.]*)(?::([^}]+))?\}")
 
 
-def formatar(texto: str, res: Resolvedor) -> str:
-    """Substitui {fato} / {fato:.1f} / {@params.x} por valores da memória de trabalho."""
+def formatar(texto: str, res: Resolvedor, br: bool = False) -> str:
+    """Substitui {fato} / {fato:.1f} / {@params.x} por valores da memória de trabalho.
+    br=True escreve números no padrão brasileiro (vírgula decimal, ponto de milhar): textos para o produtor."""
     def troca(m):
+        txt = _troca(m)
+        if br and re.fullmatch(r"[+-]?[\d.,]+%?", txt):
+            txt = txt.replace(",", "_").replace(".", ",").replace("_", ".")
+        return txt
+
+    def _troca(m):
         nome, spec = m.group(1), m.group(2)
         v = res.valor(nome if nome.startswith("@") else "$" + nome)
         if v is FALTA:

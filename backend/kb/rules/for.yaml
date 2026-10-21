@@ -121,6 +121,9 @@
         titulo: "Energia não atingível com os alimentos escolhidos"
         causa: "Mesmo no máximo de consumo, os alimentos não fornecem {pl.ell_min:.1f} Mcal de ELl/dia."
         acao: "Incluir fonte energética (milho moído, polpa cítrica), usar volumoso de melhor qualidade ou reduzir a meta de leite."
+        titulo_produtor: "Com esses alimentos não dá para chegar na energia que o lote precisa"
+        causa_produtor: "Mesmo comendo o máximo, esses alimentos não sustentam a produção."
+        acao_produtor: "Inclua milho ou polpa cítrica, use um volumoso melhor ou aceite produzir menos."
   fonte: "Dossiê (diagnóstico de inviabilidade)"
   forca: D
 
@@ -139,6 +142,9 @@
         titulo: "Proteína fora da faixa com os alimentos escolhidos"
         causa: "Não é possível chegar a {pl.pb_min:.1f}–{pl.pb_max:.1f}% de PB."
         acao: "Incluir fonte proteica (farelo de soja, caroço de algodão) ou ureia (até 1% da MS)."
+        titulo_produtor: "Com esses alimentos a proteína não fica certa"
+        causa_produtor: "Não dá para acertar a proteína só com o que foi marcado."
+        acao_produtor: "Inclua farelo de soja, caroço de algodão ou ureia (no máximo 1% da comida seca)."
   fonte: "Dossiê (diagnóstico de inviabilidade)"
   forca: D
 
@@ -157,6 +163,9 @@
         titulo: "Fibra mínima não atingível"
         causa: "Falta volumoso para cumprir FDN ≥ {meta.fdn_min:.0f}% e FDNf ≥ {meta.fdnf_min:.0f}% da MS."
         acao: "Incluir ou liberar mais volumoso na formulação."
+        titulo_produtor: "Falta volumoso para a dieta ficar segura"
+        causa_produtor: "Sem fibra suficiente, o rúmen azeda (acidose)."
+        acao_produtor: "Marque mais volumoso na sugestão."
   fonte: "NRC 2001"
   forca: D
 
@@ -175,6 +184,9 @@
         titulo: "Volumoso muito fibroso limita o consumo"
         causa: "A FDN necessária ultrapassa o teto de {pl.fdn_max_kg:.1f} kg/dia (1,25% do PV)."
         acao: "Usar volumoso mais digestível (silagem de milho) ou mais concentrado."
+        titulo_produtor: "O volumoso é fibroso demais: a vaca enche a barriga antes de comer o necessário"
+        causa_produtor: "Fibra demais limita quanto a vaca consegue comer."
+        acao_produtor: "Use um volumoso melhor (silagem de milho) ou mais concentrado."
   fonte: "Mertens via Epagri"
   forca: B
 
@@ -195,6 +207,9 @@
         titulo: "Limites de CNF ou gordura impedem a solução"
         causa: "Para atingir a energia seria preciso passar do CNF máximo ou de 6% de gordura."
         acao: "Incluir volumoso de melhor qualidade ou fontes de energia fibrosas (polpa cítrica, farelo de trigo)."
+        titulo_produtor: "Não dá para chegar na energia sem passar do limite de grão ou gordura"
+        causa_produtor: "Para chegar na energia, a dieta teria grão ou gordura demais."
+        acao_produtor: "Use um volumoso melhor ou energia com fibra (polpa cítrica, farelo de trigo)."
   fonte: "NRC 2001"
   forca: D
 
@@ -213,6 +228,9 @@
         titulo: "Falta volumoso além da cana para esta produção"
         causa: "Com {lote.leite:.0f} kg/vaca a cana pode ser no máximo {pl.cana_max_pct_volumoso:.0f}% do volumoso."
         acao: "Marcar outro volumoso disponível (silagem de milho ou sorgo, capim-elefante)."
+        titulo_produtor: "Precisa de outro volumoso além da cana"
+        causa_produtor: "Para {lote.leite:.0f} L por vaca, a cana pode ser no máximo {pl.cana_max_pct_volumoso:.0f}% do volumoso."
+        acao_produtor: "Marque silagem de milho, silagem de sorgo ou capim-elefante."
   fonte: "Semadesc-MS"
   forca: C
 
@@ -230,6 +248,9 @@
         titulo: "Não entraram na formulação: {pl.alimentos_excluidos}"
         causa: "Forragem de pastejo não é oferecida a lote confinado (FOR-06)."
         acao: "Escolha volumosos fornecidos no cocho."
+        titulo_produtor: "Ficaram de fora: {pl.alimentos_excluidos}"
+        causa_produtor: "Lote confinado não vai ao pasto."
+        acao_produtor: "Escolha volumosos dados no cocho."
   fonte: "Definição do sistema de produção"
   forca: A
 
@@ -248,6 +269,9 @@
         titulo: "Alimentos energéticos demais para este lote"
         causa: "Mesmo no consumo mínimo, a energia passa de {pl.ell_max:.1f} Mcal/dia: o lote engordaria."
         acao: "Incluir volumoso menos energético (capim, silagem de sorgo, braquiária) ou reduzir o concentrado."
+        titulo_produtor: "Comida forte demais para este lote: as vacas engordariam"
+        causa_produtor: "Mesmo comendo o mínimo, sobraria energia."
+        acao_produtor: "Use volumoso mais fraco (capim, silagem de sorgo, braquiária) ou menos concentrado."
   fonte: "Penn State; OMAFRA"
   forca: C
 
@@ -266,6 +290,9 @@
         titulo: "DCAD do pré-parto não fica negativa com estes alimentos"
         causa: "Os volumosos e concentrados escolhidos têm potássio demais em relação ao cloro e ao enxofre."
         acao: "Cadastrar e incluir um sal aniônico (com os teores de Cl e S do rótulo) ou um volumoso com menos potássio."
+        titulo_produtor: "Com esses alimentos a dieta do pré-parto não fica aniônica"
+        causa_produtor: "Os alimentos têm potássio demais."
+        acao_produtor: "Cadastre e inclua um sal aniônico, ou use um volumoso com menos potássio."
   fonte: "Santos et al. 2019"
   forca: A
 
@@ -283,6 +310,9 @@
         titulo: "Melhor dieta possível com estes alimentos: R$ {pl.custo:.2f}/vaca/dia"
         causa: "Ela respeita fibra, consumo e limites de inclusão, mas não cobre toda a exigência (veja a verificação)."
         acao: "No pós-parto o balanço energético negativo é esperado: maximize a densidade e acompanhe o ECC; fora dele, inclua alimentos mais energéticos/proteicos."
+        titulo_produtor: "Melhor dieta possível com esses alimentos: R$ {pl.custo:.2f} por vaca/dia"
+        causa_produtor: "Ela é segura, mas não cobre tudo o que o lote precisa."
+        acao_produtor: "Logo após o parto isso é normal (acompanhe o escore); fora disso, inclua alimentos mais fortes."
   fonte: "Programação por metas (folgas penalizadas)"
   forca: D
 
@@ -300,5 +330,8 @@
         titulo: "Dieta de custo mínimo: R$ {pl.custo:.2f}/vaca/dia"
         causa: "Atende energia, proteína, fibra e limites de inclusão definidos pelas regras."
         acao: "Revise a verificação abaixo e aceite para criar uma nova versão da dieta."
+        titulo_produtor: "Dieta mais barata que atende o lote: R$ {pl.custo:.2f} por vaca/dia"
+        causa_produtor: "Atende energia, proteína, fibra e os limites de cada alimento."
+        acao_produtor: "Confira e aceite para ela virar a dieta do lote."
   fonte: "Programação linear (PuLP + HiGHS)"
   forca: B

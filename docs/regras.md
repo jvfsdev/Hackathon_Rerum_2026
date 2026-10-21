@@ -1,6 +1,6 @@
-# Regras de produção — base v1.4.1
+# Regras de produção — base v1.6.0
 
-153 regras · 114 parâmetros · 13 alimentos. Gerado automaticamente de `backend/kb/` (não editar à mão).
+170 regras · 138 parâmetros · 13 alimentos. Gerado automaticamente de `backend/kb/` (não editar à mão).
 
 Formato: **SE** condições **ENTÃO** ações [CF da regra]. Limiares `@params.*` estão na tabela de parâmetros no fim.
 Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão com dados; C = extensão sem dados ou população diferente; D = escolha de engenharia.
@@ -90,12 +90,22 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | FOR-21 | Só energia/proteína são inatingíveis — entregar a melhor dieta possível com o déficit explícito | `pl.status` = parcial | alerta **atencao** (formulacao): Melhor dieta possível com estes alimentos: R$ {pl.custo:.2f}/vaca/dia | 1.0 | D | Programação por metas (folgas penalizadas) |
 | FOR-20 | PL encontrou a dieta de menor custo | `pl.status` = otimo | alerta **informativo** (formulacao): Dieta de custo mínimo: R$ {pl.custo:.2f}/vaca/dia | 1.0 | B | Programação linear (PuLP + HiGHS) |
 
+## T — Transição de dieta (TRN)
+
+| ID | Descrição | SE | ENTÃO | CF | Força | Fonte |
+|---|---|---|---|---|---|---|
+| TRN-01 | Troca do volumoso principal pede adaptação do rúmen por alguns dias | `transicao.volumoso_trocado_pct` >= @params.transicao_volumoso_min | concluir `transicao.dias_volumoso` = @params.transicao_dias_volumoso; concluir `transicao.motivo_volumoso` = True | 0.8 | C | Penn State Extension (adaptação ruminal a novo volumoso) |
+| TRN-02 | Aumento de concentrado acima do passo diário seguro é feito em etapas | `transicao.concentrado_delta_kg` > @params.transicao_passo_conc | calcular `transicao.dias_concentrado` = dias_transicao_conc(…) | 0.8 | C | NRC 2001; Penn State (aumentar o concentrado no máximo 0,5–1 kg por dia) |
+| TRN-03 | Mudança grande na composição da dieta é feita de forma gradual | `transicao.mudanca_pct` >= @params.transicao_mudanca_min | concluir `transicao.dias_geral` = @params.transicao_dias_padrao | 0.6 | D | Escolha de engenharia (troca gradual em etapas) |
+| TRN-09 | Duração da transição é a maior entre as exigidas pelos motivos encontrados | (`transicao.dias_volumoso` existe OU `transicao.dias_concentrado` existe OU `transicao.dias_geral` existe) | calcular `transicao.dias` = maximo(…); alerta **informativo** (dieta): Transição gradual em {transicao.dias} dias ({transicao.mudanca_pct:.0f}% da MS muda) | 1.0 | C | Penn State Extension; NRC 2001 |
+
 ## C — Verificação da dieta (VER)
 
 | ID | Descrição | SE | ENTÃO | CF | Força | Fonte |
 |---|---|---|---|---|---|---|
 | VER-00A | Energia efetivamente consumida (a vaca não come mais que o CMS previsto) | `dieta.ms_kg` > 0 E `exig.cms` existe | calcular `ver.ell_consumida` = energia_consumida(…); calcular `ver.razao_ms` = razao(…) | 1.0 | B | NRC 2001 |
 | VER-00B | Razão entre energia consumida e exigida | `ver.ell_consumida` existe E `exig.ell_total` existe | calcular `ver.razao_energia` = razao(…) | 1.0 | B | NRC 2001 |
+| VER-00D | Leite que a energia consumida sustenta (energia que sobra ou falta convertida em kg de leite) | `ver.ell_consumida` existe E `exig.ell_total` existe E `exig.ell_leite` > 0 E `lote.leite` > 0 | calcular `ver.leite_permitido` = leite_permitido(…) | 1.0 | B | NRC 2001 (leite permitido pela energia) |
 | VER-00C | Razão entre PB da dieta e PB alvo | `dieta.pb_pct` existe E `exig.pb_pct_alvo` existe | calcular `ver.razao_pb` = razao(…) | 1.0 | B | MSD Vet Manual |
 | VER-01 | Energia consumida abaixo da exigência — déficit energético | `ver.razao_energia` < $meta.fator_energia_min\|@params.fator_energia_min | concluir `ver.deficit_energetico` = True; alerta **atencao** (dieta): Déficit energético: a dieta cobre {ver.razao_energia:.0%} da exigência | 0.9 | B | Dossiê VER-01; NRC 2001 |
 | VER-02 | PB da dieta abaixo do alvo — déficit proteico | `ver.razao_pb` < @params.fator_pb_min | concluir `ver.deficit_proteico` = True; alerta **atencao** (dieta): Déficit proteico: PB {dieta.pb_pct:.1f}% contra alvo de {exig.pb_pct_alvo:.1f}% | 0.85 | B | Dossiê VER-02; MSD Vet Manual |
@@ -148,6 +158,9 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | ACP-S04 | Cocho acima da faixa nos 3 últimos dias (escore ou pesagem) — reduzir oferta ou investigar seleção | `mon.sobras_min3` > $meta.sobras.max | alerta **atencao** (cocho): Sobras altas: {mon.sobras_texto}; meta {meta.sobras.min:.0f}–{meta.sobras.max:.0f}% (escore 3) | 0.7 | B | eXtension; SDSU; Dossiê ACP-07 |
 | ACP-06 | Cocho vazio por 2+ leituras em lote de alta ou recém-paridas | `mon.dias_cocho_vazio` >= @params.cocho_vazio_dias E `perfil.fase` in ['recem_parida', 'inicio'] | alerta **critico** (cocho): Cocho vazio há {mon.dias_cocho_vazio} leituras | 0.8 | C | Dossiê ACP-06; DeVries 2023 |
 | ACP-06B | Cocho vazio por 2+ leituras nos demais lotes | `mon.dias_cocho_vazio` >= @params.cocho_vazio_dias E `perfil.fase` nao_in ['recem_parida', 'inicio'] | alerta **atencao** (cocho): Cocho vazio há {mon.dias_cocho_vazio} leituras | 0.7 | C | Dossiê ACP-06 |
+| ACP-TR1 | Sobras altas durante a adaptação à dieta nova — o lote está rejeitando a mudança | `mon.em_adaptacao_dieta` = True E `mon.sobras_min3` > $meta.sobras.max | alerta **atencao** (cocho): Rejeição da dieta nova: {mon.sobras_texto} ({mon.dias_dieta_nova} dia(s) após a troca) | 0.8 | C | Penn State Extension (adaptação a nova dieta); eXtension (leitura de cocho) |
+| ACP-TR2 | Fezes moles durante a adaptação à dieta nova | `mon.em_adaptacao_dieta` = True E `mon.fezes` <= @params.fezes_acidose_max | alerta **atencao** (dieta): Fezes moles (escore {mon.fezes}) na adaptação à dieta nova | 0.7 | C | Hutjens (escore de fezes); Penn State |
+| ACP-TR3 | Queda sustentada durante a adaptação à dieta nova (sem troca de volumoso registrada) | `mon.em_adaptacao_dieta` = True E `hipotese.queda_sustentada` = True E `mon.dias_desde_troca_volumoso` ausente | concluir `hipotese.causa_dieta_nova` = True; alerta **atencao** (dieta_queda): Causa provável da queda: adaptação à dieta nova ({mon.dias_dieta_nova} dia(s) após a troca) | 0.7 | C | Penn State Extension |
 
 ## D3 — Acompanhamento mensal / laudo (ACP)
 
@@ -188,6 +201,25 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | ACP-P1 | Entrada no piquete com o pasto alto demais — forragem passada | `mon.altura_entrada` > $meta.altura.entrada_max | alerta **atencao** (pasto): Pasto passado na entrada: {mon.altura_entrada:.0f} cm (máx. {meta.altura.entrada_max:.0f}) | 0.7 | C | Embrapa (Lopes) — 95% de interceptação luminosa |
 | ACP-P2 | Saída do piquete com o pasto baixo demais — superpastejo | `mon.altura_saida` < $meta.altura.saida_min | alerta **atencao** (pasto): Superpastejo: saída a {mon.altura_saida:.0f} cm (mín. {meta.altura.saida_min:.0f}) | 0.7 | C | Embrapa (Lopes) |
 | ACP-P3 | Pastejo contínuo com altura média fora da meta | (`mon.altura_media` < $meta.altura.media_min OU `mon.altura_media` > $meta.altura.media_max) | alerta **atencao** (pasto): Altura média do pasto {mon.altura_media:.0f} cm fora da meta ({meta.altura.media_min:.0f}–{meta.altura.media_max:.0f}) | 0.7 | C | Gomide 2011 (braquiária em lotação contínua: 25 cm) |
+
+## E — Estoque de insumos (EST)
+
+| ID | Descrição | SE | ENTÃO | CF | Força | Fonte |
+|---|---|---|---|---|---|---|
+| EST-01 | Estoque acaba antes do prazo seguro de compra | `estoque.saldo_kg` > 0 E `estoque.dias_restantes` <= @params.estoque_dias_critico | alerta **critico** (estoque): Estoque de {estoque.item_nome} para {estoque.dias_restantes:.0f} dia(s) | 1.0 | D | Escolha de engenharia (prazo de compra) |
+| EST-02 | Estoque para poucos dias — programar a compra | `estoque.dias_restantes` > @params.estoque_dias_critico E `estoque.dias_restantes` <= @params.estoque_dias_atencao | alerta **atencao** (estoque): Estoque de {estoque.item_nome} para {estoque.dias_restantes:.0f} dias | 1.0 | D | Escolha de engenharia (prazo de compra) |
+| EST-03 | Consumo estimado já passou do estoque contado — contagem desatualizada ou dieta diferente da registrada | `estoque.saldo_kg` <= 0 E `estoque.consumo_kg_dia` > 0 | alerta **informativo** (estoque): Contagem de {estoque.item_nome} desatualizada | 1.0 | D | Escolha de engenharia |
+
+## P — Previsão dos próximos dias (PRV)
+
+| ID | Descrição | SE | ENTÃO | CF | Força | Fonte |
+|---|---|---|---|---|---|---|
+| PRV-01 | Produção projetada cai mais que o limiar no horizonte (avanço da lactação) | `lote.estado` = lactacao E `prev.lote.variacao_leite_pct` <= @params.prev_queda_alerta | alerta **atencao** (previsao): Produção projetada {prev.lote.variacao_leite_pct:+.0f}% em {prev.dias} dias | 0.7 | C | Cobuci (curva de lactação); Inferências (economia do concentrado) |
+| PRV-02 | Secagem prevista dentro do horizonte — o leite do lote sai da receita | `prev.lote.dias_para_secagem` existe | alerta **informativo** (previsao): Secagem prevista em {prev.lote.dias_para_secagem} dias (~{prev.lote.leite_dia_antes_secagem:.0f} L/dia saem da produção) | 1.0 | A | Inferências nº 36 (período seco de 60 dias) |
+| PRV-03 | Custo da dieta projetado acima da receita do leite do lote | `lote.estado` = lactacao E `prev.lote.dias_margem_negativa` > 0 | alerta **critico** (previsao): Dieta mais cara que o leite a partir de {prev.lote.data_margem_negativa} ({prev.lote.dias_margem_negativa} dias no horizonte) | 0.8 | C | Inferências (IOFC / margem sobre a alimentação) |
+| PRV-04 | Dieta sustenta mais leite do que o projetado — energia (e dinheiro) sobrando | `lote.estado` = lactacao E `prev.lote.sobra_energia_l` >= @params.prev_sobra_energia_l | alerta **atencao** (previsao): Dieta sustenta ~{prev.lote.sobra_energia_l:.1f} L/vaca a mais que a produção projetada | 0.6 | C | NRC 2001 (leite permitido pela energia); Cobuci |
+| PRV-10 | Receita da fazenda projetada cai mais que o limiar no horizonte | `prev.fazenda.variacao_receita_pct` <= @params.prev_queda_receita_fazenda | alerta **atencao** (previsao): Receita do leite projetada {prev.fazenda.variacao_receita_pct:+.0f}% em {prev.dias} dias | 0.7 | D | Escolha de engenharia (planejamento de fluxo de caixa) |
+| PRV-11 | Fazenda projeta receita do leite abaixo do custo da alimentação | `prev.fazenda.margem_total` < 0 | alerta **critico** (previsao): Margem sobre a alimentação projetada negativa nos próximos {prev.dias} dias | 0.8 | C | Inferências (IOFC) |
 
 ## M — Meta-regras (resolução de conflito)
 
@@ -316,6 +348,30 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | `ccs_regulatorio` | 500 | mil cél/mL | A | IN 76/2018 | CCS máxima (média geométrica 3 m) |
 | `ccs_pre_regulatorio` | 400 | mil cél/mL | D | Inferências | Faixa pré-regulatória |
 | `cbt_regulatorio` | 300 | mil UFC/mL | A | IN 76/2018 | CBT/CPP máxima (média geométrica 3 m) |
+| `ajuste_peso_alimento_novo` | 3 | peso | D | Escolha de engenharia (preferir mexer no que o lote já come) | No ajuste mínimo da dieta, cada kg de alimento novo pesa isto contra 1 kg de alimento que já está na dieta |
+| `sensibilidade_variacao_meta` | 0.05 | fração | D | Escolha de engenharia | Quanto cada meta é afrouxada para medir quanto ela custa na dieta |
+| `transicao_dias_volumoso` | 5 | dias | C | Penn State Extension (adaptação ruminal a novo volumoso: 4–7 dias) | Dias de mistura quando o volumoso principal muda |
+| `transicao_dias_padrao` | 3 | dias | D | Escolha de engenharia (troca gradual em 3 etapas) | Dias de mistura para mudança grande de dieta sem troca de volumoso |
+| `transicao_mudanca_min` | 15 | % da MS | D | Escolha de engenharia | Mudança da dieta (em % da MS) a partir da qual a troca é gradual |
+| `transicao_volumoso_min` | 30 | % do volumoso | D | Escolha de engenharia | Fração do volumoso trocada que conta como troca de volumoso |
+| `transicao_passo_conc` | 1.0 | kg MS/vaca/dia | C | Penn State; NRC 2001 (aumentar concentrado no máximo 0,5–1 kg/dia) | Aumento máximo de concentrado por dia na transição |
+| `transicao_observacao_dias` | 7 | dias | D | Escolha de engenharia | Dias após o fim da transição em que o lote continua em observação de adaptação |
+| `trato_ordem` | ['volumoso_seco', 'concentrado', 'mineral', 'ureia', 'volumoso_umido'] | categorias | C | Penn State Extension, TMR mixing (feno/seco primeiro, grãos e minerais, silagem por último) | Ordem de carregamento do vagão misturador |
+| `trato_ms_seco` | 80 | % MS | D | Escolha de engenharia | Volumoso com MS acima disto é carregado como seco (feno, palha) |
+| `estoque_dias_critico` | 7 | dias | D | Escolha de engenharia (prazo típico de compra e entrega) | Estoque para menos que isto é crítico |
+| `estoque_dias_atencao` | 15 | dias | D | Escolha de engenharia | Estoque para menos que isto pede programar a compra |
+| `estoque_prazo_compra` | 5 | dias | D | Escolha de engenharia | Dias entre fazer o pedido e o insumo chegar |
+| `revisao_min_episodios` | 2 | episódios | D | Escolha de engenharia | Mínimo de episódios para uma regra entrar na revisão |
+| `revisao_taxa_recusa` | 0.5 | fração | D | Escolha de engenharia | Fração de recusas que sugere rever a regra |
+| `revisao_taxa_sozinho` | 0.7 | fração | D | Escolha de engenharia | Fração de episódios resolvidos sem ação que sugere regra sensível demais |
+| `revisao_duracao_curta` | 2 | dias | D | Escolha de engenharia | Duração mediana curta: alerta que some sozinho rápido |
+| `trato_notas` | {'ureia': 'Misture a ureia no concentrado antes (pré-mistura); nunca dê ureia pura nem em bolo.', 'mineral': 'Núcleo mineral junto com o concentrado, para espalhar bem na mistura.', 'pastejo': 'Fica no pasto: não vai no vagão.', 'volumoso_umido': 'Carregue a silagem por último e misture 3 a 5 minutos depois da última carga.'} | texto | C | Penn State Extension (TMR mixing); MAPA (ureia na alimentação de ruminantes) | Recomendações impressas na planilha de trato |
+| `prev_horizonte` | 30 | dias | D | Escolha de engenharia | Horizonte padrão da previsão |
+| `prev_z_faixa` | 1.645 | z | D | Faixa de 90% sob distribuição normal dos desvios | Largura da faixa de incerteza do leite projetado (em sigmas robustos) |
+| `prev_sigma_padrao` | 0.06 | fração | D | Escolha de engenharia (variação diária típica do leite de lote) | Incerteza usada quando o lote tem menos de 7 dias de desvio medido |
+| `prev_queda_alerta` | -10 | % | D | Escolha de engenharia | Queda projetada do leite por vaca no horizonte que gera aviso |
+| `prev_sobra_energia_l` | 2 | L/vaca | D | Escolha de engenharia | Leite permitido pela energia acima do projetado que sugere baratear a dieta |
+| `prev_queda_receita_fazenda` | -15 | % | D | Escolha de engenharia | Queda da receita da fazenda no horizonte que gera aviso |
 
 ## Alimentos
 

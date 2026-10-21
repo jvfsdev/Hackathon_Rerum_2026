@@ -2,7 +2,7 @@
  * fila no aparelho e é enviado quando a API volta a responder. */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, dataBR, ErroApi, type Alerta, type Lote } from '../api'
+import { api, dataBR, ErroApi, numero, peso, textoAlerta, type Alerta, type Lote } from '../api'
 import { EscalaEscore } from '../components/Escala'
 import { AlertaCorpo, NivelBadge } from '../components/ui'
 
@@ -86,10 +86,12 @@ export default function CampoPagina() {
         <Routes>
           <Route index element={<Registrar lotes={lotes} onEnviado={() => { fila.recarregar(); carregar() }} />} />
           <Route path="avisos" element={<Avisos alertas={pendentes} lotes={lotes} onMudou={carregar} />} />
+          <Route path="trato" element={<Trato lotes={lotes} onEnviado={fila.recarregar} />} />
         </Routes>
       </main>
       <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-stone-200 bg-white">
         <NavLink end to="/campo" className={aba}><span className="text-xl">✍️</span>Registrar</NavLink>
+        <NavLink to="/campo/trato" className={aba}><span className="text-xl">🚜</span>Trato</NavLink>
         <NavLink to="/campo/avisos" className={aba}>
           <span className="relative text-xl">🔔{importantes > 0 && <span className="absolute -right-3 -top-1 rounded-full bg-critico px-1.5 text-[10px] font-bold text-white">{importantes}</span>}</span>Avisos
         </NavLink>
@@ -326,7 +328,7 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
           <p className="font-medium">{resultado.texto}</p>
           {resultado.alertas && resultado.alertas.length > 0 && (
             <div className="mt-2 space-y-1">
-              {resultado.alertas.map((a) => <p key={a.regra} className="flex items-start gap-2"><NivelBadge nivel={a.nivel} /><span>{a.titulo}</span></p>)}
+              {resultado.alertas.map((a) => <p key={a.regra} className="flex items-start gap-2"><NivelBadge nivel={a.nivel} /><span>{textoAlerta(a).titulo}</span></p>)}
               <Link to="/campo/avisos" className="font-semibold underline">ver avisos</Link>
             </div>
           )}
@@ -377,8 +379,8 @@ function Avisos({ alertas, lotes, onMudou }: { alertas: Alerta[]; lotes: Lote[];
         <article key={a.id} className={`card p-3 ${a.nivel === 'critico' ? 'border-l-4 border-l-critico' : a.nivel === 'atencao' ? 'border-l-4 border-l-atencao' : ''}`}>
           <p className="text-xs font-medium text-stone-400">{nomeLote(a.lote_id)}{a.estado === 'aceito' && ' · aceito, aguardando ação'}</p>
           <button className="mt-0.5 w-full text-left" onClick={() => setAberto(aberto === a.id ? null : a.id!)}>
-            <p className="font-medium text-stone-900">{a.titulo}</p>
-            <p className="mt-0.5 text-sm text-campo-700">{a.acao}</p>
+            <p className="font-medium text-stone-900">{textoAlerta(a).titulo}</p>
+            <p className="mt-0.5 text-sm text-campo-700">{textoAlerta(a).acao}</p>
           </button>
           {aberto === a.id && <div className="mt-2 border-t border-stone-100 pt-2"><AlertaCorpo alerta={a} /></div>}
           {recusando === a.id ? (
@@ -408,3 +410,65 @@ function Avisos({ alertas, lotes, onMudou }: { alertas: Alerta[]; lotes: Lote[];
     else navegar(a.destino!)
   }
 }
+
+// ------------------------------------------------------------------ trato do dia (checklist do tratador)
+function Trato({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void }) {
+  const hoje = new Date().toISOString().slice(0, 10)
+  const [loteId, setLoteId] = useState<number | null>(() => lerJSON<number | null>('campo_lote', null))
+  const [p, setP] = useState<any>(null)
+  const [aviso, setAviso] = useState('')
+  const chave = `campo_trato_${loteId}_${hoje}`
+  const [feitos, setFeitos] = useState<number[]>([])
+  useEffect(() => { if (!loteId && lotes.length) setLoteId(lotes[0].id) }, [loteId, lotes])
+  useEffect(() => {
+    if (!loteId) return
+    setFeitos(lerJSON(chave, []))
+    const cache = `campo_trato_plano_${loteId}`
+    setAviso('')
+    api.get<any>(`/lotes/${loteId}/trato?tratos=2`).then((x) => { setP(x); gravarJSON(cache, x) })
+      .catch(() => { const c = lerJSON<any>(cache, null); setP(c); setAviso(c ? `Sem conexão: mostrando a planilha de ${dataBR(c.data)}.` : 'Sem conexão e sem planilha guardada.') })
+  }, [loteId])  // eslint-disable-line react-hooks/exhaustive-deps
+  const marcar = async (k: number) => {
+    const novos = feitos.includes(k) ? feitos.filter((x) => x !== k) : [...feitos, k]
+    setFeitos(novos); gravarJSON(chave, novos)
+    if (p && novos.length === p.tratos && !feitos.includes(k)) {      // todos os tratos do dia feitos: registra o total fornecido
+      const r = await enviarOuEnfileirar(`/lotes/${loteId}/registros`, { data: hoje, valores: { trato_kg: Math.round(p.total) } }, `${p.lote.nome} · trato`)
+      setAviso(r.enviado ? `Trato do dia registrado: ${peso(p.total)}.` : 'Sem conexão: trato guardado no aparelho.')
+      onEnviado()
+    }
+  }
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {lotes.map((l) => (
+          <button key={l.id} onClick={() => setLoteId(l.id)}
+            className={`rounded-full border px-3 py-2 text-sm ${l.id === loteId ? 'border-campo-600 bg-campo-600 text-white' : 'border-stone-300 bg-white text-stone-700'}`}>{l.nome.replace(/ — .*/, '')}</button>
+        ))}
+      </div>
+      {aviso && <p className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900">{aviso}</p>}
+      {!loteId && <p className="text-sm text-stone-500">Escolha o lote.</p>}
+      {p && (
+        <>
+          <p className="text-sm text-stone-600">{p.lote.nome} · {numero(p.vacas, 0)} vacas · carregue nesta ordem:</p>
+          {p.observacoes.map((o: string) => <p key={o} className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">{o}</p>)}
+          {p.total_por_trato.map((total: number, k: number) => (
+            <section key={k} className={`card p-3 ${feitos.includes(k) ? 'opacity-60' : ''}`}>
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="font-semibold text-stone-900">Trato {k + 1} · {peso(total)}</h2>
+                <button className={`rounded-lg px-3 py-1.5 text-sm font-medium ${feitos.includes(k) ? 'bg-campo-600 text-white' : 'border border-stone-300 bg-white'}`} onClick={() => marcar(k)}>
+                  {feitos.includes(k) ? '✓ feito' : 'marcar feito'}
+                </button>
+              </div>
+              <ol className="space-y-1">
+                {p.linhas.map((l: any, i: number) => (
+                  <li key={l.alimento} className="flex justify-between gap-2 text-base"><span><span className="mr-2 text-stone-400">{i + 1}.</span>{l.nome}</span><b className="num">{peso(l.por_trato[k])}</b></li>
+                ))}
+              </ol>
+            </section>
+          ))}
+        </>
+      )}
+    </div>
+  )
+}
+

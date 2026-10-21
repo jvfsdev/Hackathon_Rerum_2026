@@ -207,6 +207,12 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
                 f["mon.resposta_marginal"] = economics.resposta_marginal(
                     sum(da) / len(da), sum(dd) / len(dd), sum(ca) / len(ca), sum(cd) / len(cd))
 
+    # --- adaptação à dieta nova (versão com plano de transição)
+    if dieta is not None and getattr(dieta, "transicao", None) and dieta.inicio <= d:
+        dias_nova = (d - dieta.inicio).days
+        f["mon.dias_dieta_nova"] = dias_nova
+        f["mon.em_adaptacao_dieta"] = dias_nova <= dieta.transicao["dias"] + params["transicao_observacao_dias"]["valor"]
+
     # --- eventos (janelas de supressão e atribuição de causa)
     for tipo, fato in (("movimentacao", "mon.horas_desde_movimentacao"), ("correcao_ms", "mon.horas_desde_correcao_ms")):
         ev = h.ultimo_evento(tipo, fim_do_dia)

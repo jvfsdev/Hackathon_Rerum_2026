@@ -16,6 +16,9 @@
         titulo: "MS da silagem mudou: {mon.ms_silagem_formulacao:.1f}% → {mon.ms_silagem_atual:.1f}%"
         causa: "Mantendo os mesmos kg de matéria natural, o lote recebe outra quantidade de MS de volumoso."
         acao: "Ajustar a silagem para {mon.silagem_kg_mn_novo:.1f} kg MN/vaca (era {mon.silagem_kg_mn_atual:.1f})."
+        titulo_produtor: "A silagem mudou de umidade: ajuste o trato"
+        causa_produtor: "A silagem foi de {mon.ms_silagem_formulacao:.0f}% para {mon.ms_silagem_atual:.0f}% de matéria seca: os mesmos kg agora dão outra quantidade de comida."
+        acao_produtor: "Passe a dar {mon.silagem_kg_mn_novo:.1f} kg de silagem por vaca (era {mon.silagem_kg_mn_atual:.1f})."
   fonte: "Penn State (determinação de MS); heurística de 2 p.p."
   forca: C
 
@@ -38,6 +41,9 @@
         titulo: "Volumoso mudou muito: reformular a dieta"
         causa: "Mudança grande de MS ou silo novo muda a composição, não só a umidade."
         acao: "Pedir bromatologia do novo volumoso e reformular (use 'Sugerir dieta de custo mínimo')."
+        titulo_produtor: "O volumoso mudou muito: refaça a dieta"
+        causa_produtor: "Silo novo ou mudança grande muda a qualidade, não só a umidade."
+        acao_produtor: "Mande analisar o volumoso novo e peça uma nova sugestão de dieta."
   fonte: "OSU Buckeye Dairy News"
   forca: B
 
@@ -59,6 +65,9 @@
         titulo: "Balanço energético negativo severo: perdeu {mon.ecc_perda:.2f} ponto(s) de ECC"
         causa: "Perda acima de 1 ponto nas primeiras semanas atrasa a 1ª inseminação e aumenta doenças."
         acao: "Elevar a densidade energética, garantir acesso ao cocho; conferir a dieta de pré-parto."
+        titulo_produtor: "Vacas emagrecendo muito no pós-parto: perderam {mon.ecc_perda:.2f} ponto de escore"
+        causa_produtor: "Perder mais de 1 ponto logo após o parto atrasa o cio e aumenta doenças."
+        acao_produtor: "Dieta mais forte e cocho sempre com comida; reveja a dieta do pré-parto."
   fonte: "Dossiê ACP-05; Carvalho et al. 2014"
   forca: B
 
@@ -79,6 +88,9 @@
         titulo: "Lote perdendo condição corporal ({mon.ecc_perda:.2f} ponto)"
         causa: "Energia da dieta abaixo da exigência do lote."
         acao: "Rever a energia da dieta (verificação) e a oferta no cocho."
+        titulo_produtor: "O lote está emagrecendo ({mon.ecc_perda:.2f} ponto de escore)"
+        causa_produtor: "A comida não está dando a energia que o lote precisa."
+        acao_produtor: "Reveja a dieta e se está faltando comida no cocho."
   fonte: "OMAFRA"
   forca: B
 
@@ -110,6 +122,9 @@
         titulo: "Gestação chegou a {perfil.dias_gestacao:.0f} dias: exigências aumentaram"
         causa: "A partir de 190 dias a gestação soma energia e proteína metabolizável à exigência do lote."
         acao: "Rever a dieta (verificar ou sugerir custo mínimo) para incluir a exigência de gestação."
+        titulo_produtor: "Vacas com {perfil.dias_gestacao:.0f} dias de prenhez: precisam de mais comida"
+        causa_produtor: "A partir de 190 dias de prenhez o bezerro passa a exigir energia e proteína."
+        acao_produtor: "Confira a dieta (ou peça uma sugestão) para incluir essa necessidade."
   fonte: "NRC 2001 via AgModel; Dossiê ACP-12"
   forca: B
 
@@ -129,6 +144,9 @@
         titulo: "Programar a secagem: parto previsto em ~{mon.dias_para_parto_previsto:.0f} dias"
         causa: "Período seco recomendado de 50–60 dias antes do parto."
         acao: "Secar as vacas, mover para o lote de vacas secas e usar dieta de vaca seca."
+        titulo_produtor: "Hora de programar a secagem: parto previsto em ~{mon.dias_para_parto_previsto:.0f} dias"
+        causa_produtor: "A vaca precisa de 50 a 60 dias seca antes do parto."
+        acao_produtor: "Seque as vacas e passe para o lote de secas, com dieta de vaca seca."
   fonte: "Inferências nº 36; Embrapa Doc 286 (período seco 50–60 d)"
   forca: A
 
@@ -147,6 +165,9 @@
         titulo: "Lote no pré-parto ({lote.dias_para_parto:.0f} dias para o parto)"
         causa: "Nas 3 semanas antes do parto a dieta de transição reduz febre do leite, retenção de placenta e metrite."
         acao: "Dieta de pré-parto (PB ~14%, CMS 1,8–2% do PV). DCAD negativa (−100 mEq/kg) só para as multíparas; para novilhas não há evidência."
+        titulo_produtor: "Lote no pré-parto: faltam {lote.dias_para_parto:.0f} dias para parir"
+        causa_produtor: "A dieta das 3 semanas antes do parto evita febre do leite, retenção de placenta e infecção."
+        acao_produtor: "Use a dieta de pré-parto. Dieta aniônica só para vacas que já pariram antes; para novilhas, não."
   fonte: "Santos et al. 2019 (meta-análise); Inferências nº 36"
   forca: A
 
@@ -167,6 +188,9 @@
         titulo: "Caminhada aumentou {mon.distancia_delta:.1f} km/dia e o lote perde condição"
         causa: "O gasto de energia com atividade de pastejo cresce com a distância e o relevo."
         acao: "Atualizar a distância e o relevo no cadastro do lote para recalcular a exigência; rever a energia da dieta."
+        titulo_produtor: "As vacas estão andando mais ({mon.distancia_delta:.1f} km/dia a mais) e emagrecendo"
+        causa_produtor: "Andar mais gasta energia, ainda mais em terreno com morro."
+        acao_produtor: "Atualize a distância no cadastro do lote e reveja a dieta."
   fonte: "Dossiê ACP-11; NRC 2001 via eOrganic"
   forca: C
 
@@ -198,6 +222,9 @@
         titulo: "Pasto passado na entrada: {mon.altura_entrada:.0f} cm (máx. {meta.altura.entrada_max:.0f})"
         causa: "Acima da altura de entrada a forragem perde qualidade (mais colmo, menos folha)."
         acao: "Entrar mais cedo nos piquetes ou aumentar a lotação."
+        titulo_produtor: "Pasto passou do ponto: {mon.altura_entrada:.0f} cm na entrada"
+        causa_produtor: "Pasto alto demais tem mais talo e menos folha: perde qualidade."
+        acao_produtor: "Entre mais cedo nos piquetes ou ponha mais vacas na área."
   fonte: "Embrapa (Lopes) — 95% de interceptação luminosa"
   forca: C
 
@@ -216,6 +243,9 @@
         titulo: "Superpastejo: saída a {mon.altura_saida:.0f} cm (mín. {meta.altura.saida_min:.0f})"
         causa: "Rebaixar demais o pasto reduz o consumo das vacas e a rebrota."
         acao: "Tirar o lote mais cedo, reduzir a lotação ou suplementar volumoso."
+        titulo_produtor: "Pasto rapado demais: {mon.altura_saida:.0f} cm na saída"
+        causa_produtor: "Rapar o pasto diminui o que as vacas comem e atrasa a rebrota."
+        acao_produtor: "Tire o lote mais cedo, diminua as vacas na área ou dê volumoso no cocho."
   fonte: "Embrapa (Lopes)"
   forca: C
 
@@ -236,5 +266,8 @@
         titulo: "Altura média do pasto {mon.altura_media:.0f} cm fora da meta ({meta.altura.media_min:.0f}–{meta.altura.media_max:.0f})"
         causa: "Abaixo da meta: superpastejo; acima: subpastejo e perda de qualidade."
         acao: "Ajustar a lotação (ou a área) para manter a altura na meta."
+        titulo_produtor: "Altura do pasto fora do ideal: {mon.altura_media:.0f} cm"
+        causa_produtor: "Baixo demais: falta pasto. Alto demais: o pasto perde qualidade."
+        acao_produtor: "Ajuste o número de vacas na área para manter a altura certa."
   fonte: "Gomide 2011 (braquiária em lotação contínua: 25 cm)"
   forca: C

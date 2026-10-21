@@ -67,6 +67,13 @@ Agente usado: **Claude Code** (Anthropic), no VS Code. A IA ajudou a pesquisar, 
     severa abertos juntos) e a causa sistêmica: um episódio por regra. Correção: chave `problema` compartilhada
     entre regras do mesmo problema, um episódio que agrava ou atenua (base 1.4.1).
 
+16. **Mais valor para o produtor e linguagem clara (21/10).** O time achou o sistema "simples" e técnico demais para
+    o fazendeiro. O agente propôs 11 ideias; o time escolheu oito: explicação contrafactual ("o que precisaria mudar"),
+    revisão da base pelo uso, sensibilidade de preços, simulador "e se?", planilha de trato, estoque, plano de transição
+    de dieta e relatório semanal. Junto, cada um dos 73 avisos ganhou textos em linguagem do produtor, com uma visão do
+    produtor (padrão) e uma visão técnica. Tudo continua decidido pelas regras: transição (módulo T) e estoque (módulo E)
+    viraram regras novas; ajuste mínimo e sensibilidade usam o mesmo PL, com o mesmo contrato de verificação (base 1.5.0).
+
 ## O que os testes pegaram
 
 - Casos que o agente escreveu com expectativa errada: perda por CCS interpolada linearmente em vez de em escala logarítmica, e soma da MS da dieta. Foi corrigida a expectativa, não o código, e o motivo ficou registrado.
@@ -91,6 +98,7 @@ Agente usado: **Claude Code** (Anthropic), no VS Code. A IA ajudou a pesquisar, 
 - "Foque em implementar o que está faltando, os 2 tópicos do plano, e o que ficou de fora dos documentos de referência." (etapa 11)
 - "Sobre o mobile, essa é a parte que deveria ir para lá, o registro rápido… além de informações sucintas como os avisos." (etapa 12)
 - "Um integrante encontrou o CQBAL 4.0, lá parece ter informações valiosas, usamos ele já?" (etapa 13)
+- "Sem implementar nada ainda, sugira ideias de coisas novas… implemente 1, 2, 5, 6, 7, 8, 9 e 10; o sistema está muito técnico, o fazendeiro precisa de linguagem clara." (etapa 16)
 - "Analise novamente, veja se cumprimos os requisitos da Hackathon e se o sistema está correto e completo." (etapa 15)
 
 ## O que aprendemos com o processo

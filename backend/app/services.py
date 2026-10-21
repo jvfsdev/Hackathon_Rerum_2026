@@ -340,7 +340,8 @@ def alertas_resultado(pacote: dict) -> Resultado:
     from .engine.facts import Alerta
     r = resultado_de_dict(pacote)
     r.alertas = [Alerta(**{k: a[k] for k in ("regra", "nivel", "titulo", "causa", "acao", "categoria", "cf", "fonte",
-                                             "forca", "status", "nota")}) for a in pacote["alertas"]]
+                                             "forca", "status", "nota", "problema", "titulo_produtor", "causa_produtor",
+                                             "acao_produtor") if k in a}) for a in pacote["alertas"]]
     return r
 
 
@@ -351,7 +352,10 @@ def episodios_por_regra(s: Session, lote_id: int, origem: str) -> dict:
 
 
 # ------------------------------------------------------------------ formulação (PL)
-def formular(fatos: dict, alimentos_ids: list[str], precos: dict | None = None, cat: dict | None = None) -> dict:
+def formular(fatos: dict, alimentos_ids: list[str], precos: dict | None = None, cat: dict | None = None,
+             resolver=None) -> dict:
+    """Formulação: o motor monta metas e restrições, o PL acha as quantidades e a verificação confere.
+    `resolver(alimentos, restricoes)` troca o objetivo do PL (padrão: custo mínimo; ver ajuste_dieta)."""
     base = kb()
     wm = memoria(fatos)
     wm.declarar("formulacao.solicitada", True, origem="sistema")
@@ -373,7 +377,8 @@ def formular(fatos: dict, alimentos_ids: list[str], precos: dict | None = None, 
     alimentos = [alimento_com_preco(a, precos, cat) for a in alimentos_ids]
     excluidos = [a["nome"] for a in alimentos if restricoes["excluir_pastejo"] and a.get("pastejo")]
     wm.declarar("pl.alimentos_excluidos", excluidos, origem="sistema")
-    pl, verificacao, iteracoes = _formular_ate_ponto_fixo(fatos, alimentos, restricoes, base.params, precos, cat)
+    pl, verificacao, iteracoes = _formular_ate_ponto_fixo(fatos, alimentos, restricoes, base.params, precos, cat,
+                                                          resolver=resolver)
     wm.declarar("pl.status", pl["status"], origem="sistema")
     wm.declarar("pl.restricoes_violadas", pl["restricoes_violadas"], origem="sistema")
     if pl["status"] in ("otimo", "parcial"):
@@ -390,13 +395,13 @@ def formular(fatos: dict, alimentos_ids: list[str], precos: dict | None = None, 
 
 
 def _formular_ate_ponto_fixo(fatos: dict, alimentos: list[dict], restricoes: dict, params: dict,
-                             precos: dict | None = None, cat: dict | None = None, max_iter: int = 4):
+                             precos: dict | None = None, cat: dict | None = None, max_iter: int = 4, resolver=None):
     """Resolve o PL e verifica a dieta com as regras. Exigências que dependem da própria dieta (teto de consumo
     pela fibra, equação de CMS com cana…) só são conhecidas depois: se a verificação recalcular o CMS da dieta
     proposta, o PL é refeito com o menor CMS visto (monótono, então converge). Retorna (pl, verificação, iterações)."""
     iteracoes = []
     for _ in range(max_iter):
-        pl = lp.formular(alimentos, restricoes)
+        pl = (resolver or lp.formular)(alimentos, restricoes)
         if pl["status"] not in ("otimo", "parcial"):
             return pl, None, iteracoes
         pl["itens_arredondados"] = [{"alimento": i["alimento"]["id"], "kg_mn": arredondar_kg(i["kg_mn"])} for i in pl["itens"]]
@@ -425,6 +430,212 @@ def formular_lote(s: Session, lote: Lote, alimentos_ids: list[str], precos: dict
                    catalogo(s, lote.fazenda_id))
     out["sessao_id"] = _salvar_sessao(s, lote.id, "formulacao", out)
     return out
+
+
+def ajustar_dieta_lote(s: Session, lote: Lote, itens: list[dict] | None = None) -> dict:
+    """Menor mudança na dieta (ativa ou informada) que a faz passar em todas as restrições de verificação.
+    Pode acrescentar alimentos do catálogo da fazenda, mas prefere mexer nos que já estão na dieta."""
+    from functools import partial
+    dieta = dieta_ativa(s, lote.id)
+    itens = itens if itens is not None else (dieta.itens if dieta else [])
+    if not itens:
+        raise EntradaInvalida("o lote não tem dieta para ajustar")
+    cat = catalogo(s, lote.fazenda_id)
+    precos = precos_fazenda(s, lote.fazenda_id)
+    atual: dict[str, float] = {}
+    for i in itens:
+        a = cat.get(i["alimento"])
+        if a is None:
+            raise EntradaInvalida(f"alimento desconhecido: {i['alimento']}")
+        atual[a["id"]] = atual.get(a["id"], 0.0) + i["kg_mn"] * a["ms"] / 100
+    ids = list(dict.fromkeys([i["alimento"] for i in itens] + list(catalogo(s, lote.fazenda_id, so_ativos=True))))
+    resolver = partial(lp.ajuste_minimo, atual=atual, peso_novo=kb().params["ajuste_peso_alimento_novo"]["valor"])
+    out = formular(fatos_lote(lote, date.today(), historico(s, lote.id)), ids, precos, cat, resolver=resolver)
+    # alertas informativos da formulação falam de "custo mínimo"; aqui só interessam os diagnósticos
+    out["alertas"] = [a for a in out["alertas"] if a["nivel"] == "critico"]
+    if out["pl"].get("itens"):
+        antes = {i["alimento"]: i["kg_mn"] for i in itens}
+        depois = {i["alimento"]: i["kg_mn"] for i in out["pl"]["itens"]}
+        out["mudancas"] = [{"alimento": aid, "nome": cat[aid]["nome"], "de": antes.get(aid, 0.0), "para": depois.get(aid, 0.0)}
+                           for aid in dict.fromkeys(list(antes) + list(depois))
+                           if abs(antes.get(aid, 0.0) - depois.get(aid, 0.0)) >= 0.01]
+    out["sessao_id"] = _salvar_sessao(s, lote.id, "ajuste", out)
+    return out
+
+
+def sensibilidade_lote(s: Session, lote: Lote, alimentos_ids: list[str]) -> dict:
+    """Formula a dieta de custo mínimo e mede, no mesmo PL, a sensibilidade a preços e metas."""
+    out = formular_lote(s, lote, alimentos_ids)
+    if out["pl"]["status"] != "otimo":
+        return {"status": out["pl"]["status"], "formulacao": out}
+    cat = catalogo(s, lote.fazenda_id)
+    alimentos = [alimento_com_preco(a, precos_fazenda(s, lote.fazenda_id), cat) for a in alimentos_ids]
+    if out["pl"]["restricoes"].get("excluir_pastejo"):
+        alimentos = [a for a in alimentos if not a.get("pastejo")]
+    sens = lp.sensibilidade(alimentos, out["pl"]["restricoes"], kb().params["sensibilidade_variacao_meta"]["valor"])
+    return sens | {"custo_dieta": out["pl"]["custo"], "itens": out["pl"]["itens"]}
+
+
+# ------------------------------------------------------------------ transição de dieta e trato
+def _kg_ms_por_alimento(itens: list[dict], cat: dict) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for i in itens:
+        a = cat.get(i["alimento"])
+        if a is not None:
+            out[a["id"]] = out.get(a["id"], 0.0) + i["kg_mn"] * a["ms"] / 100
+    return out
+
+
+def planejar_transicao(lote: Lote, antigos: list[dict], novos: list[dict], cat: dict, inicio: date,
+                       de_versao: int | None = None) -> dict | None:
+    """Compara a dieta anterior com a nova e deixa as regras TRN decidirem se a troca é gradual e em quantos dias.
+    Plano: no dia k de N, fração k/(N+1) da dieta nova misturada com o restante da antiga."""
+    velho, novo = _kg_ms_por_alimento(antigos, cat), _kg_ms_por_alimento(novos, cat)
+    ids = set(velho) | set(novo)
+    total = sum(velho.values()) + sum(novo.values())
+    if not total:
+        return None
+    vol = [aid for aid in ids if cat[aid].get("tipo") == "volumoso"]
+    total_vol = sum(velho.get(a, 0) for a in vol) + sum(novo.get(a, 0) for a in vol)
+    conc = [aid for aid in ids if cat[aid].get("tipo") == "concentrado"]
+    fatos = {"transicao.mudanca_pct": 100 * sum(abs(novo.get(a, 0) - velho.get(a, 0)) for a in ids) / total,
+             "transicao.volumoso_trocado_pct":
+                 100 * sum(abs(novo.get(a, 0) - velho.get(a, 0)) for a in vol) / total_vol if total_vol else 0.0,
+             "transicao.concentrado_delta_kg": sum(novo.get(a, 0) for a in conc) - sum(velho.get(a, 0) for a in conc)}
+    resultado = Motor(kb(), ["transicao"]).executar(memoria(fatos, origem="sistema"))
+    dias = resultado.wm.valor("transicao.dias")
+    if not dias:
+        return None
+    dias = int(dias)
+    kg_velho = {i["alimento"]: i["kg_mn"] for i in antigos}
+    kg_novo = {i["alimento"]: i["kg_mn"] for i in novos}
+    plano = []
+    for k in range(1, dias + 1):
+        frac = k / (dias + 1)
+        itens = [{"alimento": aid, "kg_mn": arredondar_kg(kg_velho.get(aid, 0) * (1 - frac) + kg_novo.get(aid, 0) * frac)}
+                 for aid in dict.fromkeys(list(kg_velho) + list(kg_novo))]
+        plano.append({"dia": k, "data": (inicio + timedelta(days=k - 1)).isoformat(), "pct_nova": round(100 * frac),
+                      "itens": [i for i in itens if i["kg_mn"] > 0]})
+    alerta = next((a.to_dict() for a in resultado.alertas), None)
+    return {"dias": dias, "de_versao": de_versao, "plano": plano, "fatos": {k: round(v, 2) for k, v in fatos.items()},
+            "regras": resultado.disparadas(), "alerta": alerta}
+
+
+def itens_do_dia(dieta: Dieta | None, d: date) -> list[dict]:
+    """O que vai no cocho no dia d: a mistura do plano de transição durante a troca, senão a própria dieta."""
+    if dieta is None:
+        return []
+    t = dieta.transicao
+    if t:
+        for etapa in t["plano"]:
+            if etapa["data"] == d.isoformat():
+                return etapa["itens"]
+    return dieta.itens
+
+
+def etapa_transicao(dieta: Dieta | None, d: date) -> dict | None:
+    if dieta is None or not dieta.transicao:
+        return None
+    return next((e | {"de": dieta.transicao["dias"]} for e in dieta.transicao["plano"] if e["data"] == d.isoformat()), None)
+
+
+def vacas_em(h: HistoricoLote, lote: Lote, d: date) -> float:
+    """Nº de vacas do lote na data: último registro dos 7 dias anteriores, senão o cadastro."""
+    pts = h.serie("vacas", d, 7)
+    return pts[-1][1] if pts else lote.n_vacas
+
+
+def plano_trato(s: Session, lote: Lote, d: date | None = None, tratos: int = 2, divisao: list[float] | None = None,
+                sobra_pct: float = 0.0) -> dict:
+    """Planilha do trato: kg de cada alimento para o lote inteiro, por trato e na ordem de carregamento do vagão."""
+    from .db.models import AlertaDB
+    d = d or date.today()
+    params = kb().params
+    dieta = dieta_vigente(s, lote.id, d)
+    if dieta is None:
+        raise EntradaInvalida("o lote não tem dieta")
+    if not 1 <= tratos <= 6:
+        raise EntradaInvalida("número de tratos entre 1 e 6")
+    divisao = divisao or [1 / tratos] * tratos
+    if len(divisao) != tratos or abs(sum(divisao) - 1) > 0.01 or min(divisao) <= 0:
+        raise EntradaInvalida("a divisão dos tratos precisa somar 100%")
+    cat = catalogo(s, lote.fazenda_id)
+    h = historico(s, lote.id)
+    vacas = vacas_em(h, lote, d)
+    ordem = params["trato_ordem"]["valor"]
+    notas = params["trato_notas"]["valor"]
+
+    def categoria(a: dict) -> str:
+        if a.get("pastejo"):
+            return "pastejo"
+        if a["tipo"] == "volumoso":
+            return "volumoso_seco" if a["ms"] >= params["trato_ms_seco"]["valor"] else "volumoso_umido"
+        return a["tipo"]
+
+    linhas, no_pasto = [], []
+    for i in itens_do_dia(dieta, d):
+        a = cat[i["alimento"]]
+        cat_a = categoria(a)
+        if cat_a == "pastejo":
+            no_pasto.append({"alimento": a["id"], "nome": a["nome"], "kg_vaca": i["kg_mn"]})
+            continue
+        total = i["kg_mn"] * vacas * (1 + sobra_pct / 100)
+        linhas.append({"alimento": a["id"], "nome": a["nome"], "categoria": cat_a, "kg_vaca": i["kg_mn"],
+                       "kg_total": total, "por_trato": [total * f for f in divisao]})
+    linhas.sort(key=lambda l: (ordem.index(l["categoria"]) if l["categoria"] in ordem else len(ordem), -l["kg_total"]))
+    obs = [notas[c] for c in dict.fromkeys(l["categoria"] for l in linhas) if c in notas]
+    if no_pasto:
+        obs.append(notas["pastejo"] + " (" + ", ".join(p["nome"] for p in no_pasto) + ")")
+    etapa = etapa_transicao(dieta, d)
+    if etapa:
+        obs.insert(0, f"Troca de dieta: dia {etapa['dia']} de {etapa['de']} ({etapa['pct_nova']}% da dieta nova).")
+    if s.exec(select(AlertaDB).where(AlertaDB.lote_id == lote.id, AlertaDB.regra == "ACP-S01",
+                                     AlertaDB.estado.in_(("aberto", "aceito")))).first():
+        obs.insert(0, "A umidade da silagem mudou: veja o aviso do lote antes de carregar.")
+    return {"lote": {"id": lote.id, "nome": lote.nome}, "data": d.isoformat(), "vacas": vacas, "tratos": tratos,
+            "divisao": divisao, "sobra_pct": sobra_pct, "dieta_versao": dieta.versao, "transicao": etapa,
+            "linhas": linhas, "no_pasto": no_pasto, "observacoes": obs,
+            "total_por_trato": [sum(l["por_trato"][k] for l in linhas) for k in range(tratos)],
+            "total": sum(l["kg_total"] for l in linhas)}
+
+
+# ------------------------------------------------------------------ simulador "e se?"
+def simular(s: Session, lote: Lote, itens: list[dict], leite: float | None = None, preco_leite: float | None = None,
+            precos: dict | None = None) -> dict:
+    """Compara a dieta ativa com um cenário (outra dieta, meta de leite ou preços). Tudo passa pelo motor: o leite
+    previsto é o menor entre a meta e o que a energia da dieta sustenta (ver.leite_permitido)."""
+    fazenda = s.get(Fazenda, lote.fazenda_id)
+    dieta = dieta_ativa(s, lote.id)
+    h = historico(s, lote.id)
+    fatos = fatos_lote(lote, date.today(), h)
+    cat = catalogo(s, lote.fazenda_id)
+    vigentes = precos_fazenda(s, lote.fazenda_id)
+    vacas = vacas_em(h, lote, date.today())
+
+    def cenario(lista, leite_meta, preco, extra):
+        f = dict(fatos)
+        if leite_meta:
+            f["lote.leite"] = leite_meta
+        out = avaliar(f, lista, precos=vigentes | (extra or {}), cat=cat)
+        v = lambda k: out["fatos"].get(k, {}).get("valor")
+        meta = f.get("lote.leite")
+        permitido = v("ver.leite_permitido")
+        previsto = min(meta, permitido) if meta is not None and permitido is not None else meta
+        custo = v("dieta.custo_vaca_dia")
+        receita = previsto * preco if previsto is not None else None
+        return {"itens": lista, "leite_meta": meta, "leite_permitido": permitido, "leite_previsto": previsto,
+                "custo_vaca_dia": custo, "receita_vaca_dia": receita,
+                "margem_vaca_dia": receita - custo if receita is not None and custo is not None else None,
+                "custo_por_litro": custo / previsto if custo is not None and previsto else None,
+                "cobertura_energia": v("ver.razao_energia"), "cobertura_proteina": v("ver.razao_pb"),
+                "ms_kg": v("dieta.ms_kg"), "parecer": v("parecer.dieta"), "preco_leite": preco,
+                "alertas": [a for a in out["alertas"] if a["nivel"] != "informativo" and a["status"] == "ativo"],
+                "sessao_id": _salvar_sessao(s, lote.id, "simulacao", out)}
+
+    preco_atual = fazenda.preco_leite
+    atual = cenario(dieta.itens if dieta else [], None, preco_atual, None)
+    simulado = cenario(itens, leite, preco_leite or preco_atual, precos)
+    return {"vacas": vacas, "atual": atual, "simulado": simulado}
 
 
 # ------------------------------------------------------------------ acompanhamento

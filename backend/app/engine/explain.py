@@ -84,3 +84,47 @@ def explicar_regra(resultado: Resultado, regra_id: str) -> dict | None:
         return None
     return entrada | {"arvores": [como(resultado, p["fato"]) | {"op": p["op"], "esperado": p["esperado"]}
                                   for p in entrada["premissas"] if p["op"] != "ausente"]}
+
+
+# ------------------------------------------------------------------ contrafactual: "o que precisaria mudar?"
+INVERSO = {"<": ">=", "<=": ">", ">": "<=", ">=": "<"}
+
+
+def contrafactual(resultado: Resultado, regra_id: str, profundidade: int = 2) -> dict | None:
+    """O que faria a regra deixar de disparar. Uma regra dispara com TODAS as premissas verdadeiras, então basta UMA
+    deixar de valer (opções alternativas). Premissa que é conclusão de outras regras só some se TODAS as regras que a
+    concluíram deixarem de valer (grupos). Premissas categóricas (fase, sistema…) são contexto, não mudança."""
+    entrada = next((t for t in resultado.traco if t["regra"] == regra_id), None)
+    return _quebrar(resultado, entrada, profundidade) if entrada else None
+
+
+def _numero(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _quebrar(resultado: Resultado, entrada: dict, profundidade: int) -> dict:
+    opcoes, contexto = [], []
+    for p in entrada["premissas"]:
+        op, fato, valor, esperado = p["op"], p["fato"], p["valor"], p["esperado"]
+        if op in ("ref", "ausente"):
+            continue
+        if op in INVERSO and _numero(valor) and _numero(esperado):
+            opcoes.append({"tipo": "limite", "fato": fato, "valor": valor, "op": INVERSO[op], "limite": esperado})
+        elif op == "entre" and _numero(valor):
+            opcoes.append({"tipo": "sair_da_faixa", "fato": fato, "valor": valor, "faixa": esperado})
+        elif op == "fora" and _numero(valor):
+            opcoes.append({"tipo": "voltar_para_faixa", "fato": fato, "valor": valor, "faixa": esperado})
+        else:
+            f = resultado.wm.get(fato)
+            if f is not None and f.origem == "regra" and profundidade > 0 and f.regra:
+                grupos = []
+                for rid in f.regra.split("+"):
+                    sub = next((t for t in resultado.traco if t["regra"] == rid), None)
+                    if sub:
+                        grupos.append(_quebrar(resultado, sub, profundidade - 1)
+                                      | {"regra": rid, "descricao": sub["descricao"]})
+                opcoes.append({"tipo": "conclusao", "fato": fato, "valor": _resumo(valor), "grupos": grupos})
+            else:
+                contexto.append({"fato": fato, "valor": _resumo(valor), "op": op, "esperado": esperado})
+    return {"opcoes": opcoes, "contexto": contexto}
+

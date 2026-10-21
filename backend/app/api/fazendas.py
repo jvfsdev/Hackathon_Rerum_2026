@@ -6,7 +6,8 @@ from sqlmodel import select
 
 from .. import alertas, services
 from ..db.models import AlertaDB, AlimentoFazenda, Dieta, Evento, Fazenda, HistoricoAlerta, Lote, Registro, sessao
-from .schemas import AceitarIn, AlimentoIn, BonificacaoIn, DietaIn, EventoIn, ImportacaoIn, LoteIn, PrecosIn, RecusarIn, RegistroIn
+from .schemas import (AceitarIn, AlimentoIn, BonificacaoIn, DietaIn, EventoIn, ImportacaoIn, LoteIn, MovimentoEstoqueIn,
+                      PrecosIn, RecusarIn, RegistroIn)
 
 router = APIRouter()
 
@@ -49,7 +50,8 @@ def painel(fazenda_id: int):
             cards.append({"lote": lote, "hoje": ultimo, "serie": serie[-30:], "dieta": dieta,
                           "custo_dieta": comp.get("custo_vaca_dia") if comp else None, "alertas": contagem,
                           "principal": pendentes and sorted(pendentes, key=lambda a: -alertas.NIVEL[a.nivel])[0]})
-        return {"fazenda": fazenda, "data": hoje, "lotes": cards}
+        from .. import estoque
+        return {"fazenda": fazenda, "data": hoje, "lotes": cards, "estoque": estoque.situacao(s, fazenda_id)["alertas"]}
 
 
 @router.get("/fazendas/{fazenda_id}/precos")
@@ -255,6 +257,7 @@ def nova_dieta(lote_id: int, dados: DietaIn):
     with sessao() as s:
         lote = _lote(s, lote_id)
         anteriores = s.exec(select(Dieta).where(Dieta.lote_id == lote_id)).all()
+        ativa = services.dieta_ativa(s, lote_id)
         for d in anteriores:
             d.ativa = False
             s.add(d)
@@ -266,7 +269,10 @@ def nova_dieta(lote_id: int, dados: DietaIn):
         if silagem:
             ms = services.historico(s, lote_id).serie("ms_silagem", date.today(), 14)
             ms_ref = ms[-1][1] if ms else cat[silagem["alimento"]]["ms"]
-        dieta = Dieta(lote_id=lote_id, versao=max((d.versao for d in anteriores), default=0) + 1, itens=itens,
+        versao = max((d.versao for d in anteriores), default=0) + 1
+        transicao = (services.planejar_transicao(lote, ativa.itens, itens, cat, date.today(), ativa.versao)
+                     if dados.gradual and ativa else None)
+        dieta = Dieta(lote_id=lote_id, versao=versao, itens=itens, transicao=transicao,
                       origem=dados.origem, motivo=dados.motivo, inicio=date.today(), ativa=True, ms_silagem_ref=ms_ref,
                       parecer={"parecer": parecer["fatos"].get("parecer.dieta", {}).get("valor"),
                                "sessao_id": parecer["sessao_id"], "kb_version": parecer["kb_version"]})
@@ -324,6 +330,80 @@ def registrar_evento(lote_id: int, dados: EventoIn):
               + (f": {ev.descricao}" if ev.descricao else ""), {"evento_id": ev.id})
         s.refresh(ev)
         return ev.model_dump()
+
+
+@router.get("/lotes/{lote_id}/trato")
+def trato(lote_id: int, tratos: int = 2, sobra_pct: float = 0.0, data: date | None = None, divisao: str | None = None):
+    """Planilha do trato do dia: kg por alimento para o lote, por trato, na ordem de carregamento do vagão.
+    divisao = porcentagens separadas por vírgula (ex.: 60,40)."""
+    fracoes = None
+    if divisao:
+        try:
+            fracoes = [float(x) / 100 for x in divisao.split(",")]
+        except ValueError:
+            raise HTTPException(422, "divisão inválida")
+    with sessao() as s:
+        return services.plano_trato(s, _lote(s, lote_id), data, tratos, fracoes, sobra_pct)
+
+
+@router.get("/fazendas/{fazenda_id}/estoque")
+def ver_estoque(fazenda_id: int):
+    from .. import estoque
+    with sessao() as s:
+        if not s.get(Fazenda, fazenda_id):
+            raise HTTPException(404, "fazenda não encontrada")
+        return estoque.situacao(s, fazenda_id)
+
+
+@router.post("/fazendas/{fazenda_id}/estoque")
+def movimentar_estoque(fazenda_id: int, dados: MovimentoEstoqueIn):
+    from .. import estoque
+    with sessao() as s:
+        if not s.get(Fazenda, fazenda_id):
+            raise HTTPException(404, "fazenda não encontrada")
+        estoque.registrar(s, fazenda_id, dados.item, dados.tipo, dados.kg, dados.data or date.today(), dados.obs)
+        return estoque.situacao(s, fazenda_id)
+
+
+@router.get("/fazendas/{fazenda_id}/estoque/movimentos")
+def movimentos_estoque(fazenda_id: int, item: str | None = None):
+    from ..db.models import MovimentoEstoque
+    with sessao() as s:
+        q = select(MovimentoEstoque).where(MovimentoEstoque.fazenda_id == fazenda_id)
+        if item:
+            q = q.where(MovimentoEstoque.item == item)
+        return s.exec(q.order_by(MovimentoEstoque.data.desc(), MovimentoEstoque.id.desc())).all()
+
+
+@router.get("/lotes/{lote_id}/previsao")
+def previsao_lote(lote_id: int, dias: int = 30):
+    """Projeção do lote: leite com faixa, receita, custo, sobra, marcos (secagem, parto, fim de transição) e avisos PRV."""
+    from .. import previsao
+    if not 7 <= dias <= 90:
+        raise HTTPException(422, "horizonte entre 7 e 90 dias")
+    with sessao() as s:
+        lote = _lote(s, lote_id)
+        return previsao.projetar_lote(s, lote, dias, itu_futuro=previsao.clima_previsto(s.get(Fazenda, lote.fazenda_id), dias))
+
+
+@router.get("/fazendas/{fazenda_id}/previsao")
+def previsao_fazenda(fazenda_id: int, dias: int = 30):
+    from .. import previsao
+    if not 7 <= dias <= 90:
+        raise HTTPException(422, "horizonte entre 7 e 90 dias")
+    with sessao() as s:
+        if not s.get(Fazenda, fazenda_id):
+            raise HTTPException(404, "fazenda não encontrada")
+        return previsao.projetar_fazenda(s, fazenda_id, dias)
+
+
+@router.get("/fazendas/{fazenda_id}/relatorio")
+def relatorio(fazenda_id: int, dias: int = 7):
+    from .. import relatorio as rel
+    with sessao() as s:
+        if not s.get(Fazenda, fazenda_id):
+            raise HTTPException(404, "fazenda não encontrada")
+        return rel.gerar(s, fazenda_id, dias)
 
 
 @router.get("/lotes/{lote_id}/serie")
@@ -408,5 +488,6 @@ def historico_acoes(lote_id: int | None = None, dias: int = 120):
         if lote_id:
             q = q.where(HistoricoAlerta.lote_id == lote_id)
         linhas = s.exec(q.order_by(HistoricoAlerta.data_hora.desc(), HistoricoAlerta.id.desc())).all()
-        return [h.model_dump() | {"alerta": {"id": a.id, "regra": a.regra, "titulo": a.titulo, "nivel": a.nivel,
+        return [h.model_dump() | {"alerta": {"id": a.id, "regra": a.regra, "titulo": a.titulo,
+                                             "titulo_produtor": a.titulo_produtor, "nivel": a.nivel,
                                              "estado": a.estado, "categoria": a.categoria}} for h, a in linhas]

@@ -9,7 +9,9 @@ SAIDA = Path(__file__).resolve().parents[2] / "docs" / "regras.md"
 NOMES = {"classificacao": "A — Classificação do lote (CLS)", "exigencias": "B — Exigências e metas (EXG)",
          "verificacao": "C — Verificação da dieta (VER)", "formulacao": "F — Formulação por programação linear (FOR)",
          "acompanhamento_diario": "D1 — Acompanhamento diário (ACP)", "acompanhamento_semanal": "D2 — Acompanhamento semanal (ACP)",
-         "acompanhamento_mensal": "D3 — Acompanhamento mensal / laudo (ACP)", "meta": "M — Meta-regras (resolução de conflito)"}
+         "acompanhamento_mensal": "D3 — Acompanhamento mensal / laudo (ACP)", "meta": "M — Meta-regras (resolução de conflito)",
+         "transicao": "T — Transição de dieta (TRN)", "estoque": "E — Estoque de insumos (EST)",
+         "previsao": "P — Previsão dos próximos dias (PRV)"}
 
 
 def cond(c: dict) -> str:

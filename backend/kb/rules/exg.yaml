@@ -132,6 +132,9 @@
         titulo: "Consumo em pasto estimado com baixa confiança"
         causa: "Equações de consumo foram pouco precisas para mestiças em pasto tropical."
         acao: "Acompanhar sobras, ECC e produção para calibrar; medir altura do pasto."
+        titulo_produtor: "O consumo no pasto é uma estimativa"
+        causa_produtor: "É difícil prever quanto vaca mestiça come no pasto."
+        acao_produtor: "Acompanhe sobras, escore e leite para o sistema ir ajustando."
   fonte: "Embrapa 2012 (Jardim et al.)"
   forca: B
 

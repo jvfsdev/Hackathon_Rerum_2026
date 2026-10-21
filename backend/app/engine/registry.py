@@ -1,4 +1,6 @@
 """Funções de cálculo que as regras podem chamar pela ação `calcular`."""
+import math
+
 from ..calc import climate, conversions, diet, economics, energy, intake, protein
 
 
@@ -54,6 +56,9 @@ FUNCOES = {
     "ell_ajuste_ecc": lambda ecc, meta, dias, mcal_por_ponto, pv, pv_ref: energy.ajuste_ecc(ecc, meta, dias, mcal_por_ponto, pv, pv_ref),
     "fator_mobilizacao": energy.fator_mobilizacao,
     "soma": lambda partes: energy.soma(*partes),
+    "leite_permitido": energy.leite_permitido,
+    "maximo": lambda valores: max(v for v in valores if v is not None),
+    "dias_transicao_conc": lambda delta_kg, passo_kg: math.ceil(abs(delta_kg) / passo_kg),
     "pm_leite": lambda leite, proteina, eficiencia: protein.pm_leite(leite, proteina, eficiencia),
     "pm_gestacao": lambda dias, peso_bezerro, inicio: protein.pm_gestacao(dias, peso_bezerro, inicio),
     "pb_alvo": lambda leite, tabela: protein.pb_alvo(leite, tabela),

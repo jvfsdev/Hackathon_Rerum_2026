@@ -147,3 +147,94 @@ def _saida(status, prob, x, alimentos, restricoes, violadas) -> dict:
     comp = composicao([{"alimento": i["alimento"], "kg_mn": i["kg_mn"]} for i in itens])
     return {"status": status, "custo": comp["custo_vaca_dia"], "itens": itens, "composicao": comp,
             "restricoes_violadas": violadas, "restricoes": restricoes}
+
+
+def ajuste_minimo(alimentos: list[dict], restricoes: dict, atual: dict[str, float], peso_novo: float = 3.0) -> dict:
+    """Menor mudança na dieta atual (kg MS por alimento) que respeita todas as restrições: minimiza Σ|x − atual|,
+    com alimento novo pesando `peso_novo` e o custo só como desempate. Mesmas restrições (e contrato com a
+    verificação) da formulação de custo mínimo; se só energia/proteína forem inatingíveis, devolve "parcial"."""
+    for flexivel in (False, True):
+        prob, x, (folga_e, folga_p) = _modelo(alimentos, restricoes, metas_flexiveis=flexivel)
+        desvio = []
+        for a in alimentos:
+            aid = a["id"]
+            mais = prob.add_variable(f"mais_{aid}", lowBound=0)
+            menos = prob.add_variable(f"menos_{aid}", lowBound=0)
+            prob.addConstraint(x[aid] - mais + menos == atual.get(aid, 0.0), f"desvio_{aid}")
+            desvio.append((1.0 if atual.get(aid) else peso_novo) * (mais + menos))
+        custo = pulp.lpSum(a["preco_kg_mn"] / (a["ms"] / 100) * x[a["id"]] for a in alimentos)
+        objetivo = pulp.lpSum(desvio) + 0.001 * custo
+        if flexivel:
+            objetivo += PENALIDADE_MCAL * folga_e + PENALIDADE_PB * folga_p
+        prob.setObjective(objetivo)
+        if _resolver(prob) == "Optimal":
+            if not flexivel:
+                return _saida("otimo", prob, x, alimentos, restricoes, [])
+            violadas = diagnosticar(alimentos, restricoes)
+            if set(violadas) <= METAS_NUTRICIONAIS:
+                out = _saida("parcial", prob, x, alimentos, restricoes, violadas)
+                out["deficit"] = {"energia_mcal": folga_e.value() or 0.0,
+                                  "proteina_pp": (folga_p.value() or 0.0) / max(out["composicao"]["ms_kg"], 1e-9)}
+                return out
+    return {"status": "inviavel", "restricoes_violadas": diagnosticar(alimentos, restricoes), "restricoes": restricoes}
+
+
+# ------------------------------------------------------------------ sensibilidade de preços (análise pós-ótimo)
+def _kg_ms(alimentos: list[dict], restricoes: dict) -> dict[str, float] | None:
+    pl = formular(alimentos, dict(restricoes))
+    if pl["status"] != "otimo":
+        return None
+    return {i["alimento"]["id"]: i["kg_ms"] for i in pl["itens"]} | {"_custo": pl["custo"]}
+
+
+def _com_preco(alimentos: list[dict], aid: str, preco: float) -> list[dict]:
+    return [a | {"preco_kg_mn": preco} if a["id"] == aid else a for a in alimentos]
+
+
+def _bissecao(cond, baixo: float, alto: float, passos: int = 14) -> float:
+    """Maior valor em [baixo, alto] em que cond(valor) é verdadeira (cond(baixo) verdadeira, cond(alto) falsa)."""
+    for _ in range(passos):
+        meio = (baixo + alto) / 2
+        baixo, alto = (meio, alto) if cond(meio) else (baixo, meio)
+    return baixo
+
+
+def sensibilidade(alimentos: list[dict], restricoes: dict, variacao_meta: float = 0.05, fator_max: float = 6.0) -> dict:
+    """Para a dieta de custo mínimo: até que preço cada alimento fica na dieta (sem mudar a dieta e antes de sair),
+    abaixo de que preço um alimento de fora entraria, e quanto cada meta nutricional custa. Tudo medido resolvendo o
+    mesmo PL com o preço (ou a meta) alterado: sem aproximação linear."""
+    base = _kg_ms(alimentos, restricoes)
+    if base is None:
+        return {"status": "sem_otimo"}
+    saida = []
+    for a in alimentos:
+        aid, p0 = a["id"], a["preco_kg_mn"]
+        kg0 = base.get(aid, 0.0)
+        linha = {"alimento": aid, "nome": a.get("nome", aid), "preco": p0, "kg_mn": kg0 / (a["ms"] / 100),
+                 "na_dieta": kg0 > 0.01}
+
+        def kg(preco):
+            r = _kg_ms(_com_preco(alimentos, aid, preco), restricoes)
+            return r.get(aid, 0.0) if r else 0.0
+
+        if linha["na_dieta"]:
+            alto = p0 * fator_max if p0 > 0 else 1.0
+            igual = lambda p: abs(kg(p) - kg0) <= 0.05 * kg0
+            fica = lambda p: kg(p) > 0.02 * kg0
+            linha["mantem_ate"] = None if igual(alto) else _bissecao(igual, p0, alto)
+            linha["sai_acima"] = None if fica(alto) else _bissecao(fica, p0, alto)
+        else:
+            entra = lambda p: kg(p) > 0.05
+            linha["entra_abaixo"] = None if not entra(p0 * 0.001) else _bissecao(entra, p0 * 0.001, p0)
+        saida.append(linha)
+    metas = []
+    for meta, campos in (("energia", ("ell_min",)), ("proteina", ("pb_min",)), ("fibra", ("fdn_min", "fdnf_min"))):
+        r = dict(restricoes)
+        for c in campos:
+            if r.get(c) is not None:
+                r[c] = r[c] * (1 - variacao_meta)
+        alt = _kg_ms(alimentos, r)
+        if alt is not None:
+            metas.append({"meta": meta, "variacao": variacao_meta, "economia": base["_custo"] - alt["_custo"]})
+    return {"status": "otimo", "custo": base["_custo"], "alimentos": saida, "metas": metas}
+

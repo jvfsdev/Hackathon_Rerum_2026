@@ -1,0 +1,65 @@
+# Módulo T — Transição de dieta: quando uma nova versão da dieta muda muito, a troca é gradual (mistura dia a dia).
+# Os fatos transicao.* comparam a dieta anterior com a nova (services.planejar_transicao).
+- id: TRN-01
+  versao: 1
+  modulo: transicao
+  descricao: Troca do volumoso principal pede adaptação do rúmen por alguns dias
+  prioridade: 80
+  cf: 0.8
+  se:
+    - {fato: transicao.volumoso_trocado_pct, op: ">=", valor: "@params.transicao_volumoso_min"}
+  entao:
+    - concluir: {fato: transicao.dias_volumoso, valor: "@params.transicao_dias_volumoso"}
+    - concluir: {fato: transicao.motivo_volumoso, valor: true}
+  fonte: "Penn State Extension (adaptação ruminal a novo volumoso)"
+  forca: C
+
+- id: TRN-02
+  versao: 1
+  modulo: transicao
+  descricao: Aumento de concentrado acima do passo diário seguro é feito em etapas
+  prioridade: 80
+  cf: 0.8
+  se:
+    - {fato: transicao.concentrado_delta_kg, op: ">", valor: "@params.transicao_passo_conc"}
+  entao:
+    - calcular: {fato: transicao.dias_concentrado, funcao: dias_transicao_conc, args: {delta_kg: $transicao.concentrado_delta_kg, passo_kg: "@params.transicao_passo_conc"}}
+  fonte: "NRC 2001; Penn State (aumentar o concentrado no máximo 0,5–1 kg por dia)"
+  forca: C
+
+- id: TRN-03
+  versao: 1
+  modulo: transicao
+  descricao: Mudança grande na composição da dieta é feita de forma gradual
+  prioridade: 80
+  cf: 0.6
+  se:
+    - {fato: transicao.mudanca_pct, op: ">=", valor: "@params.transicao_mudanca_min"}
+  entao:
+    - concluir: {fato: transicao.dias_geral, valor: "@params.transicao_dias_padrao"}
+  fonte: "Escolha de engenharia (troca gradual em etapas)"
+  forca: D
+
+- id: TRN-09
+  versao: 1
+  modulo: transicao
+  descricao: Duração da transição é a maior entre as exigidas pelos motivos encontrados
+  prioridade: 40
+  se:
+    - qualquer:
+        - {fato: transicao.dias_volumoso, op: existe}
+        - {fato: transicao.dias_concentrado, op: existe}
+        - {fato: transicao.dias_geral, op: existe}
+  entao:
+    - calcular: {fato: transicao.dias, funcao: maximo, args: {valores: ["$transicao.dias_volumoso|0", "$transicao.dias_concentrado|0", "$transicao.dias_geral|0"]}}
+    - alerta:
+        nivel: informativo
+        categoria: dieta
+        titulo: "Transição gradual em {transicao.dias} dias ({transicao.mudanca_pct:.0f}% da MS muda)"
+        causa: "Volumoso trocado em {transicao.volumoso_trocado_pct:.0f}%; concentrado {transicao.concentrado_delta_kg:+.1f} kg MS/vaca."
+        acao: "Misturar a dieta antiga com a nova nas proporções do plano; observar cocho, fezes e leite."
+        titulo_produtor: "Faça a troca de dieta aos poucos, em {transicao.dias} dias"
+        causa_produtor: "Mudar a comida de uma vez desarranja o rúmen: as vacas comem menos e o leite cai."
+        acao_produtor: "Siga o plano dia a dia (a planilha de trato já mostra a mistura do dia) e olhe cocho, fezes e leite."
+  fonte: "Penn State Extension; NRC 2001"
+  forca: C

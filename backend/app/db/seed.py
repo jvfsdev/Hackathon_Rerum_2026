@@ -4,6 +4,8 @@ Lote 1  Girolando confinado: troca de silagem no dia 40 (MS 31 → 26%), queda, 
 Lote 2  Girolando semiconfinado: aumento de concentrado no dia 30 que não se paga; onda de calor nos dias 46–51.
 Lote 3  Holandês pós-parto: perda de ECC (3,5 → 2,25), cocho vazio nos últimos dias, G:P alta no laudo.
 Lote 4  Mestiças a pasto: lactose caindo com CCS subindo (mastite primeiro) e reagrupamento de vacas no dia 57.
+Lote 2  também troca a silagem de sorgo pela de milho no dia 57, com transição gradual (regras TRN).
+Estoque com contagens no dia 52 (farelo acabando) e recusas repetidas da bonificação (revisão da base pelo uso).
 Uso: python -m app.db.seed
 """
 import random
@@ -13,7 +15,7 @@ from sqlmodel import SQLModel
 
 from ..calc.lactation_curve import cobuci
 from .. import services
-from .models import DB_PATH, Dieta, Evento, Fazenda, Lote, Registro, criar_tabelas, engine, sessao
+from .models import DB_PATH, Dieta, Evento, Fazenda, Lote, MovimentoEstoque, Registro, criar_tabelas, engine, sessao
 
 DIAS = 60
 
@@ -75,7 +77,16 @@ def gerar():
               dia(50), "Correção da MS da silagem nova (31 → 26%): 32 → 38 kg MN", ms_ref=26.0)
         dieta(lotes[2], 1, [{"alimento": "silagem_sorgo", "kg_mn": 25}, {"alimento": "milho_moido", "kg_mn": 3},
                             {"alimento": "farelo_soja", "kg_mn": 1.5}, {"alimento": "nucleo_mineral", "kg_mn": 0.15}],
-              dia0, "Dieta inicial", ms_ref=30.8)
+              dia0, "Dieta inicial", ms_ref=30.8, ativa=False)
+        # lote 2: troca de volumoso no dia 57 com transição planejada pelas regras TRN
+        v1_l2 = [{"alimento": "silagem_sorgo", "kg_mn": 25}, {"alimento": "milho_moido", "kg_mn": 3},
+                 {"alimento": "farelo_soja", "kg_mn": 1.5}, {"alimento": "nucleo_mineral", "kg_mn": 0.15}]
+        v2_l2 = [{"alimento": "silagem_milho", "kg_mn": 28}, {"alimento": "milho_moido", "kg_mn": 2.5},
+                 {"alimento": "farelo_soja", "kg_mn": 2.4}, {"alimento": "nucleo_mineral", "kg_mn": 0.15}]
+        s.add(Dieta(lote_id=lotes[2].id, versao=2, itens=v2_l2, inicio=dia(57), ativa=True, origem="usuario",
+                    motivo="Silo de sorgo acabou: troca para silagem de milho", ms_silagem_ref=30.9,
+                    transicao=services.planejar_transicao(lotes[2], v1_l2, v2_l2, services.catalogo(s, faz.id),
+                                                          dia(57), 1)))
         dieta(lotes[3], 1, [{"alimento": "silagem_milho", "kg_mn": 35}, {"alimento": "milho_moido", "kg_mn": 6},
                             {"alimento": "farelo_soja", "kg_mn": 3.5}, {"alimento": "caroco_algodao", "kg_mn": 1.5},
                             {"alimento": "nucleo_mineral", "kg_mn": 0.25}], dia0, "Dieta de pós-parto", ms_ref=30.9)
@@ -89,6 +100,7 @@ def gerar():
             Evento(lote_id=lotes[1].id, data_hora=quando(50, 7), tipo="correcao_ms", descricao="Silagem 32 → 38 kg MN"),
             Evento(lote_id=lotes[2].id, data_hora=quando(30), tipo="mudanca_concentrado", descricao="Concentrado 3,0 → 4,5 kg/vaca"),
             Evento(lote_id=lotes[4].id, data_hora=quando(57, 7), tipo="movimentacao", descricao="Entrada de 5 vacas do Lote 2"),
+            Evento(lote_id=lotes[2].id, data_hora=quando(57, 6), tipo="troca_volumoso", descricao="Sorgo → milho (transição de 5 dias)"),
         ]
         for e in eventos:
             s.add(e)
@@ -205,6 +217,11 @@ def gerar():
                 s.commit()
                 alertas.registrar_acao(s, ep.id, lotes[4].id, f"Evento manejo sanitário: {ev.descricao}",
                                        {"evento_id": ev.id}, quando(51, 9))
+            if i == 53:                    # bonificação recusada em vários lotes: entra na revisão da base
+                for n, motivo in ((1, "tabela do laticínio muda todo mês, não compensa agir"),
+                                  (2, "já sabemos, sem como melhorar a CCS agora"), (4, "bonificação pequena para este lote")):
+                    if (ep := episodio(n, "ACP-M08")) and ep.estado == "aberto":
+                        alertas.recusar(s, ep, motivo, quando(53, 10))
             if i == 59 and (ep := episodio(3, "ACP-06")):
                 alertas.aceitar(s, ep, "aumentar oferta no próximo trato", quando(59, 7))
 
@@ -216,6 +233,13 @@ def gerar():
             acoes_do_dia(i)
         for lote in lotes.values():
             services.avaliar_lote(s, lote)        # alertas da dieta ativa
+        # estoque: contagem no dia 52 e uma compra de milho no dia 55 (farelo de soja acabando)
+        for item, kg in (("silagem_milho", 52000), ("silagem_sorgo", 6000), ("milho_moido", 4500),
+                         ("farelo_soja", 2300), ("caroco_algodao", 900), ("nucleo_mineral", 500)):
+            s.add(MovimentoEstoque(fazenda_id=faz.id, item=item, data=dia(52), tipo="contagem", kg=kg, obs="contagem semanal"))
+        s.add(MovimentoEstoque(fazenda_id=faz.id, item="milho_moido", data=dia(55), tipo="entrada", kg=2000,
+                               obs="NF 3321 — cooperativa"))
+        s.commit()
     print(f"Fazenda demo criada em {DB_PATH} ({DIAS} dias, {len(lotes)} lotes).")
 
 

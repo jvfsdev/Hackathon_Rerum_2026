@@ -15,7 +15,7 @@ Tudo roda em localhost. O motor de inferência é o único componente que decide
         │          │  ▲                                                                   │
         │          ▼  │                                                                   │
         │   MOTOR DE INFERÊNCIA ── lê ──▶ BASE DE CONHECIMENTO (YAML, versionada)         │
-        │   match → conflito → disparo     153 regras · 114 parâmetros · 13 alimentos     │
+        │   match → conflito → disparo     170 regras · 138 parâmetros · 13 alimentos     │
         │   forward + backward + CF        perguntas · versão + changelog                 │
         │          │                                                                      │
         │          ├── chama ──▶ calc/ (CMS, ELl, PM, ITU, curva, DCAD, R$, bonificação)  │
@@ -116,12 +116,30 @@ chave `problema`: viram um alerta só (o mais grave, citando os demais) e um ún
 | Base de conhecimento | Regras, parâmetros (editáveis no modo especialista), changelog e "rodar casos de teste". |
 | Modo campo (`/campo`) | Celular: registro rápido, clima automático, avisos; sem conexão, guarda numa fila e envia quando a API volta. |
 
+## Recursos de decisão e operação (v1.5)
+
+- **Duas visões:** produtor (textos `*_produtor` das regras, sem códigos, CF em palavras) e técnico (tudo). A decisão é a mesma.
+- **Contrafactual** (`explain.contrafactual`): para cada premissa numérica do alerta, o limite que a desfaz; premissa que é conclusão
+  de outras regras vira grupo (todas as regras que a concluíram precisam deixar de valer). Rota `/inferencia/sessoes/{id}/contrafactual/{regra}`.
+- **Ajuste mínimo** (`lp.ajuste_minimo`): mesmo modelo do PL, objetivo Σ|x − dieta atual| (alimento novo pesa `@params.ajuste_peso_alimento_novo`).
+- **Sensibilidade** (`lp.sensibilidade`): reresolve o PL variando o preço de cada alimento (bisseção) e afrouxando cada meta.
+- **Simulador:** avalia a dieta atual e o cenário pelo motor; leite previsto = min(meta, `ver.leite_permitido` — VER-00D, NRC 2001).
+- **Transição (módulo T):** regras TRN decidem se a troca é gradual e em quantos dias; o plano mistura k/(N+1) da dieta nova por dia;
+  ACP-TR1..3 acompanham a adaptação.
+- **Trato:** kg por trato para o lote, ordem de carga e notas vindas de parâmetros (`trato_ordem`, `trato_notas`).
+- **Estoque (módulo E):** saldo = contagem + entradas − consumo das dietas dia a dia; dias até acabar seguem o consumo previsto.
+- **Revisão pelo uso** (`app/revisao.py`): recusas, resoluções sem ação e regras que nunca dispararam, com os parâmetros citados.
+- **Previsão (módulo P)** (`app/previsao.py`): leite pela curva ajustada × calor previsto, com faixa; secagem e parto pelas
+  datas de gestação; custo pela dieta do dia. Regras PRV decidem os avisos. Rotas `/lotes/{id}/previsao`, `/fazendas/{id}/previsao`.
+- **Relatório semanal** (`app/relatorio.py`): produção, custo, sobra, avisos, ações e próximos passos por lote.
+
 ## API
 
 Documentação interativa em `http://localhost:8000/docs`. Grupos de rotas:
 `/fazendas` (painel, preços, insumos, bonificação), `/lotes` (CRUD, dietas, registros, eventos, série, importação),
 `/alertas` e `/historico`, `/inferencia` (avaliar, formular, acompanhar, consulta guiada, sessões, como, por quê),
-`/kb` (regras, parâmetros, perguntas, testes), `/referencias`, `/clima/{fazenda}`, `/ferramentas/pearson`.
+`/kb` (regras, parâmetros, perguntas, testes, revisão), `/lotes/{id}/trato`, `/fazendas/{id}/estoque`, `/fazendas/{id}/relatorio`,
+`/inferencia/lotes/{id}/ajuste|sensibilidade|simular`, `/referencias`, `/clima/{fazenda}`, `/ferramentas/pearson`.
 
 ## Tecnologias
 

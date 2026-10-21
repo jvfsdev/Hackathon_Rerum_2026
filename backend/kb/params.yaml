@@ -139,3 +139,40 @@ laudo_base_dias: {valor: 120, unidade: dias, fonte: "Escolha de engenharia", for
 ccs_regulatorio: {valor: 500, unidade: "mil cél/mL", fonte: "IN 76/2018", forca: A, editavel: true, descricao: "CCS máxima (média geométrica 3 m)"}
 ccs_pre_regulatorio: {valor: 400, unidade: "mil cél/mL", fonte: "Inferências", forca: D, editavel: true, descricao: "Faixa pré-regulatória"}
 cbt_regulatorio: {valor: 300, unidade: "mil UFC/mL", fonte: "IN 76/2018", forca: A, editavel: true, descricao: "CBT/CPP máxima (média geométrica 3 m)"}
+
+# --- Ajuste mínimo da dieta (contrafactual) e sensibilidade de preços ---
+ajuste_peso_alimento_novo: {valor: 3, unidade: "peso", fonte: "Escolha de engenharia (preferir mexer no que o lote já come)", forca: D, editavel: true, descricao: "No ajuste mínimo da dieta, cada kg de alimento novo pesa isto contra 1 kg de alimento que já está na dieta"}
+sensibilidade_variacao_meta: {valor: 0.05, unidade: "fração", fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Quanto cada meta é afrouxada para medir quanto ela custa na dieta"}
+
+# --- Transição de dieta ---
+transicao_dias_volumoso: {valor: 5, unidade: dias, fonte: "Penn State Extension (adaptação ruminal a novo volumoso: 4–7 dias)", forca: C, editavel: true, descricao: "Dias de mistura quando o volumoso principal muda"}
+transicao_dias_padrao: {valor: 3, unidade: dias, fonte: "Escolha de engenharia (troca gradual em 3 etapas)", forca: D, editavel: true, descricao: "Dias de mistura para mudança grande de dieta sem troca de volumoso"}
+transicao_mudanca_min: {valor: 15, unidade: "% da MS", fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Mudança da dieta (em % da MS) a partir da qual a troca é gradual"}
+transicao_volumoso_min: {valor: 30, unidade: "% do volumoso", fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Fração do volumoso trocada que conta como troca de volumoso"}
+transicao_passo_conc: {valor: 1.0, unidade: "kg MS/vaca/dia", fonte: "Penn State; NRC 2001 (aumentar concentrado no máximo 0,5–1 kg/dia)", forca: C, editavel: true, descricao: "Aumento máximo de concentrado por dia na transição"}
+transicao_observacao_dias: {valor: 7, unidade: dias, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Dias após o fim da transição em que o lote continua em observação de adaptação"}
+
+# --- Trato (vagão misturador) ---
+trato_ordem: {valor: [volumoso_seco, concentrado, mineral, ureia, volumoso_umido], unidade: "categorias", fonte: "Penn State Extension, TMR mixing (feno/seco primeiro, grãos e minerais, silagem por último)", forca: C, editavel: true, descricao: "Ordem de carregamento do vagão misturador"}
+trato_ms_seco: {valor: 80, unidade: "% MS", fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Volumoso com MS acima disto é carregado como seco (feno, palha)"}
+
+# --- Estoque ---
+estoque_dias_critico: {valor: 7, unidade: dias, fonte: "Escolha de engenharia (prazo típico de compra e entrega)", forca: D, editavel: true, descricao: "Estoque para menos que isto é crítico"}
+estoque_dias_atencao: {valor: 15, unidade: dias, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Estoque para menos que isto pede programar a compra"}
+estoque_prazo_compra: {valor: 5, unidade: dias, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Dias entre fazer o pedido e o insumo chegar"}
+
+# --- Revisão da base pelo uso ---
+revisao_min_episodios: {valor: 2, unidade: episódios, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Mínimo de episódios para uma regra entrar na revisão"}
+revisao_taxa_recusa: {valor: 0.5, unidade: fração, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Fração de recusas que sugere rever a regra"}
+revisao_taxa_sozinho: {valor: 0.7, unidade: fração, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Fração de episódios resolvidos sem ação que sugere regra sensível demais"}
+revisao_duracao_curta: {valor: 2, unidade: dias, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Duração mediana curta: alerta que some sozinho rápido"}
+trato_notas: {valor: {ureia: "Misture a ureia no concentrado antes (pré-mistura); nunca dê ureia pura nem em bolo.", mineral: "Núcleo mineral junto com o concentrado, para espalhar bem na mistura.", pastejo: "Fica no pasto: não vai no vagão.", volumoso_umido: "Carregue a silagem por último e misture 3 a 5 minutos depois da última carga."}, unidade: "texto", fonte: "Penn State Extension (TMR mixing); MAPA (ureia na alimentação de ruminantes)", forca: C, editavel: true, descricao: "Recomendações impressas na planilha de trato"}
+
+# --- Previsão dos próximos dias ---
+prev_horizonte: {valor: 30, unidade: dias, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Horizonte padrão da previsão"}
+prev_z_faixa: {valor: 1.645, unidade: "z", fonte: "Faixa de 90% sob distribuição normal dos desvios", forca: D, editavel: true, descricao: "Largura da faixa de incerteza do leite projetado (em sigmas robustos)"}
+prev_sigma_padrao: {valor: 0.06, unidade: fração, fonte: "Escolha de engenharia (variação diária típica do leite de lote)", forca: D, editavel: true, descricao: "Incerteza usada quando o lote tem menos de 7 dias de desvio medido"}
+prev_queda_alerta: {valor: -10, unidade: "%", fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Queda projetada do leite por vaca no horizonte que gera aviso"}
+prev_sobra_energia_l: {valor: 2, unidade: "L/vaca", fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Leite permitido pela energia acima do projetado que sugere baratear a dieta"}
+prev_queda_receita_fazenda: {valor: -15, unidade: "%", fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Queda da receita da fazenda no horizonte que gera aviso"}
+

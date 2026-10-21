@@ -25,7 +25,7 @@ npm run dev                                 # http://localhost:5173
 
 No celular (mesma rede Wi-Fi): `npm run dev:rede` e abra `http://<ip-do-computador>:5173` — a página inicial vira o **modo campo** (registro rápido + avisos, funciona sem conexão e envia depois).
 
-Testes: `cd backend && .venv/bin/pytest -q`, com 453 testes, entre eles 33 casos de resultado conhecido em `backend/tests/cases.yaml` (os mesmos rodam na tela **Base de conhecimento**).
+Testes: `cd backend && .venv/bin/pytest -q`, com 466 testes, entre eles 33 casos de resultado conhecido em `backend/tests/cases.yaml` (os mesmos rodam na tela **Base de conhecimento**).
 
 Sem internet o sistema funciona por completo: o clima passa a ser digitado e os preços de referência ficam no último valor coletado. Para desligar a coleta diária de preços: `LEITE_SEM_COLETA=1`. Documentação interativa da API: `http://localhost:8000/docs`.
 
@@ -37,7 +37,14 @@ Sem internet o sistema funciona por completo: o clima passa a ser digitado e os 
 - **Alertas:** causa provável, ação sugerida, aceitar (leva à tela da ação) ou recusar com motivo, resolução automática explicada e histórico.
 - **Insumos e preços:** preços por fazenda com histórico, insumos próprios com composição, preços de referência diários (Cepea, IPEADATA).
 - **Base de conhecimento:** regras, parâmetros editáveis (sobe a versão e roda os casos), changelog.
-- **Modo campo** no celular: registro rápido, clima automático e avisos, com fila offline.
+- **Modo campo** no celular: registro rápido, clima automático, avisos e checklist do trato, com fila offline.
+- **Visão do produtor × visão técnica:** o produtor vê avisos em linguagem de fazenda; o técnico vê regras, CF e traço.
+- **"O que precisaria mudar?"** em cada aviso (explicação contrafactual) e **menor mudança na dieta** que a corrige.
+- **Simulador "e se?"**: mais/menos concentrado, troca de volumoso, preços e meta de leite → custo, leite que a comida sustenta e sobra por vaca.
+- **Até quanto vale pagar** em cada alimento (sensibilidade de preços da dieta de custo mínimo).
+- **Planilha de trato** (vagão: kg por trato, ordem de carga, impressão) e **troca de dieta aos poucos** com plano dia a dia.
+- **Previsão dos próximos 30 dias**: leite com faixa de incerteza, secagens, receita, custo e sobra por lote e da fazenda.
+- **Estoque** (dias até acabar e quando comprar), **relatório semanal** para imprimir/PDF e **revisão da base pelo uso** (regras recusadas ou que somem sozinhas).
 
 ## Onde está cada coisa
 

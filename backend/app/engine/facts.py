@@ -31,6 +31,9 @@ class Alerta:
     cf: float
     fonte: str = ""
     forca: str = ""
+    titulo_produtor: str = ""        # mesmos fatos em linguagem do produtor (visão "Produtor" da interface)
+    causa_produtor: str = ""
+    acao_produtor: str = ""
     problema: str = ""               # chave do problema: regras que medem o mesmo problema em graus diferentes
     status: str = "ativo"            # ativo | suprimido
     nota: str | None = None
@@ -39,4 +42,5 @@ class Alerta:
     def to_dict(self) -> dict:
         return {"regra": self.regra, "nivel": self.nivel, "titulo": self.titulo, "causa": self.causa,
                 "acao": self.acao, "categoria": self.categoria, "cf": round(self.cf, 3), "fonte": self.fonte,
-                "forca": self.forca, "problema": self.problema, "status": self.status, "nota": self.nota, **self.extra}
+                "forca": self.forca, "problema": self.problema, "titulo_produtor": self.titulo_produtor,
+                "causa_produtor": self.causa_produtor, "acao_produtor": self.acao_produtor, "status": self.status, "nota": self.nota, **self.extra}

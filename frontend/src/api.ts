@@ -10,11 +10,14 @@ export interface Alerta {
   // episódio (alertas persistidos)
   estado?: EstadoAlerta; aberto_em?: string; ultima_ocorrencia?: string; ocorrencias?: number
   estado_em?: string | null; resolucao?: string | null; destino?: string; origem?: string
+  // mesmos fatos em linguagem do produtor (vazio = usar o texto técnico)
+  titulo_produtor?: string; causa_produtor?: string; acao_produtor?: string; problema?: string; tambem?: string[]
+  contexto?: { fato: string; valor: any }[]
 }
 export interface ItemHistorico {
   id: number; alerta_id: number; lote_id: number; data_hora: string; tipo: string; descricao: string
   automatico: boolean; ref?: Record<string, any> | null
-  alerta?: { id: number; regra: string; titulo: string; nivel: Nivel; estado: EstadoAlerta; categoria: string }
+  alerta?: { id: number; regra: string; titulo: string; titulo_produtor?: string; nivel: Nivel; estado: EstadoAlerta; categoria: string }
 }
 export interface Premissa { fato: string; op: string; esperado: any; valor: any; cf: number }
 export interface EntradaTraco {
@@ -46,7 +49,10 @@ export interface Lote {
   fracao_primiparas: number | null; ecc: number | null; distancia_km: number | null; relevo: string | null; forrageira?: string | null
   leite: number | null; gordura: number | null; proteina: number | null
 }
-export interface Dieta { id: number; lote_id: number; versao: number; itens: ItemDieta[]; origem: string; motivo: string; inicio: string; ativa: boolean; parecer?: any }
+export interface EtapaTransicao { dia: number; data: string; pct_nova: number; itens: ItemDieta[] }
+export interface Transicao { dias: number; de_versao: number | null; plano: EtapaTransicao[]; alerta?: Alerta | null }
+export interface Dieta { id: number; lote_id: number; versao: number; itens: ItemDieta[]; origem: string; motivo: string; inicio: string; ativa: boolean; parecer?: any
+  transicao?: Transicao | null }
 
 /** Erro de resposta da API, com o status HTTP e o corpo (vazio quando o proxy não alcançou a API). */
 export class ErroApi extends Error {
@@ -124,7 +130,77 @@ export const ROTULOS: Record<string, string> = {
   'laudo.lactose': 'Lactose (laudo)', 'laudo.ccs': 'CCS', 'laudo.ccs_mg3': 'CCS (média geom. 3 m)', 'laudo.cbt_mg3': 'CBT (média geom. 3 m)',
   'laudo.ccs_tendencia': 'Tendência da CCS', 'laudo.gordura_delta': 'Variação da gordura',
 }
-export const rotulo = (f: string) => ROTULOS[f] ?? f
+
+// ---------- visão do produtor × visão técnica ----------
+/** "produtor": linguagem de fazenda, sem códigos de regra nem fator de certeza. "tecnico": tudo o que o motor mostra. */
+export type Modo = 'produtor' | 'tecnico'
+let modoAtual: Modo = (() => {
+  const daUrl = new URLSearchParams(window.location.search).get('visao')     // ?visao=tecnico abre direto na visão técnica
+  if (daUrl === 'tecnico' || daUrl === 'produtor') { try { localStorage.setItem('modo', daUrl) } catch { /* */ } return daUrl }
+  try { return localStorage.getItem('modo') === 'tecnico' ? 'tecnico' : 'produtor' } catch { return 'produtor' }
+})()
+export const getModo = () => modoAtual
+export function setModoGlobal(m: Modo) {
+  modoAtual = m
+  try { localStorage.setItem('modo', m) } catch { /* sem armazenamento */ }
+}
+export const tecnico = () => modoAtual === 'tecnico'
+
+/** Nomes dos fatos em linguagem do produtor (os que aparecem em explicações e no "o que precisaria mudar"). */
+export const ROTULOS_PRODUTOR: Record<string, string> = {
+  'perfil.fase': 'Fase do lote', 'perfil.estresse_termico': 'Calor', 'perfil.gestacao_avancada': 'Prenhez avançada',
+  'clima.itu': 'Índice de calor', 'mon.itu_2d': 'Índice de calor (2 dias)', 'mon.itu_limiar': 'Calor que o lote aguenta',
+  'exig.cms': 'Quanto a vaca consegue comer (matéria seca)', 'exig.ell_total': 'Energia que o lote precisa',
+  'exig.pb_pct_alvo': 'Proteína que o lote precisa', 'ver.ell_consumida': 'Energia que a dieta dá',
+  'ver.razao_energia': 'Energia da dieta (do necessário)', 'ver.razao_pb': 'Proteína da dieta (do necessário)',
+  'ver.razao_ms': 'Comida oferecida (do que a vaca come)', 'ver.leite_permitido': 'Leite que a comida sustenta',
+  'dieta.ms_kg': 'Comida oferecida (matéria seca)', 'dieta.pb_pct': 'Proteína da dieta', 'dieta.fdn_pct': 'Fibra da dieta',
+  'dieta.fdnf_pct': 'Fibra do volumoso', 'dieta.cnf_pct': 'Amido e açúcares', 'dieta.ee_pct': 'Gordura da dieta',
+  'dieta.ureia_pct': 'Ureia na dieta', 'dieta.custo_vaca_dia': 'Custo da comida por vaca/dia', 'dieta.forragem_pct': 'Volumoso na dieta',
+  'dieta.dcad_meq_kg': 'DCAD (dieta aniônica)', 'dieta.mineral_kg_ms': 'Núcleo mineral',
+  'meta.fdn_min': 'Fibra mínima', 'meta.fdnf_min': 'Fibra mínima do volumoso', 'meta.cnf_max': 'Amido e açúcares (máximo)',
+  'meta.ee_max': 'Gordura máxima', 'meta.ureia_max': 'Ureia máxima', 'meta.sobras.max': 'Sobra máxima no cocho', 'meta.sobras.min': 'Sobra mínima no cocho',
+  'lote.del': 'Dias de lactação', 'lote.pv': 'Peso médio', 'lote.leite': 'Leite por vaca', 'lote.ecc': 'Escore corporal',
+  'lote.dias_para_parto': 'Dias para o parto', 'lote.fracao_primiparas': 'Fração de novilhas', 'lote.estado': 'Situação',
+  'lote.sistema': 'Sistema', 'lote.grupo_genetico': 'Raça', 'lote.gordura': 'Gordura do leite', 'lote.proteina': 'Proteína do leite',
+  'lote.temp': 'Temperatura', 'lote.ur': 'Umidade', 'lote.distancia_km': 'Caminhada por dia',
+  'mon.litros_vaca': 'Leite por vaca hoje', 'mon.esperado_vaca': 'Leite esperado por vaca', 'mon.residuo': 'Diferença para o esperado',
+  'mon.corrida_dias': 'Dias seguidos abaixo do esperado', 'mon.corrida_pior': 'Pior dia (diferença)', 'mon.queda_7d': 'Variação do leite em 7 dias',
+  'mon.z': 'Sinal de queda brusca', 'mon.ewma': 'Sinal de queda lenta', 'mon.ewma_limite_inf': 'Limite do sinal de queda lenta',
+  'mon.sobras_mm3': 'Sobra no cocho (3 dias)', 'mon.sobras_min3': 'Menor sobra dos 3 dias', 'mon.sobras_max3': 'Maior sobra dos 3 dias',
+  'mon.dias_cocho_vazio': 'Leituras com cocho vazio', 'mon.ecc_perda': 'Escore corporal perdido', 'mon.fezes': 'Escore de fezes',
+  'mon.litros_por_kg_conc': 'Litros por kg de concentrado', 'mon.resposta_marginal': 'Leite a mais por kg de concentrado extra',
+  'mon.razao_precos': 'Litros para pagar 1 kg de concentrado', 'mon.custo_conc_litro': 'Concentrado por litro (R$)',
+  'mon.custo_conc_razao': 'Concentrado por litro (do normal)', 'mon.alimento_pct_receita': 'Comida / dinheiro do leite (%)',
+  'mon.iofc': 'Sobra por vaca depois da comida (R$)', 'mon.ea': 'Leite por kg de comida', 'mon.ms_delta_abs': 'Mudança na umidade da silagem',
+  'mon.ms_leituras_confirmadas': 'Leituras confirmando', 'mon.ms_silagem_atual': 'Matéria seca da silagem hoje',
+  'mon.dias_desde_troca_volumoso': 'Dias desde a troca de volumoso', 'mon.horas_desde_movimentacao': 'Horas desde a mudança de vacas',
+  'mon.dias_dieta_nova': 'Dias desde a troca de dieta', 'mon.em_adaptacao_dieta': 'Em adaptação à dieta nova',
+  'mon.altura_media': 'Altura do pasto', 'mon.altura_entrada': 'Altura do pasto na entrada', 'mon.altura_saida': 'Altura do pasto na saída',
+  'mon.distancia_delta': 'Caminhada a mais', 'mon.bonificacao_rs_l': 'Bonificação (R$/L)', 'mon.dias_para_parto_previsto': 'Dias para o parto',
+  'laudo.nul': 'Ureia do leite (NUL)', 'laudo.ureia': 'Ureia do leite', 'laudo.gp': 'Gordura ÷ proteína do leite', 'laudo.lactose': 'Lactose',
+  'laudo.ccs': 'CCS', 'laudo.ccs_mg3': 'CCS (média de 3 meses)', 'laudo.cbt_mg3': 'CBT (média de 3 meses)', 'laudo.gordura_delta': 'Queda da gordura do leite',
+  'laudo.crioscopia': 'Crioscopia', 'laudo.ccs_tendencia': 'CCS subindo',
+  'hipotese.queda_sustentada': 'Leite caindo há vários dias', 'hipotese.acidose': 'Suspeita de acidose', 'hipotese.mastite': 'Suspeita de mastite',
+  'hipotese.ben_severo': 'Emagrecimento forte', 'hipotese.causa_calor': 'Calor como causa', 'hipotese.dgl': 'Queda da gordura do leite',
+  'estoque.dias_restantes': 'Dias de estoque', 'estoque.saldo_kg': 'Estoque (kg)',
+}
+export const rotulo = (f: string) => (modoAtual === 'produtor' && ROTULOS_PRODUTOR[f]) || ROTULOS[f] || f
+
+/** Título, causa e ação do alerta na linguagem da visão atual. */
+export function textoAlerta(a: Alerta) {
+  const p = modoAtual === 'produtor'
+  return { titulo: (p && a.titulo_produtor) || a.titulo, causa: (p && a.causa_produtor) || a.causa, acao: (p && a.acao_produtor) || a.acao }
+}
+/** Certeza em palavras (para o produtor), a partir do fator de certeza. */
+export const certeza = (cf: number) => (cf >= 0.75 ? 'certeza alta' : cf >= 0.5 ? 'certeza média' : 'certeza baixa')
+export const reais = (v?: number | null, casas = 2) =>
+  v === null || v === undefined || Number.isNaN(v) ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: casas, maximumFractionDigits: casas })
+export const numero = (v?: number | null, casas = 1) =>
+  v === null || v === undefined || Number.isNaN(v) ? '—' : v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: casas })
+/** kg em kg ou toneladas (estoque, trato). */
+export const peso = (kg?: number | null) =>
+  kg === null || kg === undefined ? '—' : Math.abs(kg) >= 2000 ? `${numero(kg / 1000, 1)} t` : `${numero(kg, kg < 10 ? 2 : 0)} kg`
 
 export const UNIDADES: Record<string, string> = {
   'exig.cms': 'kg MS/d', 'exig.cms_equacao': 'kg MS/d', 'exig.cms_ajuste_fdnd': 'kg MS/d', 'exig.cms_teto_fibra': 'kg MS/d', 'dieta.ms_kg': 'kg MS/d',

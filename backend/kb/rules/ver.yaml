@@ -26,6 +26,21 @@
   fonte: "NRC 2001"
   forca: B
 
+- id: VER-00D
+  versao: 1
+  modulo: verificacao
+  descricao: Leite que a energia consumida sustenta (energia que sobra ou falta convertida em kg de leite)
+  prioridade: 84
+  se:
+    - {fato: ver.ell_consumida, op: existe}
+    - {fato: exig.ell_total, op: existe}
+    - {fato: exig.ell_leite, op: ">", valor: 0}
+    - {fato: lote.leite, op: ">", valor: 0}
+  entao:
+    - calcular: {fato: ver.leite_permitido, funcao: leite_permitido, args: {ell_consumida: $ver.ell_consumida, ell_total: $exig.ell_total, ell_leite: $exig.ell_leite, leite: $lote.leite}}
+  fonte: "NRC 2001 (leite permitido pela energia)"
+  forca: B
+
 - id: VER-00C
   versao: 1
   modulo: verificacao
@@ -55,6 +70,9 @@
         titulo: "Déficit energético: a dieta cobre {ver.razao_energia:.0%} da exigência"
         causa: "Consome {ver.ell_consumida:.1f} Mcal de ELl/dia contra {exig.ell_total:.1f} exigidas. Tende a perder ECC e produção."
         acao: "Aumentar a densidade energética (milho, polpa) ou melhorar o volumoso; rever a meta de leite."
+        titulo_produtor: "A comida não dá a energia que o lote precisa ({ver.razao_energia:.0%} do necessário)"
+        causa_produtor: "Sem energia suficiente as vacas emagrecem e produzem menos."
+        acao_produtor: "Aumente milho ou polpa, use um volumoso melhor ou peça a sugestão de dieta."
   fonte: "Dossiê VER-01; NRC 2001"
   forca: B
 
@@ -74,6 +92,9 @@
         titulo: "Déficit proteico: PB {dieta.pb_pct:.1f}% contra alvo de {exig.pb_pct_alvo:.1f}%"
         causa: "Proteína abaixo do necessário para a produção do lote."
         acao: "Incluir fonte proteica (farelo de soja, caroço de algodão) ou ureia até 1% da MS."
+        titulo_produtor: "Falta proteína na dieta"
+        causa_produtor: "A proteína está abaixo do que o lote precisa para produzir."
+        acao_produtor: "Inclua farelo de soja ou caroço de algodão, ou ureia (no máximo 1% da comida seca)."
   fonte: "Dossiê VER-02; MSD Vet Manual"
   forca: B
 
@@ -92,6 +113,9 @@
         titulo: "Proteína acima do necessário ({dieta.pb_pct:.1f}% contra {exig.pb_pct_alvo:.1f}%)"
         causa: "Proteína é o nutriente mais caro; o excesso vira ureia (NUL alto) e pode afetar a reprodução."
         acao: "Reduzir a fonte proteica e conferir o NUL no próximo laudo."
+        titulo_produtor: "Proteína acima do necessário: dinheiro jogado fora"
+        causa_produtor: "Proteína é o item mais caro da dieta; o que sobra sai na urina."
+        acao_produtor: "Diminua o farelo ou a ureia e confira a ureia do leite no próximo laudo."
   fonte: "Penn State (NUL)"
   forca: C
 
@@ -149,6 +173,9 @@
         titulo: "Volumoso insuficiente: FDN de forragem {dieta.fdnf_pct:.1f}% da MS"
         causa: "Abaixo de {@params.fdnf_min_absoluto}% de FDN de forragem o NRC não tem recomendação segura: risco alto de acidose."
         acao: "Aumentar o volumoso da dieta."
+        titulo_produtor: "Volumoso muito pouco: risco alto de acidose"
+        causa_produtor: "Com tão pouco volumoso o rúmen azeda."
+        acao_produtor: "Aumente o volumoso da dieta."
   fonte: "NRC 2001 (tabela de FDN mínimo vai até FDNf 15%)"
   forca: B
 
@@ -167,6 +194,9 @@
         titulo: "Risco de acidose ruminal"
         causa: "FDN {dieta.fdn_pct:.1f}% (mín. {meta.fdn_min:.0f}%), FDNf {dieta.fdnf_pct:.1f}% (mín. {meta.fdnf_min:.0f}%), CNF {dieta.cnf_pct:.1f}% (máx. {meta.cnf_max:.0f}%)."
         acao: "Aumentar volumoso/fibra efetiva e reduzir amido rápido; conferir tamanho de partícula."
+        titulo_produtor: "Risco de acidose: pouca fibra e muito grão"
+        causa_produtor: "A dieta tem pouca fibra e muito amido para o rúmen."
+        acao_produtor: "Mais volumoso, menos grão fino; confira o tamanho da picagem."
   fonte: "NRC 2001"
   forca: B
 
@@ -185,6 +215,9 @@
         titulo: "Ureia acima do limite: {dieta.ureia_pct:.2f}% da MS (máx. {meta.ureia_max}%)"
         causa: "Excesso de ureia pode intoxicar os animais."
         acao: "Reduzir a ureia para no máximo 1% da MS, sempre misturada ao volumoso ou concentrado."
+        titulo_produtor: "Ureia acima do limite: pode intoxicar"
+        causa_produtor: "Ureia demais é veneno para a vaca."
+        acao_produtor: "Ureia no máximo 1% da comida seca, sempre bem misturada."
   fonte: "Semadesc-MS"
   forca: B
 
@@ -204,6 +237,9 @@
         titulo: "Gordura excessiva: EE {dieta.ee_pct:.1f}% da MS"
         causa: "Acima de ~6% a gordura prejudica a fermentação ruminal e pode derrubar a gordura do leite."
         acao: "Reduzir caroço de algodão ou outras fontes de gordura."
+        titulo_produtor: "Gordura demais na dieta"
+        causa_produtor: "Gordura em excesso atrapalha o rúmen e derruba a gordura do leite."
+        acao_produtor: "Diminua o caroço de algodão ou outras fontes de gordura."
   fonte: "Cultivar"
   forca: C
 
@@ -223,6 +259,9 @@
         titulo: "Oferta acima do consumo previsto ({dieta.ms_kg:.1f} kg MS contra {exig.cms:.1f})"
         causa: "Parte da dieta vai sobrar no cocho; a vaca escolhe o que come."
         acao: "Reduzir a oferta ou conferir a MS da silagem e o peso dos animais."
+        titulo_produtor: "Está dando mais comida do que o lote consegue comer"
+        causa_produtor: "A sobra vai para o lixo e as vacas escolhem o que comem."
+        acao_produtor: "Diminua o trato ou confira a umidade da silagem e o peso das vacas."
   fonte: "Dossiê VER-06"
   forca: D
 
@@ -242,6 +281,9 @@
         titulo: "Oferta abaixo do consumo possível ({dieta.ms_kg:.1f} kg MS contra {exig.cms:.1f})"
         causa: "O lote poderia comer mais; produção limitada pela oferta."
         acao: "Aumentar o volumoso ofertado e acompanhar a leitura de cocho."
+        titulo_produtor: "Está dando menos comida do que o lote poderia comer"
+        causa_produtor: "O lote poderia comer mais; a produção fica limitada."
+        acao_produtor: "Aumente o volumoso e acompanhe a leitura de cocho."
   fonte: "Escolha de engenharia"
   forca: D
 
@@ -262,6 +304,8 @@
         titulo: "Cana como único volumoso para {lote.leite:.0f} kg/vaca"
         causa: "FDN da cana é pouco digestível e limita o consumo."
         acao: "Associar silagem ou capim de melhor qualidade para lotes acima de {@params.leite_max_cana} kg."
+        titulo_produtor: "Só cana como volumoso para {lote.leite:.0f} L por vaca"
+        causa_produtor: "A fibra da cana é dura de digerir e limita o consumo."
   fonte: "Semadesc-MS"
   forca: C
 
@@ -282,6 +326,9 @@
         titulo: "Consumo previsto incomum ({perfil.cms_pct_pv:.1f}% do PV)"
         causa: "Consumo de vacas em lactação raramente sai de 2,5–4% do peso vivo."
         acao: "Conferir peso vivo, produção e DEL informados."
+        titulo_produtor: "Consumo previsto fora do comum"
+        causa_produtor: "Vaca em lactação costuma comer entre 2,5% e 4% do peso."
+        acao_produtor: "Confira peso, leite e dias de lactação no cadastro."
   fonte: "Dossiê"
   forca: C
 
@@ -301,6 +348,9 @@
         titulo: "Energia acima do necessário: a dieta cobre {ver.razao_energia:.0%} da exigência"
         causa: "Excesso de energia engorda o lote; vaca gorda ao parto tem mais cetose e deslocamento de abomaso."
         acao: "Reduzir concentrado ou usar volumoso menos energético; especialmente em vacas secas e no final da lactação."
+        titulo_produtor: "Energia sobrando: o lote vai engordar"
+        causa_produtor: "Vaca gorda no parto tem mais cetose e deslocamento de abomaso."
+        acao_produtor: "Diminua o concentrado ou use volumoso mais fraco."
   fonte: "Penn State; OMAFRA (ECC alto ao parto)"
   forca: C
 
@@ -320,6 +370,9 @@
         titulo: "ECC {lote.ecc} acima da meta da fase (máx. {meta.ecc_max})"
         causa: "Lote engordando: risco metabólico no próximo parto."
         acao: "Reduzir a densidade energética da dieta desta fase."
+        titulo_produtor: "Vacas gordas demais para a fase (escore {lote.ecc})"
+        causa_produtor: "Gordura em excesso dá problema no próximo parto."
+        acao_produtor: "Diminua a energia da dieta desta fase."
   fonte: "USC; Embrapa/IFRO; Dossiê ACP-09 (ajuste conforme direção do desvio)"
   forca: B
 
@@ -339,6 +392,8 @@
         titulo: "Alimento acima do limite de inclusão: {dieta.inclusao_excedida}"
         causa: "Cada alimento tem um teto prático na MS (ex.: caroço de algodão 15%, polpa cítrica 30%)."
         acao: "Reduzir esse alimento e completar com outro de função parecida."
+        causa_produtor: "Cada alimento tem um máximo seguro na dieta."
+        acao_produtor: "Diminua esse alimento e complete com outro parecido."
   fonte: "Limites de inclusão de foods.yaml"
   forca: C
 
@@ -358,6 +413,9 @@
         titulo: "Dieta de lote confinado com forragem de pastejo"
         causa: "Lote confinado não tem acesso ao pasto: essa parte da dieta não será consumida."
         acao: "Trocar por volumoso fornecido no cocho (silagem, capim picado, cana)."
+        titulo_produtor: "Dieta de lote confinado com pasto"
+        causa_produtor: "Lote confinado não vai ao pasto: essa parte não será comida."
+        acao_produtor: "Troque por volumoso dado no cocho."
   fonte: "Definição do sistema de produção"
   forca: A
 
@@ -376,6 +434,9 @@
         titulo: "Sem núcleo mineral suficiente na dieta"
         causa: "Minerais (Ca, P, Mg, Na…) vêm do núcleo/sal mineral."
         acao: "Incluir núcleo mineral conforme o rótulo (mín. {@params.mineral_min_kg_ms} kg MS/vaca/dia)."
+        titulo_produtor: "Falta sal mineral (núcleo) na dieta"
+        causa_produtor: "Os minerais vêm do núcleo ou sal mineral."
+        acao_produtor: "Inclua o núcleo mineral conforme o rótulo."
   fonte: "Rótulo do produto; Dossiê (minerais via núcleo)"
   forca: C
 
@@ -397,6 +458,9 @@
         titulo: "DCAD do pré-parto em {dieta.dcad_meq_kg:+.0f} mEq/kg (meta ≈ {@params.dcad_meta_preparto} para multíparas)"
         causa: "DCAD positiva no pré-parto aumenta febre do leite, retenção de placenta e metrite nas multíparas."
         acao: "Reduzir potássio (volumoso com menos K) e incluir sal aniônico até a DCAD ficar negativa; conferir pH urinário."
+        titulo_produtor: "A dieta do pré-parto não está aniônica"
+        causa_produtor: "Sem isso, as vacas que já pariram têm mais febre do leite e retenção de placenta."
+        acao_produtor: "Inclua sal aniônico e use volumoso com menos potássio; confira o pH da urina."
   fonte: "Santos et al. 2019 (meta-análise)"
   forca: A
 
@@ -417,6 +481,9 @@
         titulo: "DCAD negativa ({dieta.dcad_meq_kg:+.0f} mEq/kg) num lote só de novilhas"
         causa: "A meta-análise não encontrou benefício da dieta aniônica em novilhas."
         acao: "Dieta aniônica só para as multíparas; para novilhas, dieta de pré-parto convencional."
+        titulo_produtor: "Dieta aniônica num lote só de novilhas"
+        causa_produtor: "Para novilhas a dieta aniônica não traz benefício."
+        acao_produtor: "Use a dieta de pré-parto comum para as novilhas."
   fonte: "Santos et al. 2019"
   forca: A
 
@@ -436,6 +503,9 @@
         titulo: "Não dá para verificar a DCAD do pré-parto"
         causa: "Faltam Na, K, Cl ou S de algum alimento da dieta (tabela ou rótulo)."
         acao: "Informar os minerais dos insumos (análise ou rótulo do núcleo/sal aniônico) para o sistema verificar a DCAD."
+        titulo_produtor: "Não dá para conferir a dieta aniônica do pré-parto"
+        causa_produtor: "Faltam os minerais de algum alimento."
+        acao_produtor: "Informe os minerais dos insumos (análise ou rótulo)."
   fonte: "Santos et al. 2019"
   forca: A
 

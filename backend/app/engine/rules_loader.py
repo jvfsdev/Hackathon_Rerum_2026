@@ -12,8 +12,10 @@ from .registry import FUNCOES
 
 KB_DIR = Path(__file__).resolve().parents[2] / "kb"
 
-ORDEM_MODULOS = {"classificacao": 1, "exigencias": 2, "verificacao": 3, "formulacao": 3,
-                 "acompanhamento_diario": 4, "acompanhamento_semanal": 4, "acompanhamento_mensal": 4, "meta": 5}
+ORDEM_MODULOS = {"classificacao": 1, "exigencias": 2, "verificacao": 3, "formulacao": 3, "transicao": 3,
+                 "acompanhamento_diario": 4, "acompanhamento_semanal": 4, "acompanhamento_mensal": 4, "estoque": 4,
+                 "previsao": 4,
+                 "meta": 5}
 
 
 @dataclass
@@ -51,7 +53,7 @@ OPS_VALIDOS = set(OPERADORES) | {"existe", "ausente"}
 ACOES_VALIDAS = {"concluir", "calcular", "alerta", "suprimir", "rebaixar"}
 NIVEIS_VALIDOS = {"critico", "atencao", "informativo"}
 # Fatos que entram na memória de trabalho vindos de fora das regras (usuário, registros, laudos, sistema).
-PREFIXOS_ENTRADA = ("lote.", "dieta.", "mon.", "laudo.", "fazenda.", "formulacao.", "pl.")
+PREFIXOS_ENTRADA = ("lote.", "dieta.", "mon.", "laudo.", "fazenda.", "formulacao.", "pl.", "transicao.", "estoque.", "prev.")
 _TEMPLATE = re.compile(r"\{([@a-z_][\w\.]*)(?::[^}]+)?\}")
 
 
@@ -106,7 +108,7 @@ def validar(kb: BaseConhecimento) -> None:
                     erros.append(f"{rid}: problema '{spec['problema']}' deve ser uma chave (a-z, 0-9, _)")
                 if spec.get("nivel", "atencao") not in NIVEIS_VALIDOS:
                     erros.append(f"{rid}: nível de alerta inválido {spec.get('nivel')}")
-                for campo in ("titulo", "causa", "acao"):
+                for campo in ("titulo", "causa", "acao", "titulo_produtor", "causa_produtor", "acao_produtor"):
                     for ref in _TEMPLATE.findall(spec.get(campo, "")):
                         if ref.startswith("@params.") and ref[8:] not in kb.params:
                             erros.append(f"{rid}: {campo} cita @{ref[1:]} inexistente")

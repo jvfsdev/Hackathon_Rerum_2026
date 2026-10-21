@@ -31,6 +31,9 @@
         titulo: "Calibrando a curva de lactação do lote ({mon.calibrando_dias} dia(s) de registro)"
         causa: "A produção esperada é ajustada à fazenda com pelo menos {@params.calibracao_dias_min} dias sem calor forte."
         acao: "Continue registrando; os alertas de queda começam após a calibração."
+        titulo_produtor: "Ainda aprendendo a produção normal deste lote ({mon.calibrando_dias} dia(s) de registro)"
+        causa_produtor: "O sistema precisa de alguns dias de anotação para saber quanto este lote costuma produzir."
+        acao_produtor: "Continue anotando o leite todo dia; os avisos de queda começam depois disso."
   fonte: "Inferências (ajuste da escala da curva nas primeiras semanas)"
   forca: D
 
@@ -50,6 +53,9 @@
         titulo: "Queda brusca hoje: {mon.litros_vaca:.1f} L/vaca contra {mon.esperado_vaca:.1f} esperados"
         causa: "Um dia isolado muito abaixo costuma ser falha de ordenha, erro de registro ou tanque não coletado."
         acao: "Conferir o registro e a ordenha antes de mexer na dieta."
+        titulo_produtor: "O leite caiu de repente hoje: {mon.litros_vaca:.1f} L por vaca (o normal seria {mon.esperado_vaca:.1f})"
+        causa_produtor: "Queda de um dia só costuma ser problema na ordenha, erro na anotação ou leite que não foi para o tanque."
+        acao_produtor: "Confira a anotação e a ordenha antes de mexer na comida."
   fonte: "SPC (Shewhart) sobre resíduo padronizado"
   forca: D
 
@@ -111,6 +117,9 @@
         titulo: "Queda sustentada de produção: {mon.litros_vaca:.1f} L/vaca ({mon.residuo:.0%} do esperado)"
         causa: "{mon.corrida_dias} dia(s) seguidos abaixo da curva esperada para o DEL do lote."
         acao: "Checar silagem/MS, ITU, vacas doentes e mudanças registradas na semana."
+        titulo_produtor: "O leite está caindo há vários dias: {mon.litros_vaca:.1f} L por vaca"
+        causa_produtor: "Hoje o lote está {mon.residuo:+.0%} em relação ao normal para esta fase, e a queda não é de um dia só."
+        acao_produtor: "Veja a silagem, o calor, vacas doentes e o que mudou na semana."
   fonte: "Frontiers in Genetics 2022; de Mol 2012 (persistência)"
   forca: B
 
@@ -131,6 +140,9 @@
         titulo: "Causa provável da queda: troca de volumoso há {mon.dias_desde_troca_volumoso} dia(s)"
         causa: "Degrau de produção 1–3 dias após a troca, só neste lote."
         acao: "Medir a MS do novo volumoso, recalcular os kg de matéria natural e pedir bromatologia (com FDND)."
+        titulo_produtor: "A queda parece vir da troca do volumoso ({mon.dias_desde_troca_volumoso} dia(s) atrás)"
+        causa_produtor: "O leite caiu logo depois que o volumoso foi trocado, só neste lote."
+        acao_produtor: "Meça a umidade do volumoso novo, ajuste os kg no trato e mande uma amostra para análise."
   fonte: "Dossiê ACP-08; Inferências (assinatura de troca de silagem)"
   forca: C
 
@@ -157,6 +169,9 @@
         titulo: "Calor explica a queda (ITU médio de 2 dias = {mon.itu_2d:.1f})"
         causa: "Queda acompanhando ITU acima de {mon.itu_limiar:.0f}, sem troca recente de dieta."
         acao: "Sombra, aspersão, água e tratos nas horas frescas antes de mudar a dieta."
+        titulo_produtor: "O calor explica a queda do leite"
+        causa_produtor: "Os dois últimos dias foram quentes e abafados para as vacas, e a comida não mudou."
+        acao_produtor: "Sombra, água à vontade, molhar as vacas e tratar nas horas frescas. Não precisa mudar a dieta."
   fonte: "Dossiê ACP-10; Negri 2021; LUME UFRGS"
   forca: B
 
@@ -175,6 +190,9 @@
         titulo: "Baixa eficiência do concentrado: {mon.litros_por_kg_conc:.1f} L/kg"
         causa: "Excesso de suplementação ou volumoso/pasto limitante."
         acao: "Rever a quantidade de concentrado por vaca e checar o volumoso."
+        titulo_produtor: "Pouco leite para o concentrado gasto: {mon.litros_por_kg_conc:.1f} L por kg"
+        causa_produtor: "Pode estar sobrando concentrado ou faltando volumoso ou pasto bom."
+        acao_produtor: "Reveja quanto concentrado cada vaca recebe e confira o volumoso."
   fonte: "Inferências (C/D)"
   forca: D
 
@@ -194,6 +212,9 @@
         titulo: "Concentrado extra não se paga: {mon.resposta_marginal:+.2f} L por kg"
         causa: "Cada kg a mais de concentrado precisa render {mon.razao_precos:.2f} L para se pagar (preço conc./preço leite)."
         acao: "Voltar ao nível anterior de concentrado; em mestiças de baixa produção o ótimo costuma ficar abaixo de 1 kg/vaca."
+        titulo_produtor: "O concentrado a mais não está se pagando"
+        causa_produtor: "Cada kg extra rendeu {mon.resposta_marginal:+.2f} L, mas precisaria render {mon.razao_precos:.2f} L para cobrir o preço."
+        acao_produtor: "Volte para a quantidade de concentrado de antes."
   fonte: "de Abreu, Lana et al. 2013 (resposta marginal 0,15–0,97 kg/kg)"
   forca: B
 
@@ -214,6 +235,9 @@
         titulo: "Custo de concentrado subiu: R$ {mon.custo_conc_litro:.2f}/L (ref. R$ {mon.custo_conc_litro_ref:.2f})"
         causa: "Mais concentrado por litro produzido do que no último mês."
         acao: "Rever alocação e preços; conferir se a produção caiu."
+        titulo_produtor: "O concentrado está custando mais por litro: R$ {mon.custo_conc_litro:.2f} (antes R$ {mon.custo_conc_litro_ref:.2f})"
+        causa_produtor: "Está indo mais concentrado para cada litro do que no último mês."
+        acao_produtor: "Reveja quanto concentrado vai para cada lote e os preços; veja se o leite caiu."
   fonte: "Penn State (IOFC); Inferências"
   forca: D
 
@@ -232,6 +256,9 @@
         titulo: "Alimentação consome {mon.alimento_pct_receita:.0f}% da receita (IOFC R$ {mon.iofc:.2f}/vaca/dia)"
         causa: "Com a alimentação acima de ~60% da receita, a margem sobre o alimento (IOFC) fica baixa."
         acao: "Rever preços, sobras e a dieta (a sugestão de custo mínimo pode baixar o custo)."
+        titulo_produtor: "A comida está levando {mon.alimento_pct_receita:.0f}% do dinheiro do leite"
+        causa_produtor: "Sobram R$ {mon.iofc:.2f} por vaca por dia depois de pagar a comida; acima de 60% a margem fica apertada."
+        acao_produtor: "Confira preços e sobras e peça a sugestão de dieta mais barata."
   fonte: "Penn State (IOFC)"
   forca: C
 
@@ -265,6 +292,9 @@
         titulo: "Eficiência alimentar baixa: {mon.ea:.2f} kg de leite corrigido por kg de MS"
         causa: "Abaixo de 1,3 no meio da lactação a dieta rende pouco leite por kg consumido (referência de Holandesas)."
         acao: "Conferir digestibilidade do volumoso, sobras e balanceamento; comparar com o histórico do próprio lote."
+        titulo_produtor: "As vacas estão rendendo pouco leite para o que comem"
+        causa_produtor: "Cada kg de comida seca está virando só {mon.ea:.2f} kg de leite."
+        acao_produtor: "Confira a qualidade do volumoso, as sobras e o balanceamento da dieta."
   fonte: "eXtension (Holandesas EUA — comparar com o histórico do lote)"
   forca: C
 
@@ -284,6 +314,9 @@
         titulo: "Eficiência {mon.ea:.2f} no início da lactação: perda de peso excessiva"
         causa: "EA acima de 2,0 no início indica leite produzido à custa de reserva corporal, não mérito da dieta."
         acao: "Elevar a densidade energética e acompanhar o ECC."
+        titulo_produtor: "As recém-paridas estão tirando leite do próprio corpo"
+        causa_produtor: "Estão produzindo muito para o que comem: estão emagrecendo."
+        acao_produtor: "Dê uma dieta mais forte (mais energia) e acompanhe o escore corporal."
   fonte: "eXtension"
   forca: C
 
@@ -317,6 +350,9 @@
         titulo: "Sobras baixas: {mon.sobras_texto}; meta {meta.sobras.min:.0f}–{meta.sobras.max:.0f}% (escore 3)"
         causa: "O lote está comendo tudo; o consumo pode estar limitado pela oferta."
         acao: "Aumentar a oferta em 2–3% e esperar 3 dias antes de novo ajuste."
+        titulo_produtor: "As vacas estão limpando o cocho: {mon.sobras_texto}"
+        causa_produtor: "O lote come tudo; pode estar faltando comida."
+        acao_produtor: "Aumente o trato em 2–3% e espere 3 dias antes de mexer de novo."
   fonte: "eXtension; SDSU; Inferências (ajustar só após 3 dias fora da meta)"
   forca: B
 
@@ -330,11 +366,15 @@
     - {fato: mon.sobras_min3, op: ">", valor: $meta.sobras.max}
   entao:
     - alerta:
+        problema: cocho_alto
         nivel: atencao
         categoria: cocho
         titulo: "Sobras altas: {mon.sobras_texto}; meta {meta.sobras.min:.0f}–{meta.sobras.max:.0f}% (escore 3)"
         causa: "Oferta acima do consumo, rejeição ou seleção da dieta."
         acao: "Reduzir a oferta em 2–3% e observar se sobra a parte grossa (seleção)."
+        titulo_produtor: "Está sobrando muita comida no cocho: {mon.sobras_texto}"
+        causa_produtor: "A oferta está maior que o consumo, ou as vacas estão escolhendo o que comem."
+        acao_produtor: "Diminua o trato em 2–3% e veja se sobra só a parte grossa."
   fonte: "eXtension; SDSU; Dossiê ACP-07"
   forca: B
 
@@ -355,6 +395,8 @@
         titulo: "Cocho vazio há {mon.dias_cocho_vazio} leituras"
         causa: "Consumo possivelmente limitado num lote que precisa comer o máximo."
         acao: "Aumentar a oferta ~5% e empurrar o trato mais vezes ao dia."
+        causa_produtor: "Vacas recém-paridas ou de alta produção precisam comer o máximo."
+        acao_produtor: "Aumente o trato uns 5% e empurre a comida mais vezes por dia."
   fonte: "Dossiê ACP-06; DeVries 2023"
   forca: C
 
@@ -375,5 +417,77 @@
         titulo: "Cocho vazio há {mon.dias_cocho_vazio} leituras"
         causa: "Oferta abaixo do consumo."
         acao: "Aumentar a oferta ~5%."
+        causa_produtor: "A comida não está dando para o lote."
+        acao_produtor: "Aumente o trato uns 5%."
   fonte: "Dossiê ACP-06"
   forca: C
+
+- id: ACP-TR1
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Sobras altas durante a adaptação à dieta nova — o lote está rejeitando a mudança
+  prioridade: 62
+  cf: 0.8
+  se:
+    - {fato: mon.em_adaptacao_dieta, op: "=", valor: true}
+    - {fato: mon.sobras_min3, op: ">", valor: $meta.sobras.max}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: cocho
+        problema: cocho_alto
+        titulo: "Rejeição da dieta nova: {mon.sobras_texto} ({mon.dias_dieta_nova} dia(s) após a troca)"
+        causa: "Sobras acima da faixa durante a adaptação indicam que o lote estranhou a dieta (palatabilidade, mistura)."
+        acao: "Manter a etapa atual da transição por mais 2 dias antes de avançar; conferir mistura e seleção."
+        titulo_produtor: "As vacas estão estranhando a dieta nova: {mon.sobras_texto}"
+        causa_produtor: "Está sobrando comida desde a troca da dieta."
+        acao_produtor: "Segure a mistura de hoje por mais 2 dias antes de avançar na troca e veja se a mistura está boa."
+  fonte: "Penn State Extension (adaptação a nova dieta); eXtension (leitura de cocho)"
+  forca: C
+
+- id: ACP-TR2
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Fezes moles durante a adaptação à dieta nova
+  prioridade: 62
+  cf: 0.7
+  se:
+    - {fato: mon.em_adaptacao_dieta, op: "=", valor: true}
+    - {fato: mon.fezes, op: "<=", valor: "@params.fezes_acidose_max"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Fezes moles (escore {mon.fezes}) na adaptação à dieta nova"
+        causa: "Mudança rápida de amido ou de volumoso altera a fermentação no rúmen."
+        acao: "Voltar uma etapa da transição e avançar mais devagar; conferir a proporção de concentrado."
+        titulo_produtor: "Fezes moles depois da troca de dieta"
+        causa_produtor: "A troca pode ter sido rápida demais para o rúmen."
+        acao_produtor: "Volte um passo na mistura e avance mais devagar."
+  fonte: "Hutjens (escore de fezes); Penn State"
+  forca: C
+
+- id: ACP-TR3
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Queda sustentada durante a adaptação à dieta nova (sem troca de volumoso registrada)
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: mon.em_adaptacao_dieta, op: "=", valor: true}
+    - {fato: hipotese.queda_sustentada, op: "=", valor: true}
+    - {fato: mon.dias_desde_troca_volumoso, op: ausente}
+  entao:
+    - concluir: {fato: hipotese.causa_dieta_nova, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: dieta_queda
+        titulo: "Causa provável da queda: adaptação à dieta nova ({mon.dias_dieta_nova} dia(s) após a troca)"
+        causa: "A queda começou no período de adaptação à nova versão da dieta."
+        acao: "Conferir se a dieta nova está sendo misturada e fornecida como planejado; avançar a transição mais devagar."
+        titulo_produtor: "A queda do leite pode ser da troca de dieta"
+        causa_produtor: "O leite caiu durante a adaptação à dieta nova."
+        acao_produtor: "Confira se a dieta nova está sendo misturada e dada como no plano; vá mais devagar na troca."
+  fonte: "Penn State Extension"
+  forca: C
+

@@ -40,6 +40,9 @@
         titulo: "NUL alto: {laudo.nul:.1f} mg/dL"
         causa: "Proteína degradável acima da energia fermentável: sobra amônia, vira ureia (desperdício)."
         acao: "Reduzir ~1 p.p. de PB (≈ −2 mg/dL de NUL) ou aumentar energia fermentável (milho)."
+        titulo_produtor: "Ureia do leite alta ({laudo.nul:.1f}): está sobrando proteína"
+        causa_produtor: "Proteína a mais não vira leite: sai na urina e custa caro."
+        acao_produtor: "Diminua um pouco o farelo de soja ou a ureia, ou aumente o milho."
   fonte: "Penn State; Embrapa Pedroso 2011"
   forca: B
 
@@ -58,6 +61,9 @@
         titulo: "NUL {laudo.nul:.1f} mg/dL: risco reprodutivo"
         causa: "Acima de ~19,5 mg/dL a chance de prenhez cai cerca de 43% (OR 0,57)."
         acao: "Ajustar a relação proteína:energia antes da estação de inseminação."
+        titulo_produtor: "Ureia do leite muito alta ({laudo.nul:.1f}): atrapalha a vaca emprenhar"
+        causa_produtor: "Com a ureia do leite nesse nível, a chance de prenhez cai quase pela metade."
+        acao_produtor: "Acerte a proteína e a energia da dieta antes das inseminações."
   fonte: "Raboisson et al. 2017 (meta-análise)"
   forca: A
 
@@ -79,6 +85,9 @@
         titulo: "NUL baixo ({laudo.nul:.1f} mg/dL) com produção abaixo do esperado"
         causa: "Proteína degradável pode estar limitando a produção."
         acao: "Rever a proteína degradável (farelo de soja, ureia até 1% da MS)."
+        titulo_produtor: "Ureia do leite baixa e o leite abaixo do normal"
+        causa_produtor: "Pode estar faltando proteína para produzir mais."
+        acao_produtor: "Reveja o farelo de soja ou a ureia da dieta (ureia no máximo 1% da comida seca)."
   fonte: "Magalhães UFV 2003; Meyer et al. 2006 (alvo único de NUL não vale)"
   forca: B
 
@@ -124,6 +133,9 @@
         titulo: "Suspeita de acidose ruminal subaguda"
         causa: "Evidências combinadas (G:P do leite, fezes, ruminação) apontam pouca fibra efetiva."
         acao: "Aumentar fibra efetiva (FDNfe), reduzir amido rápido e checar o tamanho de partícula."
+        titulo_produtor: "Sinais de acidose (rúmen azedo)"
+        causa_produtor: "A gordura do leite, as fezes e a ruminação indicam pouca fibra para o rúmen."
+        acao_produtor: "Mais volumoso, picado no tamanho certo, e menos milho ou grão fino."
   fonte: "Dossiê; MYCIN (combinação de CFs)"
   forca: C
 
@@ -144,6 +156,9 @@
         titulo: "G:P {laudo.gp:.2f} em recém-paridas: risco de cetose subclínica"
         causa: "Gordura alta em relação à proteína indica mobilização de gordura corporal."
         acao: "Aumentar a densidade energética e o acesso ao cocho; testar BHB em ≥12 vacas."
+        titulo_produtor: "Recém-paridas gastando gordura do corpo (risco de cetose)"
+        causa_produtor: "Gordura do leite alta em relação à proteína é sinal de que estão usando a reserva do corpo."
+        acao_produtor: "Dieta mais forte, cocho sempre com comida e teste de cetose em algumas vacas."
   fonte: "Penn State (cetose subclínica)"
   forca: B
 
@@ -164,6 +179,9 @@
         titulo: "Gordura do leite caiu {laudo.gordura_delta:.2f} p.p. com proteína estável"
         causa: "Depressão da gordura: amido rápido, partícula fina, óleo insaturado ou MS da silagem não corrigida."
         acao: "Mais fibra efetiva, menos amido rápido/óleo; reavaliar em 7–14 dias."
+        titulo_produtor: "A gordura do leite caiu ({laudo.gordura_delta:+.2f} ponto)"
+        causa_produtor: "Pode ser grão demais, comida muito picada, óleo ou silagem mais úmida sem ajuste no trato."
+        acao_produtor: "Mais fibra, menos grão e óleo; confira de novo em 1 a 2 semanas."
   fonte: "eXtension (gordura do leite)"
   forca: C
 
@@ -186,6 +204,9 @@
         titulo: "Mastite primeiro: lactose {laudo.lactose:.2f}% com CCS subindo"
         causa: "Lactose e ESD baixos com CCS em alta são sinal de mastite, não de dieta."
         acao: "CMT/caneca no lote, cultura das vacas suspeitas e revisão da rotina de ordenha. Não mudar a dieta agora."
+        titulo_produtor: "Cuide primeiro da mastite"
+        causa_produtor: "O laudo (lactose {laudo.lactose:.2f}% e CCS subindo) indica mastite, não problema de comida."
+        acao_produtor: "Teste da caneca ou CMT, cultura das vacas suspeitas e revisão da ordenha. Não mude a dieta agora."
   fonte: "IN 76/2018; Inferências"
   forca: A
 
@@ -205,6 +226,9 @@
         titulo: "CCS {laudo.ccs_mg3:.0f} mil acima do limite da IN 76 (500 mil)"
         causa: "Mastite subclínica custa ~{mon.perda_ccs.pct:.0f}% da produção: ≈ R$ {mon.perda_ccs.rs_mes:.0f}/mês neste lote."
         acao: "Checklist de mastite: pré e pós-dipping, linha de ordenha, tratamento na secagem, descarte de crônicas."
+        titulo_produtor: "CCS {laudo.ccs_mg3:.0f} mil: acima do limite do laticínio (500 mil)"
+        causa_produtor: "A mastite escondida custa cerca de R$ {mon.perda_ccs.rs_mes:.0f} por mês neste lote."
+        acao_produtor: "Pré e pós-dipping, máquina de ordenha, tratamento na secagem e descarte das vacas crônicas."
   fonte: "IN 76/2018; eXtension (perdas por CCS)"
   forca: A
 
@@ -224,6 +248,9 @@
         titulo: "CCS {laudo.ccs_mg3:.0f} mil: perto do limite regulatório"
         causa: "Três meses acima de 500 mil suspendem a coleta."
         acao: "Rever rotina de ordenha e identificar vacas com CCS alta."
+        titulo_produtor: "CCS {laudo.ccs_mg3:.0f} mil: chegando perto do limite"
+        causa_produtor: "Três meses acima de 500 mil e o laticínio pode suspender a coleta."
+        acao_produtor: "Revise a ordenha e descubra quais vacas estão com CCS alta."
   fonte: "IN 76/2018"
   forca: A
 
@@ -242,6 +269,9 @@
         titulo: "CBT {laudo.cbt_mg3:.0f} mil UFC/mL acima do limite (300 mil)"
         causa: "CBT alta indica higiene de ordenha, resfriamento ou limpeza do equipamento."
         acao: "Checklist de ordenha e tanque (≤ 4 °C em até 3 h); não mexer na dieta."
+        titulo_produtor: "Bactérias no leite (CBT {laudo.cbt_mg3:.0f} mil) acima do limite"
+        causa_produtor: "É higiene da ordenha, resfriamento ou limpeza do equipamento."
+        acao_produtor: "Limpeza da ordenha e do tanque; leite a 4 °C em até 3 horas. Não é a dieta."
   fonte: "IN 76/2018"
   forca: A
 
@@ -260,6 +290,9 @@
         titulo: "Crioscopia {laudo.crioscopia:.3f} °H fora da faixa (−0,555 a −0,530)"
         causa: "Fora da faixa indica água no leite (equipamento, lavagem), problema de manejo ou de amostra."
         acao: "Conferir o escoamento da ordenhadeira e do tanque e a coleta da amostra; pedir nova análise."
+        titulo_produtor: "Possível água no leite (crioscopia fora da faixa)"
+        causa_produtor: "Pode ser água que ficou no equipamento ou na lavagem, ou problema na amostra."
+        acao_produtor: "Confira o escorrimento da ordenhadeira e do tanque e peça nova análise."
   fonte: "IN 76/2018"
   forca: A
 
@@ -278,6 +311,9 @@
         titulo: "Bonificação: R$ {mon.bonificacao_rs_l:+.3f}/L hoje; deixando de ganhar ~R$ {mon.bonificacao_perda_rs_mes:.0f}/mês"
         causa: "Pela tabela do laticínio, a qualidade atual não está na melhor faixa: {mon.bonificacao_detalhe}."
         acao: "Priorizar o parâmetro com maior perda (CCS/CBT: rotina de ordenha e resfriamento; sólidos: dieta)."
+        titulo_produtor: "Bonificação de R$ {mon.bonificacao_rs_l:+.3f}/L: dá para ganhar ~R$ {mon.bonificacao_perda_rs_mes:.0f} a mais por mês"
+        causa_produtor: "A qualidade do leite não está na melhor faixa da tabela do laticínio ({mon.bonificacao_detalhe})."
+        acao_produtor: "Comece pelo item que mais tira dinheiro (CCS e CBT: ordenha e resfriamento; sólidos: dieta)."
   fonte: "Tabela de bonificação do laticínio da fazenda; Dias et al. (Embrapa)"
   forca: B
 
@@ -297,5 +333,8 @@
         titulo: "Causa provável da queda: mastite"
         causa: "Queda de produção junto com lactose baixa e CCS em alta."
         acao: "Priorizar o controle de mastite; a dieta não é a causa provável."
+        titulo_produtor: "A queda do leite parece ser mastite"
+        causa_produtor: "O leite caiu junto com sinais de mastite no laudo."
+        acao_produtor: "Cuide da mastite primeiro; a comida não parece ser a causa."
   fonte: "Inferências (assinatura de surto de mastite)"
   forca: C

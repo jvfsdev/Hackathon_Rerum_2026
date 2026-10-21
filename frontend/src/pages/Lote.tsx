@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { CartesianGrid, ComposedChart, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { api, comEpisodios, dataBR, fmt, OPCOES, rotulo, UNIDADES, type Alerta, type Alimento, type Dieta, type ItemDieta, type ItemHistorico, type Lote, type Resultado } from '../api'
+import { api, certeza, comEpisodios, dataBR, fmt, numero, OPCOES, reais, rotulo, tecnico, textoAlerta, UNIDADES, type Alerta, type Alimento, type Dieta, type ItemDieta, type ItemHistorico, type Lote, type Resultado } from '../api'
 import LoteForm from '../components/LoteForm'
 import { EscalaEscore } from '../components/Escala'
-import { AlertaItem, BotaoComo, Carregando, CfBarra, Erro, ExplicacaoAlerta, Gaveta, LinhaDoTempo, NivelBadge, Painel } from '../components/ui'
+import { AjusteMinimo, AlertaItem, BotaoComo, Carregando, CfBarra, Erro, ExplicacaoAlerta, Gaveta, LinhaDoTempo, NivelBadge, Painel } from '../components/ui'
+import { AbaPrevisao, AbaSimular, AbaTrato, PlanoTransicao, Sensibilidade } from './LoteExtras'
 
 const aba = ({ isActive }: { isActive: boolean }) =>
   `whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${isActive ? 'border-campo-600 text-campo-700' : 'border-transparent text-stone-500 hover:text-stone-800'}`
@@ -26,7 +27,8 @@ export default function LotePagina() {
         <h1 className="text-xl font-semibold text-stone-900">{lote.nome}</h1>
         <p className="text-sm text-stone-500">
           {lote.n_vacas} vacas · {OPCOES[lote.grupo_genetico]} · {OPCOES[lote.sistema]} · {OPCOES[lote.estado]}
-          {fatos['lote.del'] !== undefined && ` · DEL ${Math.round(fatos['lote.del'])}`} · PV {lote.pv} kg
+          {fatos['lote.del'] !== undefined && (tecnico() ? ` · DEL ${Math.round(fatos['lote.del'])}` : ` · ${Math.round(fatos['lote.del'])} dias de lactação`)}
+          {tecnico() ? ` · PV ${lote.pv} kg` : ` · peso médio ${lote.pv} kg`}
           {fatos['lote.leite'] !== undefined && ` · ${fmt(fatos['lote.leite'])} L/vaca (média 7 d)`}
         </p>
        </div>
@@ -36,15 +38,21 @@ export default function LotePagina() {
         <LoteForm lote={lote} fatos={fatos} onSalvo={() => { setEditando(false); recarregar() }} />
       </Gaveta>
       <nav className="-mx-4 flex overflow-x-auto border-b border-stone-200 px-4">
-        <NavLink end to="" className={aba}>Perfil e exigências</NavLink>
+        <NavLink end to="" className={aba}>{tecnico() ? 'Perfil e exigências' : 'Resumo'}</NavLink>
         <NavLink to="dieta" className={aba}>Dieta</NavLink>
+        <NavLink to="simular" className={aba}>Simular (e se?)</NavLink>
+        <NavLink to="trato" className={aba}>Trato</NavLink>
+        <NavLink to="previsao" className={aba}>Previsão</NavLink>
         <NavLink to="acompanhamento" className={aba}>Acompanhamento</NavLink>
         <NavLink to="registro" className={aba}>Registro rápido</NavLink>
-        <NavLink to="alertas" className={aba}>Alertas e ações</NavLink>
+        <NavLink to="alertas" className={aba}>{tecnico() ? 'Alertas e ações' : 'Avisos'}</NavLink>
       </nav>
       <Routes>
         <Route index element={<AbaPerfil key={JSON.stringify(lote)} loteId={lote.id} />} />
         <Route path="dieta" element={<AbaDieta lote={lote} dietaAtiva={info.dieta} onSalvo={recarregar} />} />
+        <Route path="simular" element={<AbaSimular lote={lote} dieta={info.dieta} />} />
+        <Route path="trato" element={<AbaTrato lote={lote} />} />
+        <Route path="previsao" element={<AbaPrevisao lote={lote} />} />
         <Route path="acompanhamento" element={<AbaAcompanhamento loteId={lote.id} />} />
         <Route path="registro" element={<AbaRegistro lote={lote} />} />
         <Route path="alertas" element={<AbaAlertas loteId={lote.id} />} />
@@ -60,7 +68,7 @@ function AbaPerfil({ loteId }: { loteId: number }) {
   useEffect(() => { api.post<Resultado>(`/inferencia/lotes/${loteId}/avaliar`).then(setR).catch((e) => setErro(e.message)) }, [loteId])
   if (erro) return <Erro msg={erro} />
   if (!r) return <Carregando />
-  return <ResultadoAvaliacao r={r} linkDieta="dieta#sugerir" />
+  return <ResultadoAvaliacao r={r} linkDieta="dieta#sugerir" loteId={loteId} />
 }
 
 function Valor({ r, fato, destaque = false }: { r: Resultado; fato: string; destaque?: boolean }) {
@@ -80,7 +88,82 @@ function Valor({ r, fato, destaque = false }: { r: Resultado; fato: string; dest
 
 const COMPONENTES_ELL = ['exig.ell_mantenca', 'exig.ell_leite', 'exig.ell_gestacao', 'exig.ell_crescimento', 'exig.ell_atividade', 'exig.ell_ecc']
 
-export function ResultadoAvaliacao({ r, linkDieta }: { r: Resultado; linkDieta?: string }) {
+const PARECER_PRODUTOR: Record<string, [string, string]> = {
+  adequada: ['A dieta está boa para este lote ✓', 'Ela dá o que as vacas precisam, sem passar dos limites seguros.'],
+  ajustar: ['A dieta precisa de ajustes', 'Ela funciona, mas falta ou sobra alguma coisa. Veja abaixo.'],
+  bloqueada: ['A dieta tem um problema sério', 'Não use esta dieta como está: há risco para as vacas.'],
+}
+
+/** Resumo para o produtor: parecer, quanto o lote come, leite que a comida sustenta e o que está faltando/sobrando. */
+function ResumoProdutor({ r, linkDieta, loteId }: { r: Resultado; linkDieta?: string; loteId?: number }) {
+  const [aberto, setAberto] = useState<Alerta | null>(null)
+  const v = (f: string) => r.fatos[f]?.valor
+  const parecer = r.fatos['parecer.dieta']
+  const motivos = r.alertas.filter((a) => a.status === 'ativo' && a.nivel !== 'informativo' && ['dieta', 'formulacao'].includes(a.categoria))
+  const leiteMeta = v('lote.leite'), permitido = v('ver.leite_permitido')
+  return (
+    <div className="space-y-4">
+      {parecer && (
+        <div className={`card p-4 ${parecer.valor === 'adequada' ? 'border-campo-500 bg-campo-50' : parecer.valor === 'bloqueada' ? 'border-red-300 bg-red-50' : 'border-amber-300 bg-amber-50'}`}>
+          <p className="text-lg font-semibold text-stone-900">{PARECER_PRODUTOR[parecer.valor]?.[0] ?? fmt(parecer.valor)}</p>
+          <p className="text-sm text-stone-600">{PARECER_PRODUTOR[parecer.valor]?.[1]} <span className="text-stone-400">({certeza(parecer.cf)})</span></p>
+          {motivos.length > 0 && <ul className="mt-2 ml-4 list-disc space-y-0.5 text-sm text-stone-800">{motivos.map((a) => <li key={a.regra}>{textoAlerta(a).titulo}</li>)}</ul>}
+          {parecer.valor !== 'adequada' && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {linkDieta && <Link to={linkDieta} className="btn-primario">Pedir a dieta mais barata que resolve →</Link>}
+              {loteId && <span className="w-full"><AjusteMinimo loteId={loteId} /></span>}
+            </div>
+          )}
+        </div>
+      )}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Painel titulo="O lote">
+          <LinhaSimples rotulo="Fase" valor={fmt(v('perfil.fase'))} />
+          {v('lote.del') !== undefined && <LinhaSimples rotulo="Dias de lactação" valor={numero(v('lote.del'), 0)} />}
+          {v('perfil.estresse_termico') && <LinhaSimples rotulo="Calor" valor={`${fmt(v('perfil.estresse_termico'))} (índice ${numero(v('clima.itu'))})`} />}
+          {v('perfil.gestacao_avancada') && <LinhaSimples rotulo="Prenhez" valor="mais de 190 dias: precisa de mais comida" />}
+          {v('perfil.crescimento') && <LinhaSimples rotulo="Novilhas" valor="ainda crescendo: precisam de mais comida" />}
+        </Painel>
+        <Painel titulo="O que cada vaca precisa por dia">
+          <LinhaSimples rotulo="Comer" valor={`${numero(v('exig.cms'))} kg de matéria seca`} como={r.explicacoes?.['exig.cms']} />
+          {v('exig.pb_pct_alvo') !== undefined && <LinhaSimples rotulo="Proteína na dieta" valor={`${numero(v('exig.pb_pct_alvo'))}% da matéria seca`} como={r.explicacoes?.['exig.pb_pct_alvo']} />}
+          {v('meta.fdn_min') !== undefined && <LinhaSimples rotulo="Fibra na dieta" valor={`pelo menos ${numero(v('meta.fdn_min'), 0)}%`} />}
+        </Painel>
+        <Painel titulo="O que a dieta dá">
+          {v('dieta.ms_kg') !== undefined ? <>
+            <LinhaSimples rotulo="Comida oferecida" valor={`${numero(v('dieta.ms_kg'))} kg de matéria seca`} />
+            {v('ver.razao_energia') !== undefined && <LinhaSimples rotulo="Energia" valor={`${fmt(v('ver.razao_energia'), 'ver.razao_energia')} do necessário`} />}
+            {permitido !== undefined && leiteMeta !== undefined && <LinhaSimples rotulo="Leite que a comida sustenta" valor={`${numero(permitido)} L (hoje ${numero(leiteMeta)} L)`} />}
+            <LinhaSimples rotulo="Custo da comida" valor={`${reais(v('dieta.custo_vaca_dia'))} por vaca/dia`} />
+          </> : <p className="text-sm text-stone-500">Sem dieta cadastrada.</p>}
+        </Painel>
+      </div>
+      {v('dieta.ms_kg') !== undefined && <Comparacao r={r} />}
+      {r.alertas.length > 0 && (
+        <Painel titulo="Avisos" subtitulo={r.episodios ? 'Aceite para ajustar a dieta ou recuse dizendo o motivo.' : undefined}>
+          {comEpisodios(r).map((a, i) => <AlertaItem key={i} alerta={{ ...a, sessao_id: a.sessao_id ?? r.sessao_id }} onAbrir={() => setAberto({ ...a, sessao_id: a.sessao_id ?? r.sessao_id })} />)}
+        </Painel>
+      )}
+      <Gaveta aberta={!!aberto} onFechar={() => setAberto(null)} titulo="Entender o aviso">{aberto && <ExplicacaoAlerta alerta={aberto} />}</Gaveta>
+    </div>
+  )
+}
+
+function LinhaSimples({ rotulo: r, valor, como }: { rotulo: string; valor: string; como?: any }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-stone-100 py-1.5 text-sm last:border-0">
+      <span className="text-stone-600">{r}</span>
+      <span className="flex items-baseline gap-2 text-right font-medium text-stone-900">{valor}{como && <BotaoComo no={como} />}</span>
+    </div>
+  )
+}
+
+export function ResultadoAvaliacao({ r, linkDieta, loteId }: { r: Resultado; linkDieta?: string; loteId?: number }) {
+  if (!tecnico()) return <ResumoProdutor r={r} linkDieta={linkDieta} loteId={loteId} />
+  return <ResultadoTecnico r={r} linkDieta={linkDieta} />
+}
+
+function ResultadoTecnico({ r, linkDieta }: { r: Resultado; linkDieta?: string }) {
   const [aberto, setAberto] = useState<Alerta | null>(null)
   const temDieta = !!r.fatos['dieta.ms_kg']
   const total = r.fatos['exig.ell_total']?.valor ?? 0
@@ -143,7 +226,7 @@ export function ResultadoAvaliacao({ r, linkDieta }: { r: Resultado; linkDieta?:
       {temDieta && <Comparacao r={r} />}
       {r.alertas.length > 0 && (
         <Painel titulo="Conclusões e alertas" subtitulo={r.episodios ? 'Alertas da dieta ativa: aceite para ajustar a dieta ou recuse com o motivo.' : undefined}>
-          {comEpisodios(r).map((a, i) => <AlertaItem key={i} alerta={a} onAbrir={a.id ? () => setAberto(a) : undefined} />)}
+          {comEpisodios(r).map((a, i) => <AlertaItem key={i} alerta={a} onAbrir={() => setAberto({ ...a, sessao_id: a.sessao_id ?? r.sessao_id })} />)}
         </Painel>
       )}
       <Traco r={r} />
@@ -154,20 +237,22 @@ export function ResultadoAvaliacao({ r, linkDieta }: { r: Resultado; linkDieta?:
 
 function Comparacao({ r }: { r: Resultado }) {
   const v = (f: string) => r.fatos[f]?.valor
+  const t = tecnico()
   const linhas = [
-    { nome: 'Energia (ELl)', oferta: v('ver.ell_consumida'), alvo: v('exig.ell_total'), un: 'Mcal', tipo: 'min', tol: v('meta.fator_energia_min') ?? 0.95 },
-    { nome: 'Proteína bruta', oferta: v('dieta.pb_pct'), alvo: v('exig.pb_pct_alvo'), un: '% MS', tipo: 'min', tol: 0.95 },
-    { nome: 'Matéria seca', oferta: v('dieta.ms_kg'), alvo: v('exig.cms'), un: 'kg', tipo: 'faixa' },
-    { nome: 'FDN', oferta: v('dieta.fdn_pct'), alvo: v('meta.fdn_min'), un: '% MS', tipo: 'min', tol: 1 },
-    { nome: 'FDN de forragem', oferta: v('dieta.fdnf_pct'), alvo: v('meta.fdnf_min'), un: '% MS', tipo: 'min', tol: 1 },
-    { nome: 'CNF', oferta: v('dieta.cnf_pct'), alvo: v('meta.cnf_max'), un: '% MS', tipo: 'max' },
-    { nome: 'Gordura (EE)', oferta: v('dieta.ee_pct'), alvo: v('meta.ee_max'), un: '% MS', tipo: 'max' },
-    { nome: 'Ureia', oferta: v('dieta.ureia_pct'), alvo: v('meta.ureia_max'), un: '% MS', tipo: 'max' },
+    { nome: t ? 'Energia (ELl)' : 'Energia', oferta: v('ver.ell_consumida'), alvo: v('exig.ell_total'), un: t ? 'Mcal' : 'Mcal', tipo: 'min', tol: v('meta.fator_energia_min') ?? 0.95 },
+    { nome: t ? 'Proteína bruta' : 'Proteína', oferta: v('dieta.pb_pct'), alvo: v('exig.pb_pct_alvo'), un: '%', tipo: 'min', tol: 0.95 },
+    { nome: t ? 'Matéria seca' : 'Quantidade de comida', oferta: v('dieta.ms_kg'), alvo: v('exig.cms'), un: 'kg', tipo: 'faixa' },
+    { nome: t ? 'FDN' : 'Fibra', oferta: v('dieta.fdn_pct'), alvo: v('meta.fdn_min'), un: '%', tipo: 'min', tol: 1 },
+    { nome: t ? 'FDN de forragem' : 'Fibra do volumoso', oferta: v('dieta.fdnf_pct'), alvo: v('meta.fdnf_min'), un: '%', tipo: 'min', tol: 1 },
+    { nome: t ? 'CNF' : 'Amido e açúcares', oferta: v('dieta.cnf_pct'), alvo: v('meta.cnf_max'), un: '%', tipo: 'max' },
+    { nome: t ? 'Gordura (EE)' : 'Gordura', oferta: v('dieta.ee_pct'), alvo: v('meta.ee_max'), un: '%', tipo: 'max' },
+    { nome: 'Ureia', oferta: v('dieta.ureia_pct'), alvo: v('meta.ureia_max'), un: '%', tipo: 'max' },
     ...(r.fatos['perfil.fase']?.valor === 'pre_parto' && v('dieta.dcad_meq_kg') !== undefined
       ? [{ nome: 'DCAD (pré-parto)', oferta: v('dieta.dcad_meq_kg'), alvo: 0, un: 'mEq/kg', tipo: 'dcad' }] : []),
   ].filter((l) => l.oferta !== undefined && l.alvo !== undefined)
   return (
-    <Painel titulo="Oferta × exigência" subtitulo={`Dieta: ${fmt(v('dieta.ms_kg'))} kg MS · R$ ${fmt(v('dieta.custo_vaca_dia'))}/vaca/dia · ${fmt(v('dieta.forragem_pct'))}% de volumoso na MS`}>
+    <Painel titulo={t ? 'Oferta × exigência' : 'A dieta item por item'} subtitulo={t ? `Dieta: ${fmt(v('dieta.ms_kg'))} kg MS · R$ ${fmt(v('dieta.custo_vaca_dia'))}/vaca/dia · ${fmt(v('dieta.forragem_pct'))}% de volumoso na MS`
+      : `Barra verde: dentro do certo. Laranja: falta ou passou. A linha preta é o necessário. ${fmt(v('dieta.forragem_pct'))}% da comida é volumoso.`}>
       <div className="space-y-2">
         {linhas.map((l) => {
           const razao = l.tipo === 'dcad' ? (l.oferta + 300) / 300 : l.oferta / l.alvo
@@ -181,7 +266,9 @@ function Comparacao({ r }: { r: Resultado }) {
                 <span className="absolute inset-y-[-3px] w-0.5 bg-stone-800" style={{ left: `${(1 / 1.5) * 100}%` }} title="alvo" />
               </span>
               <span className="num text-right text-xs text-stone-700">
-                {fmt(l.oferta)} {l.tipo === 'max' || l.tipo === 'dcad' ? '≤' : l.tipo === 'min' ? '≥' : '≈'} {fmt(l.alvo)} {l.un} {ok ? '✓' : '⚠'}
+                {t ? <>{fmt(l.oferta)} {l.tipo === 'max' || l.tipo === 'dcad' ? '≤' : l.tipo === 'min' ? '≥' : '≈'} {fmt(l.alvo)} {l.un} {ok ? '✓' : '⚠'}</>
+                  : ok ? <span className="text-campo-700">ok</span>
+                  : <span className="font-medium text-atencao">{l.tipo === 'max' || l.tipo === 'dcad' ? 'passou do limite' : razao < 1 ? 'falta' : 'sobra'}</span>}
               </span>
             </div>
           )
@@ -193,6 +280,7 @@ function Comparacao({ r }: { r: Resultado }) {
 
 function Traco({ r }: { r: Resultado }) {
   const [aberto, setAberto] = useState(false)
+  if (!tecnico()) return null
   return (
     <Painel titulo="Traço de inferência" subtitulo={`${r.traco.length} regras disparadas · base v${r.kb_version}`}
       acoes={<button className="btn-secundario" onClick={() => setAberto(!aberto)}>{aberto ? 'Ocultar' : 'Mostrar'}</button>}>
@@ -236,8 +324,8 @@ function BannerAcao({ alerta, onCancelar }: { alerta: Alerta | null; onCancelar:
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-campo-700">Registrando a ação do alerta aceito</p>
-          <p className="mt-0.5 font-medium text-stone-900"><span className="font-mono text-xs text-stone-500">{alerta.regra}</span> {alerta.titulo}</p>
-          <p className="mt-1 text-sm text-stone-700"><b>Recomendação:</b> {alerta.acao}</p>
+          <p className="mt-0.5 font-medium text-stone-900">{tecnico() && <span className="font-mono text-xs text-stone-500">{alerta.regra} </span>}{textoAlerta(alerta).titulo}</p>
+          <p className="mt-1 text-sm text-stone-700"><b>{tecnico() ? 'Recomendação' : 'O que fazer'}:</b> {textoAlerta(alerta).acao}</p>
           <p className="mt-1 text-xs text-stone-500">O que você salvar nesta tela entra no histórico do alerta. A resolução é confirmada pelo sistema quando a condição deixar de valer.</p>
         </div>
         <button className="text-sm text-stone-500 hover:underline" onClick={onCancelar}>não registrar agora</button>
@@ -259,6 +347,8 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
   const [motivo, setMotivo] = useState('')
   const [ocupado, setOcupado] = useState('')
   const [erro, setErro] = useState('')
+  const [gradual, setGradual] = useState(true)
+  const [ajustando, setAjustando] = useState(false)
   // de onde veio o que está no editor: dieta ativa, sugestão do PL ou versão anterior
   const [base, setBase] = useState<{ rotulo: string; origem: string; motivo: string; itens: ItemDieta[] }>(
     { rotulo: dietaAtiva ? `Dieta ativa v${dietaAtiva.versao}` : 'Nova dieta', origem: 'usuario', motivo: '', itens: dietaAtiva?.itens ?? [] })
@@ -273,7 +363,7 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
   }
   /** Origem gravada na versão: sugestão do PL intacta, PL ajustada à mão, retorno a uma versão ou manual. */
   const origemAoSalvar = () => base.origem === 'pl' ? (alterado ? 'pl_ajustada' : 'pl')
-    : base.origem === 'restauracao' ? (alterado ? 'usuario' : 'restauracao') : 'usuario'
+    : ['restauracao', 'ajuste', 'simulacao'].includes(base.origem) ? (alterado ? 'usuario' : base.origem) : 'usuario'
 
   useEffect(() => {
     // catálogo da fazenda (base + insumos cadastrados), com o preço vigente de cada um
@@ -281,10 +371,17 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
     api.get<Dieta[]>(`/lotes/${lote.id}/dietas`).then(setVersoes)
   }, [lote.id, lote.fazenda_id])
   useEffect(() => { setEscolhidos(Array.from(new Set([...(dietaAtiva?.itens.map((i) => i.alimento) ?? []), 'ureia']))) }, [dietaAtiva])
-  const { hash } = useLocation()
+  const loc = useLocation()
+  const hash = loc.hash
   useEffect(() => {
     if (hash === '#sugerir' && alimentos.length) document.getElementById('sugerir')?.scrollIntoView({ behavior: 'smooth' })
   }, [hash, alimentos.length])
+  // veio do "o que precisaria mudar" ou do simulador com uma dieta pronta para revisar
+  useEffect(() => {
+    const st = loc.state as { itensAjuste?: ItemDieta[]; rotulo?: string; origem?: string } | null
+    if (st?.itensAjuste) carregarNoEditor(st.itensAjuste, st.rotulo ?? 'Menor mudança calculada', st.origem ?? 'ajuste',
+      st.origem === 'simulacao' ? 'Dieta testada no simulador' : 'Menor mudança para corrigir a dieta')
+  }, [loc.state])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const nome = (id: string) => alimentos.find((a) => a.id === id)?.nome ?? id
   const verificar = async () => {
@@ -295,11 +392,12 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
   const salvar = async (lista: ItemDieta[], origem: string, mot: string) => {
     setOcupado('salvar'); setErro('')
     try {
-      const d = await api.post<Dieta>(`/lotes/${lote.id}/dietas`, { itens: lista, motivo: mot || 'Ajuste manual', origem, alerta_id: alertaId })
+      const d = await api.post<Dieta>(`/lotes/${lote.id}/dietas`, { itens: lista, motivo: mot || 'Ajuste manual', origem, alerta_id: alertaId, gradual })
       setVersoes(await api.get<Dieta[]>(`/lotes/${lote.id}/dietas`)); setMotivo(''); onSalvo()
       const salvos = lista.map((i) => ({ ...i }))
       setItens(salvos); setBase({ rotulo: `Dieta ativa v${d.versao}`, origem: 'usuario', motivo: '', itens: salvos.map((i) => ({ ...i })) })
-      setRegistrado(alertaId ? `Dieta v${d.versao} salva e registrada como ação do alerta ${alerta?.regra ?? ''}.` : `Dieta v${d.versao} salva.`)
+      const troca = d.transicao ? ` A troca será feita aos poucos, em ${d.transicao.dias} dias: a planilha de trato já mostra a mistura de cada dia.` : ''
+      setRegistrado((alertaId ? `Dieta v${d.versao} salva e registrada como ação do aviso.` : `Dieta v${d.versao} salva.`) + troca)
       if (alertaId) concluir()
     } catch (e: any) { setErro(e.message) }
     setOcupado('')
@@ -320,7 +418,7 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
       )}
       <div className="grid gap-4 lg:grid-cols-2">
         <div id="editor" className="scroll-mt-4">
-        <Painel titulo="Montar e verificar a dieta" subtitulo="Quantidades por vaca/dia em matéria natural (como fornecido)."
+        <Painel titulo="Montar e verificar a dieta" subtitulo={tecnico() ? 'Quantidades por vaca/dia em matéria natural (como fornecido).' : 'Quantos kg de cada alimento cada vaca recebe por dia (do jeito que vai no cocho).'}
           className={base.origem !== 'usuario' ? 'ring-2 ring-campo-500' : ''}>
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-600">
             <span>Editando a partir de: <b className="text-stone-800">{base.rotulo}</b></span>
@@ -358,10 +456,20 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
             <input className="input max-w-56" placeholder="Motivo da mudança" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
             <button className="btn-secundario" onClick={() => salvar(itens, origemAoSalvar(), motivo)} disabled={!!ocupado || !itens.length}>Salvar nova versão</button>
           </div>
+          <label className="mt-2 flex items-center gap-2 text-xs text-stone-600" title="As regras de transição decidem se a troca precisa ser gradual e em quantos dias.">
+            <input type="checkbox" className="accent-campo-600" checked={gradual} onChange={(e) => setGradual(e.target.checked)} />
+            Fazer a troca aos poucos quando a mudança for grande (recomendado)
+          </label>
+          <div className="mt-2">
+            {!ajustando
+              ? <button className="text-sm font-medium text-campo-600 hover:underline" onClick={() => setAjustando(true)} disabled={!itens.length}>Corrigir esta dieta com a menor mudança possível →</button>
+              : <AjusteMinimo key={JSON.stringify(itens)} loteId={lote.id} itens={itens}
+                  onUsar={(lista, custo) => { setAjustando(false); carregarNoEditor(lista, `Menor mudança (${reais(custo)}/vaca/dia)`, 'ajuste', 'Menor mudança para corrigir a dieta') }} />}
+          </div>
         </Painel>
         </div>
         <div id="sugerir" className="scroll-mt-4">
-        <Painel className={hash === '#sugerir' ? 'ring-2 ring-campo-500' : ''} titulo="Sugerir dieta de custo mínimo" subtitulo="As regras definem metas e restrições; a programação linear acha as quantidades; as regras verificam o resultado.">
+        <Painel className={hash === '#sugerir' ? 'ring-2 ring-campo-500' : ''} titulo={tecnico() ? 'Sugerir dieta de custo mínimo' : 'Sugerir a dieta mais barata'} subtitulo={tecnico() ? 'As regras definem metas e restrições; a programação linear acha as quantidades; as regras verificam o resultado.' : 'Marque o que tem na fazenda. O sistema monta a dieta mais barata que atende o lote e confere o resultado.'}>
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
             {alimentos.map((a) => (
               <label key={a.id} className="flex items-center gap-1.5 text-sm text-stone-700">
@@ -376,6 +484,7 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
             <button className="btn-primario" onClick={sugerir} disabled={!!ocupado || !escolhidos.length}>{ocupado === 'pl' ? 'Otimizando…' : 'Sugerir dieta'}</button>
             <Link to="/insumos" className="text-xs font-medium text-campo-600 hover:underline">Insumos e preços →</Link>
           </div>
+          {pl?.pl?.status === 'otimo' && <Sensibilidade loteId={lote.id} alimentos={escolhidos} />}
           {pl && <ResultadoPL pl={pl} nome={nome}
             onAceitar={(lista) => salvar(lista, 'pl', `Dieta de custo mínimo (PL), R$ ${pl.pl.custo.toFixed(2)}/vaca/dia`)}
             onEditar={(lista) => carregarNoEditor(lista, `Sugestão de custo mínimo (R$ ${pl.pl.custo.toFixed(2)}/vaca/dia)`, 'pl',
@@ -386,6 +495,7 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
       {ocupado === 'verificar' && <Carregando />}
       {res && <ResultadoAvaliacao r={res} />}
       <CalculadoraPearson alimentos={alimentos} />
+      {dietaAtiva?.transicao && <PlanoTransicao dieta={dietaAtiva} nome={nome} />}
       <Painel titulo="Versões da dieta" subtitulo="Cada ajuste vira uma nova versão com motivo e parecer. Uma versão antiga pode ser carregada no editor para modificar, ou reativada (vira uma nova versão; nada é apagado).">
         <ol className="space-y-2">
           {versoes.map((d) => (
@@ -396,7 +506,8 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
               <span className="rounded bg-stone-100 px-1.5 text-xs text-stone-600">{ORIGEM_DIETA[d.origem] ?? d.origem}</span>
               <span className="text-stone-700">{d.motivo}</span>
               <span className="w-full text-xs text-stone-500">{d.itens.map((i) => `${nome(i.alimento)} ${i.kg_mn} kg`).join(' · ')}</span>
-              {d.parecer?.parecer && <span className="text-xs text-stone-500">Parecer: <b>{fmt(d.parecer.parecer)}</b> (base v{d.parecer.kb_version})</span>}
+              {d.parecer?.parecer && <span className="text-xs text-stone-500">Parecer: <b>{fmt(d.parecer.parecer)}</b>{tecnico() && ` (base v${d.parecer.kb_version})`}</span>}
+              {d.transicao && <span className="text-xs text-campo-700">troca gradual em {d.transicao.dias} dias a partir da v{d.transicao.de_versao}</span>}
               <span className="flex w-full flex-wrap gap-3 text-xs">
                 <button className="font-medium text-campo-600 hover:underline" disabled={!!ocupado}
                   onClick={() => carregarNoEditor(d.itens, `Versão v${d.versao} (${new Date(d.inicio + 'T12:00').toLocaleDateString('pt-BR')})`,
@@ -460,6 +571,13 @@ function CalculadoraPearson({ alimentos }: { alimentos: Alimento[] }) {
 
 const ORIGEM_DIETA: Record<string, string> = {
   usuario: 'manual', pl: 'PL custo mínimo', pl_ajustada: 'PL ajustada à mão', restauracao: 'retorno a versão anterior',
+  ajuste: 'menor mudança', simulacao: 'testada no simulador',
+}
+
+const GRUPO_SIMPLES: Record<string, string> = {
+  consumo: 'quantidade de comida', energia: 'energia', excesso_energia: 'energia demais', proteina: 'proteína', fibra: 'fibra',
+  enchimento: 'fibra demais (enche a barriga)', cnf: 'amido e açúcares', gordura: 'gordura', ureia: 'ureia', cana: 'cana demais',
+  dcad: 'dieta aniônica', combinacao: 'a combinação dos limites',
 }
 
 function ResultadoPL({ pl, nome, onAceitar, onEditar }: { pl: any; nome: (id: string) => string; onAceitar: (itens: ItemDieta[]) => void; onEditar: (itens: ItemDieta[]) => void }) {
@@ -470,32 +588,34 @@ function ResultadoPL({ pl, nome, onAceitar, onEditar }: { pl: any; nome: (id: st
     <div className="mt-4 space-y-3">
       {alertas.filter((a) => a.nivel === 'critico').map((a, i) => (
         <div key={i} className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm">
-          <div className="flex items-center gap-2"><NivelBadge nivel={a.nivel} /><span className="font-mono text-xs">{a.regra}</span></div>
-          <p className="mt-1 font-medium text-stone-900">{a.titulo}</p>
-          <p className="text-stone-600">{a.causa}</p>
-          <p className="text-campo-700">{a.acao}</p>
+          <div className="flex items-center gap-2"><NivelBadge nivel={a.nivel} />{tecnico() && <span className="font-mono text-xs">{a.regra}</span>}</div>
+          <p className="mt-1 font-medium text-stone-900">{textoAlerta(a).titulo}</p>
+          <p className="text-stone-600">{textoAlerta(a).causa}</p>
+          <p className="text-campo-700">{textoAlerta(a).acao}</p>
         </div>
       ))}
-      {st === 'inviavel' && <p className="text-sm text-stone-600">Restrições que impedem a solução: <b>{pl.pl.restricoes_violadas.join(', ')}</b>.</p>}
-      {pl.pl.iteracoes?.length > 1 && (
+      {st === 'inviavel' && <p className="text-sm text-stone-600">{tecnico() ? 'Restrições que impedem a solução' : 'O que não dá para atender com esses alimentos'}: <b>{pl.pl.restricoes_violadas.map((g: string) => tecnico() ? g : GRUPO_SIMPLES[g] ?? g).join(', ')}</b>.</p>}
+      {pl.pl.iteracoes?.length > 1 && tecnico() && (
         <p className="text-xs text-stone-500">A dieta mudou o próprio consumo previsto (teto de fibra / equação de consumo); a formulação foi refeita {pl.pl.iteracoes.length - 1} vez(es) até ficar consistente.</p>
       )}
       {(st === 'otimo' || st === 'parcial') && (
         <>
           {st === 'parcial' && (
             <p className="rounded-lg bg-amber-50 p-2 text-sm text-atencao">
-              Melhor dieta possível com estes alimentos: não atinge {pl.pl.restricoes_violadas.join(' e ')}
+              Melhor dieta possível com estes alimentos: não atinge {pl.pl.restricoes_violadas.map((g: string) => tecnico() ? g : GRUPO_SIMPLES[g] ?? g).join(' e ')}
               {pl.pl.deficit?.energia_mcal > 0.01 && ` (faltam ${pl.pl.deficit.energia_mcal.toFixed(1)} Mcal/dia)`}. Todas as demais restrições são respeitadas.
             </p>
           )}
           <div className={`rounded-lg p-3 ${st === 'otimo' ? 'bg-campo-50' : 'bg-stone-50'}`}>
-            <p className="num text-sm font-semibold text-campo-900">R$ {pl.pl.custo.toFixed(2)} por vaca/dia · {fmt(pl.pl.composicao.ms_kg)} kg MS · PB {fmt(pl.pl.composicao.pb_pct)}% · FDN {fmt(pl.pl.composicao.fdn_pct)}%</p>
+            {tecnico()
+              ? <p className="num text-sm font-semibold text-campo-900">R$ {pl.pl.custo.toFixed(2)} por vaca/dia · {fmt(pl.pl.composicao.ms_kg)} kg MS · PB {fmt(pl.pl.composicao.pb_pct)}% · FDN {fmt(pl.pl.composicao.fdn_pct)}%</p>
+              : <p className="num text-sm font-semibold text-campo-900">Custa {reais(pl.pl.custo)} por vaca por dia</p>}
             <ul className="mt-1 text-sm text-stone-700">
-              {pl.pl.itens.map((i: ItemDieta) => <li key={i.alimento} className="num">{nome(i.alimento)}: <b>{i.kg_mn}</b> kg MN</li>)}
+              {pl.pl.itens.map((i: ItemDieta) => <li key={i.alimento} className="num">{nome(i.alimento)}: <b>{numero(i.kg_mn, 2)}</b> {tecnico() ? 'kg MN' : 'kg por vaca/dia'}</li>)}
             </ul>
-            <p className="mt-2 text-xs text-stone-600">Verificação pelas regras: <b>{fmt(pl.verificacao?.fatos?.['parecer.dieta']?.valor)}</b></p>
+            <p className="mt-2 text-xs text-stone-600">{tecnico() ? 'Verificação pelas regras' : 'Conferida pelo sistema'}: <b>{fmt(pl.verificacao?.fatos?.['parecer.dieta']?.valor)}</b></p>
             {(pl.verificacao?.alertas ?? []).filter((a: Alerta) => a.nivel !== 'informativo').map((a: Alerta) => (
-              <p key={a.regra} className="mt-1 text-xs text-atencao"><span className="font-mono">{a.regra}</span> {a.titulo}</p>
+              <p key={a.regra} className="mt-1 text-xs text-atencao">{tecnico() && <span className="font-mono">{a.regra} </span>}{textoAlerta(a).titulo}</p>
             ))}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -590,7 +710,8 @@ function AbaAcompanhamento({ loteId }: { loteId: number }) {
   }
   return (
     <div className="space-y-4">
-      <Painel titulo="Produção observada × esperada" subtitulo="Esperado = curva de lactação (Cobuci) × escala da fazenda, corrigido pelo ITU. Linhas numeradas = eventos registrados (passe o mouse no gráfico ou na legenda abaixo).">
+      <Painel titulo={tecnico() ? 'Produção observada × esperada' : 'Leite por vaca: real × esperado'} subtitulo={tecnico() ? 'Esperado = curva de lactação (Cobuci) × escala da fazenda, corrigido pelo ITU. Linhas numeradas = eventos registrados (passe o mouse no gráfico ou na legenda abaixo).'
+        : 'O esperado é quanto este lote costuma produzir nesta fase da lactação, descontando o calor. Os números no gráfico são o que foi anotado (troca de silo, mudança de vacas…).'}>
         <div className="h-72">
           <ResponsiveContainer>
             <ComposedChart data={dados} margin={{ left: -10, right: 10 }}>
@@ -760,7 +881,7 @@ function AbaRegistro({ lote }: { lote: Lote }) {
       </div>
       <div>
         {res && (
-          <Painel titulo="Resultado do acompanhamento" subtitulo={`${res.traco.length} regras disparadas`}>
+          <Painel titulo={tecnico() ? 'Resultado do acompanhamento' : 'Como o lote está'} subtitulo={tecnico() ? `${res.traco.length} regras disparadas` : undefined}>
             {res.alertas.length === 0 && <p className="text-sm text-campo-700">Nenhum alerta: o lote está dentro do esperado.</p>}
             {comEpisodios(res).map((a, i) => <AlertaItem key={i} alerta={a} />)}
             {['mon.litros_vaca', 'mon.esperado_vaca', 'mon.residuo', 'mon.itu_2d', 'mon.litros_por_kg_conc'].filter((f) => res.fatos[f]).map((f) => (
@@ -858,8 +979,9 @@ function AbaAlertas({ loteId }: { loteId: number }) {
   useEffect(carregar, [carregar])
   const abrirPorId = async (id: number) => setAberto(await api.get<Alerta>(`/alertas/${id}`))
   return (
-    <Painel titulo="Alertas e ações"
-      subtitulo="Cada problema é um episódio: aberto → aceito (ação registrada) ou recusado → resolvido quando a condição deixa de valer, mesmo sem passar pelo aceite."
+    <Painel titulo={tecnico() ? 'Alertas e ações' : 'Avisos do lote'}
+      subtitulo={tecnico() ? 'Cada problema é um episódio: aberto → aceito (ação registrada) ou recusado → resolvido quando a condição deixa de valer, mesmo sem passar pelo aceite.'
+        : 'Aceite para ir à tela onde se registra o que foi feito, ou recuse dizendo o motivo. O aviso some sozinho quando o problema for resolvido, e fica no histórico.'}
       acoes={
         <div className="flex flex-wrap gap-2">
           <div className="flex rounded-lg border border-stone-300 p-0.5 text-sm">
@@ -880,7 +1002,7 @@ function AbaAlertas({ loteId }: { loteId: number }) {
       {vista === 'alertas' && alertas?.length === 0 && <p className="text-sm text-stone-500">Nenhum alerta neste filtro.</p>}
       {vista === 'alertas' && alertas?.map((a) => <AlertaItem key={a.id} alerta={a} onAbrir={() => setAberto(a)} onMudou={carregar} />)}
       {vista === 'historico' && (hist ? <LinhaDoTempo itens={hist} mostrarAlerta onAbrirAlerta={abrirPorId} /> : <Carregando />)}
-      <Gaveta aberta={!!aberto} onFechar={() => { setAberto(null); carregar() }} titulo="Alerta: explicação e histórico">
+      <Gaveta aberta={!!aberto} onFechar={() => { setAberto(null); carregar() }} titulo={tecnico() ? 'Alerta: explicação e histórico' : 'Entender o aviso'}>
         {aberto && <ExplicacaoAlerta key={aberto.id} alerta={aberto} />}
       </Gaveta>
     </Painel>
