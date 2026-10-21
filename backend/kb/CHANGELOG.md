@@ -1,5 +1,11 @@
 # Histórico da base de conhecimento
 
+## 1.1.0 — 21/10/2026
+- FOR-05: o PL limita a cana a 50% do volumoso quando o lote produz acima de 15 kg/vaca (antes o PL podia sugerir
+  cana como único volumoso e a própria verificação, VER-07, reprovava a dieta sugerida).
+- FOR-15: diagnóstico quando falta volumoso além da cana. Novo parâmetro `cana_max_pct_volumoso`.
+- FOR-06: lote confinado não recebe forragem de pastejo no PL (alimento com `pastejo: true`).
+
 ## 1.0.0 — 21/10/2026
 - Versão inicial: módulos de classificação (CLS), exigências (EXG), verificação (VER), formulação (FOR),
   acompanhamento diário/semanal/mensal (ACP) e meta-regras (META).

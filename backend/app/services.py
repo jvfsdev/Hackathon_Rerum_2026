@@ -1,4 +1,5 @@
 """Orquestra banco, motor de inferência, otimizador e monitor. Não contém regras de decisão."""
+import math
 from datetime import date, timedelta
 
 from sqlmodel import Session, select
@@ -160,7 +161,8 @@ def formular(fatos: dict, alimentos_ids: list[str], precos: dict | None = None) 
     restricoes = {"cms": v("exig.cms"), "folga_ms": v("pl.folga_ms"), "ell_min": v("pl.ell_min"),
                   "pb_min": v("pl.pb_min"), "pb_max": v("pl.pb_max"), "fdn_min": v("meta.fdn_min"),
                   "fdnf_min": v("meta.fdnf_min"), "cnf_max": v("meta.cnf_max"), "ee_max": v("meta.ee_max"),
-                  "ureia_max": v("meta.ureia_max"), "fdn_max_kg": v("pl.fdn_max_kg")}
+                  "ureia_max": v("meta.ureia_max"), "fdn_max_kg": v("pl.fdn_max_kg"),
+                  "cana_max_pct_volumoso": v("pl.cana_max_pct_volumoso"), "excluir_pastejo": v("pl.excluir_pastejo")}
     alimentos = [dict(base.alimentos[a], **({"preco_kg_mn": precos[a]} if precos and a in precos else {}))
                  for a in alimentos_ids]
     pl = lp.formular(alimentos, restricoes)
@@ -172,10 +174,17 @@ def formular(fatos: dict, alimentos_ids: list[str], precos: dict | None = None) 
     out = _pacote(resultado, ["exig.cms", "exig.ell_total", "exig.pb_pct_alvo", "pl.ell_min"])
     out["pl"] = {"status": pl["status"], "restricoes": restricoes, "restricoes_violadas": pl["restricoes_violadas"]}
     if pl["status"] == "otimo":
-        itens = [{"alimento": i["alimento"]["id"], "kg_mn": round(i["kg_mn"], 2)} for i in pl["itens"]]
+        itens = [{"alimento": i["alimento"]["id"], "kg_mn": _arredondar(i)} for i in pl["itens"]]
         out["pl"].update({"custo": pl["custo"], "itens": itens, "composicao": pl["composicao"]})
         out["verificacao"] = avaliar(fatos, itens)   # a dieta do PL passa pela verificação das regras
     return out
+
+
+def _arredondar(item: dict) -> float:
+    """kg MN com 2 casas; ureia arredonda para baixo para não passar do limite (o PL a deixa exatamente nele)."""
+    if item["alimento"]["tipo"] == "ureia":
+        return math.floor(item["kg_mn"] * 100) / 100
+    return round(item["kg_mn"], 2)
 
 
 def formular_lote(s: Session, lote: Lote, alimentos_ids: list[str], precos: dict | None = None) -> dict:

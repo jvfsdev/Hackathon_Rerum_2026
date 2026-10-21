@@ -21,9 +21,12 @@ export default function PainelPagina() {
 
   return (
     <div className="space-y-5">
-      <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+       <div>
         <h1 className="text-xl font-semibold text-stone-900">{dados.fazenda.nome}</h1>
         <p className="text-sm text-stone-500">{dados.fazenda.municipio} · leite R$ {dados.fazenda.preco_leite.toFixed(2)}/L · concentrado R$ {dados.fazenda.preco_concentrado.toFixed(2)}/kg · hoje {new Date(dados.data + 'T12:00').toLocaleDateString('pt-BR')}</p>
+       </div>
+       <Link to="/lotes/novo" className="btn-primario">+ Novo lote</Link>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

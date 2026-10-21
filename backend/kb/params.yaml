@@ -53,6 +53,7 @@ fator_pb_min: {valor: 0.95, unidade: fração, fonte: "Dossiê VER-02", forca: D
 fator_pb_max: {valor: 1.15, unidade: fração, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "PB acima disso = desperdício"}
 fator_oferta_max: {valor: 1.05, unidade: fração, fonte: "Dossiê VER-06", forca: D, editavel: true, descricao: "MS ofertada / CMS previsto acima disso não será consumida"}
 fator_oferta_min: {valor: 0.90, unidade: fração, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "MS ofertada / CMS abaixo disso = subalimentação"}
+cana_max_pct_volumoso: {valor: 50, unidade: "% da MS de volumoso", fonte: "Escolha de engenharia derivada de VER-07 (Semadesc-MS)", forca: D, editavel: true, descricao: "Teto de cana no volumoso do PL quando o lote produz acima de leite_max_cana"}
 leite_max_cana: {valor: 15, unidade: kg, fonte: "Dossiê VER-07 (a validar)", forca: C, editavel: true, descricao: "Produção acima disso com cana como único volumoso"}
 
 # --- Formulação (PL) ---

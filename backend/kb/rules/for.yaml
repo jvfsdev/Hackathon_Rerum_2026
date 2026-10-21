@@ -52,6 +52,32 @@
   fonte: "Mertens via Epagri"
   forca: B
 
+- id: FOR-05
+  versao: 1
+  modulo: formulacao
+  descricao: Lote acima de 15 kg/vaca não pode ter cana como único volumoso — limitar a cana no PL
+  prioridade: 80
+  se:
+    - {fato: formulacao.solicitada, op: "=", valor: true}
+    - {fato: lote.leite, op: ">", valor: "@params.leite_max_cana"}
+  entao:
+    - concluir: {fato: pl.cana_max_pct_volumoso, valor: "@params.cana_max_pct_volumoso"}
+  fonte: "Semadesc-MS (mesma base da VER-07)"
+  forca: C
+
+- id: FOR-06
+  versao: 1
+  modulo: formulacao
+  descricao: Lote confinado não pasteja — excluir forragens de pastejo do PL
+  prioridade: 80
+  se:
+    - {fato: formulacao.solicitada, op: "=", valor: true}
+    - {fato: lote.sistema, op: "=", valor: confinado}
+  entao:
+    - concluir: {fato: pl.excluir_pastejo, valor: true}
+  fonte: "Definição do sistema de produção"
+  forca: A
+
 - id: FOR-10
   versao: 1
   modulo: formulacao
@@ -143,6 +169,24 @@
         acao: "Incluir volumoso de melhor qualidade ou fontes de energia fibrosas (polpa cítrica, farelo de trigo)."
   fonte: "NRC 2001"
   forca: D
+
+- id: FOR-15
+  versao: 1
+  modulo: formulacao
+  descricao: PL inviável porque falta volumoso além da cana
+  prioridade: 60
+  se:
+    - {fato: pl.status, op: "=", valor: inviavel}
+    - {fato: pl.restricoes_violadas, op: contem, valor: cana}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: formulacao
+        titulo: "Falta volumoso além da cana para esta produção"
+        causa: "Com {lote.leite:.0f} kg/vaca a cana pode ser no máximo {pl.cana_max_pct_volumoso:.0f}% do volumoso."
+        acao: "Marcar outro volumoso disponível (silagem de milho ou sorgo, capim-elefante)."
+  fonte: "Semadesc-MS"
+  forca: C
 
 - id: FOR-20
   versao: 1

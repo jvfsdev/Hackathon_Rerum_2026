@@ -10,7 +10,7 @@ import pulp
 
 from ..calc.diet import cnf_alimento, composicao, ell_alimento
 
-GRUPOS = ["consumo", "energia", "proteina", "fibra", "enchimento", "cnf", "gordura", "ureia"]
+GRUPOS = ["consumo", "energia", "proteina", "fibra", "enchimento", "cnf", "gordura", "ureia", "cana"]
 
 
 def _modelo(alimentos: list[dict], r: dict, ignorar: tuple[str, ...] = ()):
@@ -35,8 +35,14 @@ def _modelo(alimentos: list[dict], r: dict, ignorar: tuple[str, ...] = ()):
     grupo("cnf", [pulp.lpSum((cnf_alimento(a) - r["cnf_max"]) * x[a["id"]] for a in alimentos) <= 0])
     grupo("gordura", [pulp.lpSum((a.get("ee", 0) - r["ee_max"]) * x[a["id"]] for a in alimentos) <= 0])
     grupo("ureia", [pulp.lpSum(100 * x[a["id"]] for a in alimentos if a["tipo"] == "ureia") - r["ureia_max"] * total <= 0])
+    if r.get("cana_max_pct_volumoso") is not None:   # FOR-05: cana não pode ser o único volumoso
+        volumoso = pulp.lpSum(x[a["id"]] for a in alimentos if a["tipo"] == "volumoso")
+        grupo("cana", [pulp.lpSum(x[a["id"]] for a in alimentos if a["id"] == "cana")
+                       - r["cana_max_pct_volumoso"] / 100 * volumoso <= 0])
     # limites de inclusão de cada alimento: nunca relaxados
     for a in alimentos:
+        if r.get("excluir_pastejo") and a.get("pastejo"):   # FOR-06: lote confinado não pasteja
+            prob.addConstraint(x[a["id"]] <= 0, f"sem_pastejo_{a['id']}")
         if a.get("max_pct_ms") is not None:
             prob += x[a["id"]] <= a["max_pct_ms"] / 100 * total, f"inclusao_max_{a['id']}"
         if a.get("min_kg_ms") is not None:
@@ -66,7 +72,7 @@ def diagnosticar(alimentos: list[dict], restricoes: dict) -> list[str]:
 
 def formular(alimentos: list[dict], restricoes: dict) -> dict:
     """alimentos: dicionários de foods.yaml (com preço); restricoes: cms, folga_ms, ell_min, pb_min, pb_max,
-    fdn_min, fdnf_min, cnf_max, ee_max, ureia_max, fdn_max_kg."""
+    fdn_min, fdnf_min, cnf_max, ee_max, ureia_max, fdn_max_kg e, opcionais, cana_max_pct_volumoso e excluir_pastejo."""
     prob, x = _modelo(alimentos, restricoes)
     if _resolver(prob) != "Optimal":
         return {"status": "inviavel", "restricoes_violadas": diagnosticar(alimentos, restricoes), "restricoes": restricoes}

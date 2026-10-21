@@ -1,6 +1,6 @@
-# Regras de produção — base v1.0.0
+# Regras de produção — base v1.1.0
 
-111 regras · 81 parâmetros · 12 alimentos. Gerado automaticamente de `backend/kb/` (não editar à mão).
+114 regras · 82 parâmetros · 12 alimentos. Gerado automaticamente de `backend/kb/` (não editar à mão).
 
 Formato: **SE** condições **ENTÃO** ações [CF da regra]. Limiares `@params.*` estão na tabela de parâmetros no fim.
 Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão com dados; C = extensão sem dados ou população diferente; D = escolha de engenharia.
@@ -65,11 +65,14 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | FOR-02 | Energia mínima do PL = exigência × fator de tolerância | `formulacao.solicitada` = True E `exig.ell_total` existe | calcular `pl.ell_min` = produto(…) | 1.0 | D | Dossiê VER-01 |
 | FOR-03 | Faixa de PB do PL = alvo até alvo + folga | `formulacao.solicitada` = True E `exig.pb_pct_alvo` existe | concluir `pl.pb_min` = $exig.pb_pct_alvo; calcular `pl.pb_max` = soma(…) | 1.0 | D | MSD Vet Manual |
 | FOR-04 | Teto de consumo de FDN (kg/dia) = 1,25% do PV | `formulacao.solicitada` = True E `lote.pv` existe | calcular `pl.fdn_max_kg` = pct_de(…) | 1.0 | B | Mertens via Epagri |
+| FOR-05 | Lote acima de 15 kg/vaca não pode ter cana como único volumoso — limitar a cana no PL | `formulacao.solicitada` = True E `lote.leite` > @params.leite_max_cana | concluir `pl.cana_max_pct_volumoso` = @params.cana_max_pct_volumoso | 1.0 | C | Semadesc-MS (mesma base da VER-07) |
+| FOR-06 | Lote confinado não pasteja — excluir forragens de pastejo do PL | `formulacao.solicitada` = True E `lote.sistema` = confinado | concluir `pl.excluir_pastejo` = True | 1.0 | A | Definição do sistema de produção |
 | FOR-10 | PL inviável por energia — faltam alimentos energéticos | `pl.status` = inviavel E `pl.restricoes_violadas` contem energia | alerta **critico** (formulacao): Energia não atingível com os alimentos escolhidos | 1.0 | D | Dossiê (diagnóstico de inviabilidade) |
 | FOR-11 | PL inviável por proteína | `pl.status` = inviavel E `pl.restricoes_violadas` contem proteina | alerta **critico** (formulacao): Proteína fora da faixa com os alimentos escolhidos | 1.0 | D | Dossiê (diagnóstico de inviabilidade) |
 | FOR-12 | PL inviável por fibra mínima | `pl.status` = inviavel E `pl.restricoes_violadas` contem fibra | alerta **critico** (formulacao): Fibra mínima não atingível | 1.0 | D | NRC 2001 |
 | FOR-13 | PL inviável por enchimento (FDN demais para o consumo) | `pl.status` = inviavel E `pl.restricoes_violadas` contem enchimento | alerta **critico** (formulacao): Volumoso muito fibroso limita o consumo | 1.0 | B | Mertens via Epagri |
 | FOR-14 | PL inviável por CNF ou gordura máximos | `pl.status` = inviavel E (`pl.restricoes_violadas` contem cnf OU `pl.restricoes_violadas` contem gordura) | alerta **critico** (formulacao): Limites de CNF ou gordura impedem a solução | 1.0 | D | NRC 2001 |
+| FOR-15 | PL inviável porque falta volumoso além da cana | `pl.status` = inviavel E `pl.restricoes_violadas` contem cana | alerta **critico** (formulacao): Falta volumoso além da cana para esta produção | 1.0 | C | Semadesc-MS |
 | FOR-20 | PL encontrou a dieta de menor custo | `pl.status` = otimo | alerta **informativo** (formulacao): Dieta de custo mínimo: R$ {pl.custo:.2f}/vaca/dia | 1.0 | B | Programação linear (PuLP + HiGHS) |
 
 ## C — Verificação da dieta (VER)
@@ -204,6 +207,7 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | `fator_pb_max` | 1.15 | fração | D | Escolha de engenharia | PB acima disso = desperdício |
 | `fator_oferta_max` | 1.05 | fração | D | Dossiê VER-06 | MS ofertada / CMS previsto acima disso não será consumida |
 | `fator_oferta_min` | 0.9 | fração | D | Escolha de engenharia | MS ofertada / CMS abaixo disso = subalimentação |
+| `cana_max_pct_volumoso` | 50 | % da MS de volumoso | D | Escolha de engenharia derivada de VER-07 (Semadesc-MS) | Teto de cana no volumoso do PL quando o lote produz acima de leite_max_cana |
 | `leite_max_cana` | 15 | kg | C | Dossiê VER-07 (a validar) | Produção acima disso com cana como único volumoso |
 | `pl_folga_cms` | 0.05 | fração | D | Inferências (CMS ± 5%) | Folga do total de MS no PL |
 | `pl_pb_folga_max` | 3.0 | p.p. | D | Escolha de engenharia | PB máxima = alvo + folga |

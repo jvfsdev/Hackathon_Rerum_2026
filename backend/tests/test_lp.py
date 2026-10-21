@@ -41,3 +41,35 @@ def test_pl_inviavel_volumoso_fibroso_aponta_varias_restricoes():
     res = formular(alimentos, R | {"ell_min": 30.0})
     assert res["status"] == "inviavel"
     assert "energia" in res["restricoes_violadas"] and "enchimento" in res["restricoes_violadas"]
+
+
+def test_dieta_sugerida_arredondada_passa_na_verificacao():
+    """Regressão: ureia no limite exato + arredondamento para cima bloqueava a dieta (VER-04)."""
+    from app import services
+    fatos = {"lote.estado": "lactacao", "lote.del": 60, "lote.grupo_genetico": "girolando", "lote.sistema": "confinado",
+             "lote.pv": 480, "lote.leite": 18, "lote.gordura": 3.8, "lote.proteina": 3.2, "lote.fracao_primiparas": 1.0}
+    out = services.formular(fatos, ["silagem_milho", "milho_moido", "farelo_soja", "ureia", "nucleo_mineral"])
+    assert out["pl"]["status"] == "otimo"
+    assert out["verificacao"]["fatos"]["parecer.dieta"]["valor"] != "bloqueada"
+
+
+def test_pl_nao_sugere_dieta_que_a_verificacao_reprova():
+    """Regressão: com todos os alimentos, o PL escolhia cana como único volumoso e a VER-07 reprovava a sugestão."""
+    from app import services
+    fatos = {"lote.estado": "lactacao", "lote.del": 104, "lote.grupo_genetico": "girolando", "lote.sistema": "confinado",
+             "lote.pv": 560, "lote.leite": 21, "lote.gordura": 3.3, "lote.proteina": 3.22, "lote.fracao_primiparas": 0.25,
+             "lote.ecc": 2.75}
+    out = services.formular(fatos, list(services.kb().alimentos))
+    assert out["pl"]["status"] == "otimo"
+    verif = out["verificacao"]
+    assert verif["fatos"]["parecer.dieta"]["valor"] == "adequada", [a["titulo"] for a in verif["alertas"]]
+    assert "braquiaria" not in [i["alimento"] for i in out["pl"]["itens"]]   # confinado não pasteja (FOR-06)
+
+
+def test_pl_so_com_cana_aponta_falta_de_outro_volumoso():
+    from app import services
+    fatos = {"lote.estado": "lactacao", "lote.del": 104, "lote.grupo_genetico": "girolando", "lote.sistema": "confinado",
+             "lote.pv": 560, "lote.leite": 21, "lote.gordura": 3.3, "lote.proteina": 3.22}
+    out = services.formular(fatos, ["cana", "milho_moido", "farelo_soja", "ureia", "nucleo_mineral"])
+    assert out["pl"]["status"] == "inviavel" and "cana" in out["pl"]["restricoes_violadas"]
+    assert "FOR-15" in [a["regra"] for a in out["alertas"]]

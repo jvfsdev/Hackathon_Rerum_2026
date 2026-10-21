@@ -3,6 +3,7 @@ import PainelPagina from './pages/Painel'
 import LotePagina from './pages/Lote'
 import ConsultaPagina from './pages/Consulta'
 import BasePagina from './pages/Base'
+import NovoLotePagina from './pages/NovoLote'
 
 const link = ({ isActive }: { isActive: boolean }) =>
   `rounded-lg px-3 py-1.5 text-sm font-medium transition ${isActive ? 'bg-white/15 text-white' : 'text-campo-100 hover:bg-white/10 hover:text-white'}`
@@ -27,6 +28,7 @@ export default function App() {
       <main className="mx-auto max-w-6xl overflow-x-hidden px-4 py-5">
         <Routes>
           <Route path="/" element={<PainelPagina />} />
+          <Route path="/lotes/novo" element={<NovoLotePagina />} />
           <Route path="/lotes/:id/*" element={<LotePagina />} />
           <Route path="/consulta" element={<ConsultaPagina />} />
           <Route path="/base" element={<BasePagina />} />

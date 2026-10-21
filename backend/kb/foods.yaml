@@ -2,10 +2,11 @@
 # Fontes: [A] Embrapa Gado de Leite, Planejamento alimentar (tabs. 6/8: Valadares Filho et al. 2006);
 #         [B] Embrapa Rondônia, Doc 167 (2ª ed.). EE dos volumosos e MM são padrões (força D).
 # cf: 0.8 = tabela publicada; 0.6 = valor estimado/padrão. max_pct_ms / min_kg_ms são limites de inclusão do PL.
+# pastejo: true = forragem colhida pelo animal no pasto (não entra em dieta de lote confinado).
 - {id: silagem_milho, nome: "Silagem de milho", tipo: volumoso, ms: 30.9, pb: 7.3, fdn: 55.4, ndt: 64.3, ee: 2.5, mm: 4.5, preco_kg_mn: 0.25, fonte: "[A] VF 2006", forca: B, cf: 0.8}
 - {id: silagem_sorgo, nome: "Silagem de sorgo", tipo: volumoso, ms: 30.8, pb: 6.7, fdn: 61.4, ndt: 57.2, ee: 2.5, mm: 5.5, preco_kg_mn: 0.22, fonte: "[A] VF 2006", forca: B, cf: 0.8}
 - {id: capim_elefante, nome: "Capim-elefante picado (46–60 d)", tipo: volumoso, ms: 19.9, pb: 9.2, fdn: 72.3, ndt: 52.0, ee: 2.0, mm: 8.0, preco_kg_mn: 0.12, fonte: "[A] VF 2006; NDT [B]", forca: B, cf: 0.8}
-- {id: braquiaria, nome: "Braquiária decumbens (pastejo)", tipo: volumoso, ms: 31.0, pb: 6.7, fdn: 74.6, ndt: 58.2, ee: 2.0, mm: 8.0, preco_kg_mn: 0.05, fonte: "[B] Tab. 1", forca: B, cf: 0.6}
+- {id: braquiaria, nome: "Braquiária decumbens (pastejo)", tipo: volumoso, pastejo: true, ms: 31.0, pb: 6.7, fdn: 74.6, ndt: 58.2, ee: 2.0, mm: 8.0, preco_kg_mn: 0.05, fonte: "[B] Tab. 1", forca: B, cf: 0.6}
 - {id: cana, nome: "Cana-de-açúcar", tipo: volumoso, ms: 28.5, pb: 2.7, fdn: 57.7, ndt: 62.7, ee: 1.0, mm: 3.0, preco_kg_mn: 0.10, fonte: "[A] VF 2006", forca: B, cf: 0.8}
 - {id: milho_moido, nome: "Milho grão moído (fubá)", tipo: concentrado, ms: 87.6, pb: 9.1, fdn: 14.0, ndt: 87.2, ee: 4.0, mm: 1.5, preco_kg_mn: 1.40, fonte: "[A] Tab. 2", forca: B, cf: 0.8}
 - {id: farelo_soja, nome: "Farelo de soja", tipo: concentrado, ms: 88.6, pb: 48.8, fdn: 14.6, ndt: 81.5, ee: 1.7, mm: 6.5, preco_kg_mn: 2.60, fonte: "[A] Tab. 3", forca: B, cf: 0.8}

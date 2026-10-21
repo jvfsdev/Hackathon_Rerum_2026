@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { NavLink, Route, Routes, useParams } from 'react-router-dom'
+import { Link, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { CartesianGrid, ComposedChart, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, fmt, OPCOES, rotulo, UNIDADES, type Alerta, type Alimento, type Dieta, type ItemDieta, type Lote, type Resultado } from '../api'
+import LoteForm from '../components/LoteForm'
 import { AlertaItem, BotaoComo, Carregando, CfBarra, Erro, ExplicacaoAlerta, Gaveta, NivelBadge, Painel } from '../components/ui'
 
 const aba = ({ isActive }: { isActive: boolean }) =>
@@ -11,6 +12,7 @@ export default function LotePagina() {
   const { id } = useParams()
   const [info, setInfo] = useState<{ lote: Lote; fatos: Record<string, any>; dieta: Dieta | null } | null>(null)
   const [erro, setErro] = useState('')
+  const [editando, setEditando] = useState(false)
   const recarregar = useCallback(() => { api.get<any>(`/lotes/${id}`).then(setInfo).catch((e) => setErro(e.message)) }, [id])
   useEffect(recarregar, [recarregar])
   if (erro) return <Erro msg={erro} />
@@ -18,14 +20,20 @@ export default function LotePagina() {
   const { lote, fatos } = info
   return (
     <div className="space-y-4">
-      <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+       <div>
         <h1 className="text-xl font-semibold text-stone-900">{lote.nome}</h1>
         <p className="text-sm text-stone-500">
           {lote.n_vacas} vacas · {OPCOES[lote.grupo_genetico]} · {OPCOES[lote.sistema]} · {OPCOES[lote.estado]}
           {fatos['lote.del'] !== undefined && ` · DEL ${Math.round(fatos['lote.del'])}`} · PV {lote.pv} kg
           {fatos['lote.leite'] !== undefined && ` · ${fmt(fatos['lote.leite'])} L/vaca (média 7 d)`}
         </p>
+       </div>
+       <button className="btn-secundario" onClick={() => setEditando(true)}>Editar lote</button>
       </div>
+      <Gaveta aberta={editando} onFechar={() => setEditando(false)} titulo={`Editar ${lote.nome}`}>
+        <LoteForm lote={lote} fatos={fatos} onSalvo={() => { setEditando(false); recarregar() }} />
+      </Gaveta>
       <nav className="-mx-4 flex overflow-x-auto border-b border-stone-200 px-4">
         <NavLink end to="" className={aba}>Perfil e exigências</NavLink>
         <NavLink to="dieta" className={aba}>Dieta</NavLink>
@@ -34,7 +42,7 @@ export default function LotePagina() {
         <NavLink to="alertas" className={aba}>Alertas</NavLink>
       </nav>
       <Routes>
-        <Route index element={<AbaPerfil loteId={lote.id} />} />
+        <Route index element={<AbaPerfil key={JSON.stringify(lote)} loteId={lote.id} />} />
         <Route path="dieta" element={<AbaDieta lote={lote} dietaAtiva={info.dieta} onSalvo={recarregar} />} />
         <Route path="acompanhamento" element={<AbaAcompanhamento loteId={lote.id} />} />
         <Route path="registro" element={<AbaRegistro lote={lote} />} />
@@ -51,7 +59,7 @@ function AbaPerfil({ loteId }: { loteId: number }) {
   useEffect(() => { api.post<Resultado>(`/inferencia/lotes/${loteId}/avaliar`).then(setR).catch((e) => setErro(e.message)) }, [loteId])
   if (erro) return <Erro msg={erro} />
   if (!r) return <Carregando />
-  return <ResultadoAvaliacao r={r} />
+  return <ResultadoAvaliacao r={r} linkDieta="dieta#sugerir" />
 }
 
 function Valor({ r, fato, destaque = false }: { r: Resultado; fato: string; destaque?: boolean }) {
@@ -71,11 +79,12 @@ function Valor({ r, fato, destaque = false }: { r: Resultado; fato: string; dest
 
 const COMPONENTES_ELL = ['exig.ell_mantenca', 'exig.ell_leite', 'exig.ell_gestacao', 'exig.ell_crescimento', 'exig.ell_atividade', 'exig.ell_ecc']
 
-export function ResultadoAvaliacao({ r }: { r: Resultado }) {
+export function ResultadoAvaliacao({ r, linkDieta }: { r: Resultado; linkDieta?: string }) {
   const [aberto, setAberto] = useState<Alerta | null>(null)
   const temDieta = !!r.fatos['dieta.ms_kg']
   const total = r.fatos['exig.ell_total']?.valor ?? 0
   const parecer = r.fatos['parecer.dieta']
+  const motivos = r.alertas.filter((a) => a.status === 'ativo' && a.nivel !== 'informativo' && a.categoria === 'dieta')
   return (
     <div className="space-y-4">
       {parecer && (
@@ -83,8 +92,16 @@ export function ResultadoAvaliacao({ r }: { r: Resultado }) {
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Parecer da dieta</p>
             <p className="text-lg font-semibold text-stone-900">{fmt(parecer.valor)}</p>
+            {motivos.length > 0 && (
+              <ul className="mt-1 space-y-0.5 text-sm text-stone-700">
+                {motivos.map((a) => <li key={a.regra}><span className="font-mono text-xs text-stone-500">{a.regra}</span> {a.titulo}</li>)}
+              </ul>
+            )}
           </div>
-          <div className="flex items-center gap-3"><CfBarra cf={parecer.cf} /><BotaoComo no={r.explicacoes?.['parecer.dieta']} /></div>
+          <div className="flex flex-wrap items-center gap-3">
+            <CfBarra cf={parecer.cf} /><BotaoComo no={r.explicacoes?.['parecer.dieta']} />
+            {linkDieta && parecer.valor !== 'adequada' && <Link to={linkDieta} className="btn-primario">Sugerir dieta de custo mínimo →</Link>}
+          </div>
         </div>
       )}
       <div className="grid gap-4 md:grid-cols-3">
@@ -214,6 +231,10 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
     api.get<Dieta[]>(`/lotes/${lote.id}/dietas`).then(setVersoes)
   }, [lote.id])
   useEffect(() => { setEscolhidos(Array.from(new Set([...(dietaAtiva?.itens.map((i) => i.alimento) ?? []), 'ureia']))) }, [dietaAtiva])
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (hash === '#sugerir' && alimentos.length) document.getElementById('sugerir')?.scrollIntoView({ behavior: 'smooth' })
+  }, [hash, alimentos.length])
 
   const nome = (id: string) => alimentos.find((a) => a.id === id)?.nome ?? id
   const verificar = async () => {
@@ -260,7 +281,8 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
             <button className="btn-secundario" onClick={() => salvar(itens, 'usuario', motivo)} disabled={!!ocupado || !itens.length}>Salvar nova versão</button>
           </div>
         </Painel>
-        <Painel titulo="Sugerir dieta de custo mínimo" subtitulo="As regras definem metas e restrições; a programação linear acha as quantidades; as regras verificam o resultado.">
+        <div id="sugerir" className="scroll-mt-4">
+        <Painel className={hash === '#sugerir' ? 'ring-2 ring-campo-500' : ''} titulo="Sugerir dieta de custo mínimo" subtitulo="As regras definem metas e restrições; a programação linear acha as quantidades; as regras verificam o resultado.">
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
             {alimentos.map((a) => (
               <label key={a.id} className="flex items-center gap-1.5 text-sm text-stone-700">
@@ -274,6 +296,7 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
           <button className="btn-primario mt-3" onClick={sugerir} disabled={!!ocupado || !escolhidos.length}>{ocupado === 'pl' ? 'Otimizando…' : 'Sugerir dieta'}</button>
           {pl && <ResultadoPL pl={pl} nome={nome} onAceitar={(lista) => salvar(lista, 'pl', `Dieta de custo mínimo (PL), R$ ${pl.pl.custo.toFixed(2)}/vaca/dia`)} />}
         </Painel>
+        </div>
       </div>
       {ocupado === 'verificar' && <Carregando />}
       {res && <ResultadoAvaliacao r={res} />}
@@ -319,6 +342,9 @@ function ResultadoPL({ pl, nome, onAceitar }: { pl: any; nome: (id: string) => s
               {pl.pl.itens.map((i: ItemDieta) => <li key={i.alimento} className="num">{nome(i.alimento)}: <b>{i.kg_mn}</b> kg MN</li>)}
             </ul>
             <p className="mt-2 text-xs text-stone-600">Verificação pelas regras: <b>{fmt(pl.verificacao?.fatos?.['parecer.dieta']?.valor)}</b></p>
+            {(pl.verificacao?.alertas ?? []).filter((a: Alerta) => a.nivel !== 'informativo').map((a: Alerta) => (
+              <p key={a.regra} className="mt-1 text-xs text-atencao"><span className="font-mono">{a.regra}</span> {a.titulo}</p>
+            ))}
           </div>
           <button className="btn-primario" onClick={() => onAceitar(pl.pl.itens)}>Aceitar como nova versão</button>
         </>
