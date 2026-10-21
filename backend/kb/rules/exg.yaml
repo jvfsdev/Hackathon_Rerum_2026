@@ -1,0 +1,381 @@
+# Módulo B — Exigências e metas do lote (por vaca/dia).
+- id: EXG-00
+  versao: 1
+  modulo: exigencias
+  descricao: Calcular a composição da dieta informada (MS, PB, FDN, FDNf, CNF, EE, ELl, ureia, custo)
+  prioridade: 100
+  se:
+    - {fato: dieta.itens, op: existe}
+  entao:
+    - calcular: {fato: dieta, funcao: composicao_dieta, args: {itens: $dieta.itens}}
+  fonte: "Conversão MN→MS; ELl = 0,0245·NDT − 0,12 (NRC 2001 Eq. 2-3)"
+  forca: B
+
+- id: EXG-01A
+  versao: 1
+  modulo: exigencias
+  descricao: CMS pela equação NRC 2001 (Holandês/Jersey em lactação)
+  prioridade: 80
+  se:
+    - {fato: perfil.equacao_cms, op: "=", valor: nrc2001}
+  entao:
+    - calcular:
+        fato: exig.cms_equacao
+        funcao: cms_nrc2001
+        args: {pv: $lote.pv, leite: $lote.leite, gordura: $lote.gordura, semana: $perfil.semana_lactacao}
+  fonte: "NRC 2001 (coeficientes confirmados em fonte secundária)"
+  forca: B
+
+- id: EXG-01B
+  versao: 1
+  modulo: exigencias
+  descricao: CMS pela equação BR-Leite Eq. 1.1 (zebuínos e cruzados)
+  prioridade: 80
+  se:
+    - {fato: perfil.equacao_cms, op: "=", valor: brleite}
+    - qualquer:
+        - {fato: dieta.cana_unico_volumoso, op: ausente}
+        - {fato: dieta.cana_unico_volumoso, op: "=", valor: false}
+  entao:
+    - calcular:
+        fato: exig.cms_equacao
+        funcao: cms_brleite
+        args: {pv: $lote.pv, leite: $lote.leite, gordura: $lote.gordura, del_: $lote.del}
+  fonte: "BR-Leite 2024, cap. 3, Eq. 1.1 (Embrapa)"
+  forca: B
+
+- id: EXG-01C
+  versao: 1
+  modulo: exigencias
+  descricao: CMS pela equação BR-Leite Eq. 1.2 quando a cana é o volumoso
+  prioridade: 80
+  se:
+    - {fato: perfil.equacao_cms, op: "=", valor: brleite}
+    - {fato: dieta.cana_unico_volumoso, op: "=", valor: true}
+  entao:
+    - calcular:
+        fato: exig.cms_equacao
+        funcao: cms_brleite_cana
+        args: {pv: $lote.pv, leite: $lote.leite, gordura: $lote.gordura, del_: $lote.del}
+  fonte: "BR-Leite 2024, cap. 3, Eq. 1.2 (Embrapa)"
+  forca: B
+
+- id: EXG-01D
+  versao: 1
+  modulo: exigencias
+  descricao: Teto de consumo pelo enchimento (consumo de FDN ≤ 1,25% do PV)
+  prioridade: 80
+  se:
+    - {fato: dieta.fdn_pct, op: ">", valor: 0}
+    - {fato: exig.cms_equacao, op: existe}
+  entao:
+    - calcular: {fato: exig.cms_teto_fibra, funcao: teto_fibra, args: {pv: $lote.pv, fdn: $dieta.fdn_pct, limite: "@params.teto_fdn_pct_pv"}}
+  fonte: "Mertens via Epagri"
+  forca: B
+
+- id: EXG-01E
+  versao: 1
+  modulo: exigencias
+  descricao: CMS esperado é o menor entre a equação e o teto de fibra
+  prioridade: 40
+  se:
+    - {fato: exig.cms_equacao, op: existe}
+    - {fato: perfil.cms_baixa_confianca, op: ausente}
+  entao:
+    - calcular: {fato: exig.cms, funcao: minimo, args: {a: $exig.cms_equacao, b: "$exig.cms_teto_fibra|null"}}
+  fonte: "NRC 2001; Mertens"
+  forca: B
+
+- id: EXG-01P
+  versao: 1
+  modulo: exigencias
+  descricao: Em pasto com mestiças o CMS é estimado com confiança reduzida
+  prioridade: 40
+  cf: 0.6
+  se:
+    - {fato: exig.cms_equacao, op: existe}
+    - {fato: perfil.cms_baixa_confianca, op: "=", valor: true}
+  entao:
+    - calcular: {fato: exig.cms, funcao: minimo, args: {a: $exig.cms_equacao, b: "$exig.cms_teto_fibra|null"}}
+    - alerta:
+        nivel: informativo
+        categoria: dieta
+        titulo: "Consumo em pasto estimado com baixa confiança"
+        causa: "Equações de consumo foram pouco precisas para mestiças em pasto tropical."
+        acao: "Acompanhar sobras, ECC e produção para calibrar; medir altura do pasto."
+  fonte: "Embrapa 2012 (Jardim et al.)"
+  forca: B
+
+- id: EXG-03
+  versao: 1
+  modulo: exigencias
+  descricao: Vacas secas e pré-parto consomem cerca de 1,8–2% do PV
+  prioridade: 80
+  se:
+    - {fato: perfil.fase, op: in, valor: [pre_parto, seca]}
+  entao:
+    - calcular: {fato: exig.cms, funcao: cms_preparto, args: {pv: $lote.pv, pct: "@params.cms_preparto_pct_pv"}}
+  fonte: "NASEM 2021 via Drackley 2021"
+  forca: B
+
+- id: EXG-02A
+  versao: 1
+  modulo: exigencias
+  descricao: Energia de mantença = k × PV^0,75
+  prioridade: 80
+  se:
+    - {fato: lote.pv, op: existe}
+    - {fato: perfil.fase, op: existe}
+  entao:
+    - calcular: {fato: exig.ell_mantenca, funcao: mantenca, args: {pv: $lote.pv, k: "@params.k_mantenca"}}
+  fonte: "NRC 2001 (NASEM 2021: 0,10)"
+  forca: B
+
+- id: EXG-02B
+  versao: 1
+  modulo: exigencias
+  descricao: Energia para produção de leite pela composição do leite
+  prioridade: 80
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+  entao:
+    - calcular:
+        fato: exig.ell_leite
+        funcao: ell_leite
+        args: {leite: $lote.leite, gordura: $lote.gordura, proteina: $lote.proteina, lactose: "$lote.lactose|null"}
+  fonte: "NRC 2001"
+  forca: B
+
+- id: EXG-02C
+  versao: 1
+  modulo: exigencias
+  descricao: Energia de gestação (a partir de 190 dias)
+  prioridade: 80
+  se:
+    - {fato: perfil.gestacao_avancada, op: "=", valor: true}
+  entao:
+    - calcular: {fato: exig.ell_gestacao, funcao: ell_gestacao, args: {dias: $lote.dias_gestacao, peso_bezerro: "@params.peso_bezerro_kg"}}
+    - calcular: {fato: exig.pm_gestacao, funcao: pm_gestacao, args: {dias: $lote.dias_gestacao, peso_bezerro: "@params.peso_bezerro_kg"}}
+  fonte: "NRC 2001 (Bell & Ehrhardt); confere com tabela de Drackley 2021"
+  forca: B
+
+- id: EXG-02D
+  versao: 1
+  modulo: exigencias
+  descricao: Energia de crescimento das primíparas
+  prioridade: 70
+  cf: 0.9
+  se:
+    - {fato: perfil.crescimento, op: "=", valor: true}
+    - {fato: exig.ell_mantenca, op: existe}
+  entao:
+    - calcular:
+        fato: exig.ell_crescimento
+        funcao: ell_crescimento
+        args: {mantenca: $exig.ell_mantenca, fracao: $lote.fracao_primiparas, acrescimo: "@params.acrescimo_primiparas"}
+  fonte: "NRC 1989 (+20% de mantença na 1ª lactação)"
+  forca: D
+
+- id: EXG-02E
+  versao: 1
+  modulo: exigencias
+  descricao: Energia de atividade de pastejo por peso, distância e relevo
+  prioridade: 80
+  cf: 0.8
+  se:
+    - {fato: perfil.atividade_pastejo, op: "=", valor: true}
+  entao:
+    - calcular:
+        fato: exig.ell_atividade
+        funcao: ell_atividade
+        args: {pv: $lote.pv, distancia: "$lote.distancia_km|1.0", relevo: "$lote.relevo|plano"}
+  fonte: "NRC 2001 via eOrganic (reproduz valores tabelados)"
+  forca: B
+
+- id: EXG-06A
+  versao: 1
+  modulo: exigencias
+  descricao: ECC abaixo do mínimo no meio da lactação — somar energia para recuperar
+  prioridade: 80
+  cf: 0.8
+  se:
+    - {fato: perfil.fase, op: "=", valor: meio}
+    - {fato: lote.ecc, op: "<", valor: "@params.ecc_min_meio"}
+  entao:
+    - calcular:
+        fato: exig.ell_ecc
+        funcao: ell_ajuste_ecc
+        args: {ecc: $lote.ecc, meta: "@params.ecc_meta_meio", dias: "@params.dias_recuperacao_ecc", mcal_por_ponto: "@params.mcal_por_ponto_ecc"}
+  fonte: "Penn State (417 Mcal por ponto de ECC)"
+  forca: B
+
+- id: EXG-06B
+  versao: 1
+  modulo: exigencias
+  descricao: ECC abaixo do mínimo no final da lactação — somar energia para recuperar antes da secagem
+  prioridade: 80
+  cf: 0.8
+  se:
+    - {fato: perfil.fase, op: "=", valor: final}
+    - {fato: lote.ecc, op: "<", valor: "@params.ecc_min_final"}
+  entao:
+    - calcular:
+        fato: exig.ell_ecc
+        funcao: ell_ajuste_ecc
+        args: {ecc: $lote.ecc, meta: "@params.ecc_meta_final", dias: "@params.dias_recuperacao_ecc", mcal_por_ponto: "@params.mcal_por_ponto_ecc"}
+  fonte: "Penn State"
+  forca: B
+
+- id: EXG-06C
+  versao: 1
+  modulo: exigencias
+  descricao: ECC abaixo do mínimo no início da lactação — somar energia para recuperar
+  prioridade: 80
+  cf: 0.8
+  se:
+    - {fato: perfil.fase, op: in, valor: [recem_parida, inicio]}
+    - {fato: lote.ecc, op: "<", valor: "@params.ecc_min_inicio"}
+  entao:
+    - calcular:
+        fato: exig.ell_ecc
+        funcao: ell_ajuste_ecc
+        args: {ecc: $lote.ecc, meta: "@params.ecc_meta_inicio", dias: "@params.dias_recuperacao_ecc", mcal_por_ponto: "@params.mcal_por_ponto_ecc"}
+  fonte: "Penn State"
+  forca: B
+
+- id: EXG-07
+  versao: 1
+  modulo: exigencias
+  descricao: Início de lactação com ECC adequado pode mobilizar reserva — tolerar oferta de energia um pouco menor
+  prioridade: 80
+  cf: 0.8
+  se:
+    - {fato: perfil.fase, op: in, valor: [recem_parida, inicio]}
+    - {fato: lote.ecc, op: ">=", valor: "@params.ecc_min_inicio"}
+  entao:
+    - concluir: {fato: meta.fator_energia_min, valor: "@params.fator_energia_mobilizacao"}
+  fonte: "Penn State; USC"
+  forca: B
+
+- id: EXG-02Z
+  versao: 1
+  modulo: exigencias
+  descricao: Exigência total de ELl = mantença + leite + gestação + crescimento + atividade ± ECC
+  prioridade: 30
+  se:
+    - {fato: exig.ell_mantenca, op: existe}
+  entao:
+    - calcular:
+        fato: exig.ell_total
+        funcao: soma
+        args:
+          partes: [$exig.ell_mantenca, "$exig.ell_leite|0", "$exig.ell_gestacao|0", "$exig.ell_crescimento|0", "$exig.ell_atividade|0", "$exig.ell_ecc|0"]
+  fonte: "NRC 2001"
+  forca: B
+
+- id: EXG-PB1
+  versao: 1
+  modulo: exigencias
+  descricao: PB alvo por produção — Holandês/Jersey
+  prioridade: 80
+  se:
+    - {fato: perfil.equacao_cms, op: "=", valor: nrc2001}
+  entao:
+    - calcular: {fato: exig.pb_pct_alvo, funcao: pb_alvo, args: {leite: $lote.leite, tabela: "@params.pb_tabela_holandes"}}
+    - calcular: {fato: exig.pm_leite, funcao: pm_leite, args: {leite: $lote.leite, proteina: $lote.proteina, eficiencia: "@params.eficiencia_pm"}}
+  fonte: "MSD Vet Manual; NRC 2001"
+  forca: B
+
+- id: EXG-PB2
+  versao: 1
+  modulo: exigencias
+  descricao: PB alvo por produção — zebuínos e cruzados
+  prioridade: 80
+  se:
+    - {fato: perfil.equacao_cms, op: "=", valor: brleite}
+  entao:
+    - calcular: {fato: exig.pb_pct_alvo, funcao: pb_alvo, args: {leite: $lote.leite, tabela: "@params.pb_tabela_mestico"}}
+    - calcular: {fato: exig.pm_leite, funcao: pm_leite, args: {leite: $lote.leite, proteina: $lote.proteina, eficiencia: "@params.eficiencia_pm"}}
+  fonte: "MSD Vet Manual (raças pequenas)"
+  forca: B
+
+- id: EXG-PB3
+  versao: 1
+  modulo: exigencias
+  descricao: PB alvo no pré-parto
+  prioridade: 80
+  se:
+    - {fato: perfil.fase, op: "=", valor: pre_parto}
+  entao:
+    - concluir: {fato: exig.pb_pct_alvo, valor: "@params.pb_preparto"}
+  fonte: "Dossiê (pré-parto 13–15% PB)"
+  forca: C
+
+- id: EXG-PB4
+  versao: 1
+  modulo: exigencias
+  descricao: PB alvo para vacas secas
+  prioridade: 80
+  se:
+    - {fato: perfil.fase, op: "=", valor: seca}
+  entao:
+    - concluir: {fato: exig.pb_pct_alvo, valor: "@params.pb_seca"}
+  fonte: "Prática de campo"
+  forca: D
+
+- id: EXG-04
+  versao: 1
+  modulo: exigencias
+  descricao: Metas fixas de fibra de forragem, gordura e ureia da dieta
+  prioridade: 80
+  se:
+    - {fato: perfil.fase, op: existe}
+  entao:
+    - concluir: {fato: meta.fdnf_min, valor: "@params.fdnf_min"}
+    - concluir: {fato: meta.ee_max, valor: "@params.ee_max"}
+    - concluir: {fato: meta.ureia_max, valor: "@params.ureia_max"}
+  fonte: "NRC 2001; Cultivar; Semadesc-MS"
+  forca: B
+
+- id: EXG-04B
+  versao: 1
+  modulo: exigencias
+  descricao: Sem dieta informada, metas de FDN e CNF ficam no valor base
+  prioridade: 20
+  se:
+    - {fato: perfil.fase, op: existe}
+    - {fato: dieta.fdnf_pct, op: ausente}
+  entao:
+    - concluir: {fato: meta.fdn_min, valor: "@params.fdn_min"}
+    - concluir: {fato: meta.cnf_max, valor: "@params.cnf_max"}
+  fonte: "NRC 2001"
+  forca: B
+
+- id: EXG-05
+  versao: 1
+  modulo: exigencias
+  descricao: Cada ponto de FDNf abaixo de 19% sobe o FDN mínimo em 2 e baixa o CNF máximo em 2
+  prioridade: 70
+  se:
+    - {fato: dieta.fdnf_pct, op: existe}
+    - {fato: perfil.fase, op: existe}
+  entao:
+    - calcular:
+        fato: meta
+        funcao: metas_fibra
+        args: {fdnf_dieta: $dieta.fdnf_pct, fdn_min: "@params.fdn_min", fdnf_min: "@params.fdnf_min", cnf_max: "@params.cnf_max", passo: "@params.passo_fibra"}
+  fonte: "NRC 2001 via CompreRural"
+  forca: B
+
+- id: EXG-09
+  versao: 1
+  modulo: exigencias
+  descricao: Calcular CMS como % do PV para checagem de plausibilidade
+  prioridade: 20
+  se:
+    - {fato: exig.cms, op: existe}
+    - {fato: lote.estado, op: "=", valor: lactacao}
+  entao:
+    - calcular: {fato: perfil.cms_pct_pv, funcao: cms_pct_pv, args: {cms: $exig.cms, pv: $lote.pv}}
+  fonte: "Dossiê (CMS de lactação entre 2,5 e 4% do PV)"
+  forca: C

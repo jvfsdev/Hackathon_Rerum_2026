@@ -1,0 +1,162 @@
+# Módulo F — Formulação: as regras definem metas e restrições do PL; depois diagnosticam o resultado.
+- id: FOR-01
+  versao: 1
+  modulo: formulacao
+  descricao: Faixa de matéria seca total do PL (CMS ± 5%)
+  prioridade: 80
+  se:
+    - {fato: formulacao.solicitada, op: "=", valor: true}
+    - {fato: exig.cms, op: existe}
+  entao:
+    - calcular: {fato: pl.folga_ms, funcao: produto, args: {a: $exig.cms, b: "@params.pl_folga_cms"}}
+  fonte: "Inferências (CMS ± 5%)"
+  forca: D
+
+- id: FOR-02
+  versao: 1
+  modulo: formulacao
+  descricao: Energia mínima do PL = exigência × fator de tolerância
+  prioridade: 80
+  se:
+    - {fato: formulacao.solicitada, op: "=", valor: true}
+    - {fato: exig.ell_total, op: existe}
+  entao:
+    - calcular: {fato: pl.ell_min, funcao: produto, args: {a: $exig.ell_total, b: "$meta.fator_energia_min|@params.fator_energia_min"}}
+  fonte: "Dossiê VER-01"
+  forca: D
+
+- id: FOR-03
+  versao: 1
+  modulo: formulacao
+  descricao: Faixa de PB do PL = alvo até alvo + folga
+  prioridade: 80
+  se:
+    - {fato: formulacao.solicitada, op: "=", valor: true}
+    - {fato: exig.pb_pct_alvo, op: existe}
+  entao:
+    - concluir: {fato: pl.pb_min, valor: $exig.pb_pct_alvo}
+    - calcular: {fato: pl.pb_max, funcao: soma, args: {partes: [$exig.pb_pct_alvo, "@params.pl_pb_folga_max"]}}
+  fonte: "MSD Vet Manual"
+  forca: D
+
+- id: FOR-04
+  versao: 1
+  modulo: formulacao
+  descricao: Teto de consumo de FDN (kg/dia) = 1,25% do PV
+  prioridade: 80
+  se:
+    - {fato: formulacao.solicitada, op: "=", valor: true}
+    - {fato: lote.pv, op: existe}
+  entao:
+    - calcular: {fato: pl.fdn_max_kg, funcao: pct_de, args: {valor: $lote.pv, pct: "@params.teto_fdn_pct_pv"}}
+  fonte: "Mertens via Epagri"
+  forca: B
+
+- id: FOR-10
+  versao: 1
+  modulo: formulacao
+  descricao: PL inviável por energia — faltam alimentos energéticos
+  prioridade: 60
+  se:
+    - {fato: pl.status, op: "=", valor: inviavel}
+    - {fato: pl.restricoes_violadas, op: contem, valor: energia}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: formulacao
+        titulo: "Energia não atingível com os alimentos escolhidos"
+        causa: "Mesmo no máximo de consumo, os alimentos não fornecem {pl.ell_min:.1f} Mcal de ELl/dia."
+        acao: "Incluir fonte energética (milho moído, polpa cítrica), usar volumoso de melhor qualidade ou reduzir a meta de leite."
+  fonte: "Dossiê (diagnóstico de inviabilidade)"
+  forca: D
+
+- id: FOR-11
+  versao: 1
+  modulo: formulacao
+  descricao: PL inviável por proteína
+  prioridade: 60
+  se:
+    - {fato: pl.status, op: "=", valor: inviavel}
+    - {fato: pl.restricoes_violadas, op: contem, valor: proteina}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: formulacao
+        titulo: "Proteína fora da faixa com os alimentos escolhidos"
+        causa: "Não é possível chegar a {pl.pb_min:.1f}–{pl.pb_max:.1f}% de PB."
+        acao: "Incluir fonte proteica (farelo de soja, caroço de algodão) ou ureia (até 1% da MS)."
+  fonte: "Dossiê (diagnóstico de inviabilidade)"
+  forca: D
+
+- id: FOR-12
+  versao: 1
+  modulo: formulacao
+  descricao: PL inviável por fibra mínima
+  prioridade: 60
+  se:
+    - {fato: pl.status, op: "=", valor: inviavel}
+    - {fato: pl.restricoes_violadas, op: contem, valor: fibra}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: formulacao
+        titulo: "Fibra mínima não atingível"
+        causa: "Falta volumoso para cumprir FDN ≥ {meta.fdn_min:.0f}% e FDNf ≥ {meta.fdnf_min:.0f}% da MS."
+        acao: "Incluir ou liberar mais volumoso na formulação."
+  fonte: "NRC 2001"
+  forca: D
+
+- id: FOR-13
+  versao: 1
+  modulo: formulacao
+  descricao: PL inviável por enchimento (FDN demais para o consumo)
+  prioridade: 60
+  se:
+    - {fato: pl.status, op: "=", valor: inviavel}
+    - {fato: pl.restricoes_violadas, op: contem, valor: enchimento}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: formulacao
+        titulo: "Volumoso muito fibroso limita o consumo"
+        causa: "A FDN necessária ultrapassa o teto de {pl.fdn_max_kg:.1f} kg/dia (1,25% do PV)."
+        acao: "Usar volumoso mais digestível (silagem de milho) ou mais concentrado."
+  fonte: "Mertens via Epagri"
+  forca: B
+
+- id: FOR-14
+  versao: 1
+  modulo: formulacao
+  descricao: PL inviável por CNF ou gordura máximos
+  prioridade: 60
+  se:
+    - {fato: pl.status, op: "=", valor: inviavel}
+    - qualquer:
+        - {fato: pl.restricoes_violadas, op: contem, valor: cnf}
+        - {fato: pl.restricoes_violadas, op: contem, valor: gordura}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: formulacao
+        titulo: "Limites de CNF ou gordura impedem a solução"
+        causa: "Para atingir a energia seria preciso passar do CNF máximo ou de 6% de gordura."
+        acao: "Incluir volumoso de melhor qualidade ou fontes de energia fibrosas (polpa cítrica, farelo de trigo)."
+  fonte: "NRC 2001"
+  forca: D
+
+- id: FOR-20
+  versao: 1
+  modulo: formulacao
+  descricao: PL encontrou a dieta de menor custo
+  prioridade: 60
+  se:
+    - {fato: pl.status, op: "=", valor: otimo}
+  entao:
+    - alerta:
+        nivel: informativo
+        categoria: formulacao
+        titulo: "Dieta de custo mínimo: R$ {pl.custo:.2f}/vaca/dia"
+        causa: "Atende energia, proteína, fibra e limites de inclusão definidos pelas regras."
+        acao: "Revise a verificação abaixo e aceite para criar uma nova versão da dieta."
+  fonte: "Programação linear (PuLP + HiGHS)"
+  forca: B

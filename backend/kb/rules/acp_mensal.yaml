@@ -1,0 +1,265 @@
+# Módulo D3 — Acompanhamento mensal: laudo do laticínio / controle leiteiro (NUL, G:P, gordura, lactose, CCS, CBT).
+- id: ACP-M00
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: Laudo em ureia — converter para NUL (× 0,4667)
+  prioridade: 95
+  se:
+    - {fato: laudo.ureia, op: existe}
+    - {fato: laudo.nul, op: ausente}
+  entao:
+    - calcular: {fato: laudo.nul, funcao: ureia_para_nul, args: {ureia: $laudo.ureia}}
+  fonte: "Magalhães, UFV 2003"
+  forca: B
+
+- id: ACP-M01
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: Calcular a relação gordura:proteína do leite
+  prioridade: 95
+  se:
+    - {fato: laudo.gordura, op: existe}
+    - {fato: laudo.proteina, op: existe}
+  entao:
+    - calcular: {fato: laudo.gp, funcao: razao, args: {a: $laudo.gordura, b: $laudo.proteina}}
+  fonte: "Penn State"
+  forca: B
+
+- id: ACP-01
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: NUL alto — excesso de proteína ou falta de energia fermentável
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: laudo.nul, op: ">", valor: "@params.nul_max"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "NUL alto: {laudo.nul:.1f} mg/dL"
+        causa: "Proteína degradável acima da energia fermentável: sobra amônia, vira ureia (desperdício)."
+        acao: "Reduzir ~1 p.p. de PB (≈ −2 mg/dL de NUL) ou aumentar energia fermentável (milho)."
+  fonte: "Penn State; Embrapa Pedroso 2011"
+  forca: B
+
+- id: ACP-01R
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: NUL acima de ~19,5 mg/dL reduz a chance de prenhez
+  prioridade: 65
+  cf: 0.9
+  se:
+    - {fato: laudo.nul, op: ">=", valor: "@params.nul_reprodutivo"}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: reproducao
+        titulo: "NUL {laudo.nul:.1f} mg/dL: risco reprodutivo"
+        causa: "Acima de ~19,5 mg/dL a chance de prenhez cai cerca de 43% (OR 0,57)."
+        acao: "Ajustar a relação proteína:energia antes da estação de inseminação."
+  fonte: "Raboisson et al. 2017 (meta-análise)"
+  forca: A
+
+- id: ACP-02
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: NUL baixo junto com produção abaixo do esperado — proteína possivelmente insuficiente
+  prioridade: 60
+  cf: 0.6
+  se:
+    - {fato: laudo.nul, op: "<", valor: "@params.nul_min"}
+    - qualquer:
+        - {fato: hipotese.queda_sustentada, op: "=", valor: true}
+        - {fato: mon.residuo, op: "<", valor: -0.05}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: dieta_queda
+        titulo: "NUL baixo ({laudo.nul:.1f} mg/dL) com produção abaixo do esperado"
+        causa: "Proteína degradável pode estar limitando a produção."
+        acao: "Rever a proteína degradável (farelo de soja, ureia até 1% da MS)."
+  fonte: "Magalhães UFV 2003; Meyer et al. 2006 (alvo único de NUL não vale)"
+  forca: B
+
+- id: ACP-03
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: G:P abaixo de 1,0 — suspeita de acidose subaguda
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: laudo.gp, op: "<", valor: "@params.gp_sara_max"}
+  entao:
+    - concluir: {fato: hipotese.acidose, valor: true}
+  fonte: "Dossiê ACP-03; UNH 2025"
+  forca: C
+
+- id: ACP-04
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: G:P baixa com fezes fluidas reforça a suspeita de acidose
+  prioridade: 60
+  cf: 0.6
+  se:
+    - {fato: laudo.gp, op: "<", valor: "@params.gp_sara_max"}
+    - {fato: mon.fezes, op: "<=", valor: "@params.fezes_acidose_max"}
+  entao:
+    - concluir: {fato: hipotese.acidose, valor: true}
+  fonte: "Dossiê ACP-04"
+  forca: C
+
+- id: ACP-ACID
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: Alerta de acidose subaguda com o CF combinado das evidências
+  prioridade: 40
+  se:
+    - {fato: hipotese.acidose, op: "=", valor: true}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        cf_de: hipotese.acidose
+        titulo: "Suspeita de acidose ruminal subaguda"
+        causa: "Evidências combinadas (G:P do leite, fezes, ruminação) apontam pouca fibra efetiva."
+        acao: "Aumentar fibra efetiva (FDNfe), reduzir amido rápido e checar o tamanho de partícula."
+  fonte: "Dossiê; MYCIN (combinação de CFs)"
+  forca: C
+
+- id: ACP-M03
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: G:P acima de 1,4 em recém-paridas — balanço energético negativo / cetose subclínica
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: perfil.fase, op: in, valor: [recem_parida, inicio]}
+    - {fato: lote.del, op: "<=", valor: 40}
+    - {fato: laudo.gp, op: ">", valor: "@params.gp_ben_min"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "G:P {laudo.gp:.2f} em recém-paridas: risco de cetose subclínica"
+        causa: "Gordura alta em relação à proteína indica mobilização de gordura corporal."
+        acao: "Aumentar a densidade energética e o acesso ao cocho; testar BHB em ≥12 vacas."
+  fonte: "Penn State (cetose subclínica)"
+  forca: B
+
+- id: ACP-M04
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: Queda de gordura com proteína estável — depressão da gordura do leite
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: laudo.gordura_delta, op: "<=", valor: "@params.gordura_queda_pp"}
+    - {fato: laudo.proteina_delta_abs, op: "<", valor: "@params.proteina_estavel_pp"}
+  entao:
+    - concluir: {fato: hipotese.dgl, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Gordura do leite caiu {laudo.gordura_delta:.2f} p.p. com proteína estável"
+        causa: "Depressão da gordura: amido rápido, partícula fina, óleo insaturado ou MS da silagem não corrigida."
+        acao: "Mais fibra efetiva, menos amido rápido/óleo; reavaliar em 7–14 dias."
+  fonte: "eXtension (gordura do leite)"
+  forca: C
+
+- id: ACP-M05
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: Lactose baixa com CCS subindo — mastite primeiro, não dieta
+  prioridade: 80
+  cf: 0.8
+  se:
+    - {fato: laudo.lactose, op: "<", valor: "@params.lactose_min"}
+    - qualquer:
+        - {fato: laudo.ccs_tendencia, op: "=", valor: subindo}
+        - {fato: laudo.ccs, op: ">", valor: "@params.ccs_pre_regulatorio"}
+  entao:
+    - concluir: {fato: hipotese.mastite, valor: true}
+    - alerta:
+        nivel: critico
+        categoria: qualidade
+        titulo: "Mastite primeiro: lactose {laudo.lactose:.2f}% com CCS subindo"
+        causa: "Lactose e ESD baixos com CCS em alta são sinal de mastite, não de dieta."
+        acao: "CMT/caneca no lote, cultura das vacas suspeitas e revisão da rotina de ordenha. Não mudar a dieta agora."
+  fonte: "IN 76/2018; Inferências"
+  forca: A
+
+- id: ACP-M06
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: CCS do tanque acima do limite regulatório (média geométrica de 3 meses)
+  prioridade: 70
+  cf: 1.0
+  se:
+    - {fato: laudo.ccs_mg3, op: ">", valor: "@params.ccs_regulatorio"}
+  entao:
+    - calcular: {fato: mon.perda_ccs, funcao: perda_ccs, args: {ccs: $laudo.ccs_mg3, litros_dia: $mon.litros_lote, preco: $fazenda.preco_leite}}
+    - alerta:
+        nivel: critico
+        categoria: qualidade
+        titulo: "CCS {laudo.ccs_mg3:.0f} mil acima do limite da IN 76 (500 mil)"
+        causa: "Mastite subclínica custa ~{mon.perda_ccs.pct:.0f}% da produção: ≈ R$ {mon.perda_ccs.rs_mes:.0f}/mês neste lote."
+        acao: "Checklist de mastite: pré e pós-dipping, linha de ordenha, tratamento na secagem, descarte de crônicas."
+  fonte: "IN 76/2018; eXtension (perdas por CCS)"
+  forca: A
+
+- id: ACP-M06B
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: CCS do tanque em faixa pré-regulatória
+  prioridade: 70
+  cf: 0.8
+  se:
+    - {fato: laudo.ccs_mg3, op: ">", valor: "@params.ccs_pre_regulatorio"}
+    - {fato: laudo.ccs_mg3, op: "<=", valor: "@params.ccs_regulatorio"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: qualidade
+        titulo: "CCS {laudo.ccs_mg3:.0f} mil: perto do limite regulatório"
+        causa: "Três meses acima de 500 mil suspendem a coleta."
+        acao: "Rever rotina de ordenha e identificar vacas com CCS alta."
+  fonte: "IN 76/2018"
+  forca: A
+
+- id: ACP-M07
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: CBT acima do limite — higiene e resfriamento, não dieta
+  prioridade: 70
+  cf: 1.0
+  se:
+    - {fato: laudo.cbt_mg3, op: ">", valor: "@params.cbt_regulatorio"}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: qualidade
+        titulo: "CBT {laudo.cbt_mg3:.0f} mil UFC/mL acima do limite (300 mil)"
+        causa: "CBT alta indica higiene de ordenha, resfriamento ou limpeza do equipamento."
+        acao: "Checklist de ordenha e tanque (≤ 4 °C em até 3 h); não mexer na dieta."
+  fonte: "IN 76/2018"
+  forca: A
+
+- id: ACP-M05B
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: Queda de produção com mastite em curso — causa provável é a mastite
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: hipotese.queda_sustentada, op: "=", valor: true}
+    - {fato: hipotese.mastite, op: "=", valor: true}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: qualidade
+        titulo: "Causa provável da queda: mastite"
+        causa: "Queda de produção junto com lactose baixa e CCS em alta."
+        acao: "Priorizar o controle de mastite; a dieta não é a causa provável."
+  fonte: "Inferências (assinatura de surto de mastite)"
+  forca: C

@@ -1,0 +1,302 @@
+# Casos com resultado conhecido (base no conhecimento do domínio). Validam cada versão da base.
+# fatos: entradas declaradas; dieta: itens (id do alimento, kg MN/vaca/dia); modulos: omitido = todos.
+# espera: fatos (igualdade), aprox ([valor, tolerância]), cf, ausentes, disparadas, nao_disparadas,
+#         alertas (ativos), suprimidos, so_alertas (conjunto exato de alertas ativos).
+
+- id: T1
+  descricao: CMS NRC 2001 — vaca 650 kg, 35 kg de leite a 3,8%, semana 6
+  testa: EXG-01A
+  modulos: [classificacao, exigencias]
+  fatos: {lote.estado: lactacao, lote.del: 42, lote.grupo_genetico: holandes, lote.pv: 650, lote.leite: 35, lote.gordura: 3.8, lote.proteina: 3.2}
+  espera:
+    aprox: {exig.cms_equacao: [21.2, 0.15]}
+    disparadas: [CLS-08B, EXG-01A]
+
+- id: T2
+  descricao: Mesma vaca — energia do leite, mantença e PM do leite
+  testa: EXG-02A, EXG-02B, EXG-PB1
+  modulos: [classificacao, exigencias]
+  fatos: {lote.estado: lactacao, lote.del: 42, lote.grupo_genetico: holandes, lote.pv: 650, lote.leite: 35, lote.gordura: 3.8, lote.proteina: 3.2}
+  espera:
+    aprox: {exig.ell_leite: [25.2, 0.1], exig.ell_mantenca: [10.3, 0.1], exig.pm_leite: [1672, 2]}
+
+- id: T3
+  descricao: DEL 10 em lactação é recém-parida
+  testa: CLS-01
+  modulos: [classificacao]
+  fatos: {lote.estado: lactacao, lote.del: 10}
+  espera:
+    fatos: {perfil.fase: recem_parida}
+    disparadas: [CLS-01]
+
+- id: T4
+  descricao: Seca a 15 dias do parto — pré-parto, CMS ≈ 1,9% do PV
+  testa: CLS-05, EXG-03
+  modulos: [classificacao, exigencias]
+  fatos: {lote.estado: seca, lote.dias_para_parto: 15, lote.pv: 600, lote.dias_gestacao: 265}
+  espera:
+    fatos: {perfil.fase: pre_parto}
+    aprox: {exig.cms: [11.4, 0.01]}
+    disparadas: [CLS-05, EXG-03, EXG-02C]
+
+- id: T5
+  descricao: Dieta com FDN 22% e FDNf 19% — risco de acidose
+  testa: VER-03
+  modulos: [classificacao, exigencias, verificacao]
+  fatos: {lote.estado: lactacao, lote.del: 80, lote.grupo_genetico: holandes, lote.pv: 600, lote.leite: 30, lote.gordura: 3.6, lote.proteina: 3.1,
+          dieta.ms_kg: 20, dieta.fdn_pct: 22, dieta.fdnf_pct: 19, dieta.cnf_pct: 42, dieta.pb_pct: 16, dieta.ee_pct: 4, dieta.ureia_pct: 0, dieta.ell_mcal_kg: 1.65}
+  espera:
+    disparadas: [VER-03, VER-03Z]
+    alertas: [VER-03Z]
+    nao_disparadas: [VER-03C]
+
+- id: T6
+  descricao: FDNf 17% — FDN mínimo vira 29% e CNF máximo 40%
+  testa: EXG-05
+  modulos: [classificacao, exigencias]
+  fatos: {lote.estado: lactacao, lote.del: 80, dieta.fdnf_pct: 17}
+  espera:
+    aprox: {meta.fdn_min: [29, 0.001], meta.cnf_max: [40, 0.001]}
+
+- id: T7
+  descricao: Ureia 1,4% da MS — dieta bloqueada citando VER-04
+  testa: VER-04
+  modulos: [classificacao, exigencias, verificacao]
+  fatos: {lote.estado: lactacao, lote.del: 80, lote.grupo_genetico: girolando, lote.pv: 500, lote.leite: 18, lote.gordura: 3.8, lote.proteina: 3.2,
+          dieta.ms_kg: 15, dieta.fdn_pct: 40, dieta.fdnf_pct: 30, dieta.cnf_pct: 35, dieta.pb_pct: 17, dieta.ee_pct: 3, dieta.ureia_pct: 1.4, dieta.ell_mcal_kg: 1.5}
+  espera:
+    fatos: {parecer.dieta: bloqueada}
+    alertas: [VER-04]
+
+- id: T8
+  descricao: NUL 22 mg/dL — excesso de proteína / falta de energia e risco reprodutivo
+  testa: ACP-01, ACP-01R
+  modulos: [acompanhamento_mensal, meta]
+  fatos: {laudo.nul: 22}
+  espera:
+    alertas: [ACP-01, ACP-01R]
+
+- id: T9
+  descricao: Gordura 2,9%, proteína 3,3% (G:P 0,88) e fezes 2 — acidose com CF ≈ 0,88
+  testa: ACP-03, ACP-04, combinação MYCIN
+  modulos: [acompanhamento_mensal, acompanhamento_semanal, meta]
+  fatos: {laudo.gordura: 2.9, laudo.proteina: 3.3, mon.fezes: 2}
+  espera:
+    cf: {hipotese.acidose: [0.88, 0.001]}
+    alertas: [ACP-ACID]
+
+- id: T10
+  descricao: ECC 3,5 no parto → 2,25 na semana 5 — balanço energético negativo severo
+  testa: ACP-05
+  modulos: [classificacao, acompanhamento_semanal, meta]
+  fatos: {lote.estado: lactacao, lote.del: 35, mon.ecc_perda: 1.25}
+  espera:
+    alertas: [ACP-05]
+    nao_disparadas: [ACP-09]
+
+- id: T12
+  descricao: Vaca de 635 kg em pasto acidentado andando 3,2 km/dia — atividade ≈ 5,5 Mcal
+  testa: CLS-09, EXG-02E
+  modulos: [classificacao, exigencias]
+  fatos: {lote.estado: lactacao, lote.del: 120, lote.sistema: pasto, lote.grupo_genetico: holandes, lote.pv: 635, lote.distancia_km: 3.2, lote.relevo: acidentado}
+  espera:
+    aprox: {exig.ell_atividade: [5.5, 0.05]}
+
+- id: T13
+  descricao: T = 30 °C e UR = 70% — ITU ≈ 81,3 e alerta forte de estresse térmico
+  testa: CLS-ITU, CLS-11
+  modulos: [classificacao]
+  fatos: {lote.temp: 30, lote.ur: 70}
+  espera:
+    aprox: {clima.itu: [81.3, 0.05]}
+    fatos: {perfil.estresse_termico: forte}
+    alertas: [CLS-11]
+    nao_disparadas: [CLS-10]
+
+- id: T14
+  descricao: Lactação com 200 dias de gestação — termo de gestação incluído
+  testa: CLS-06, EXG-02C
+  modulos: [classificacao, exigencias]
+  fatos: {lote.estado: lactacao, lote.del: 250, lote.grupo_genetico: holandes, lote.pv: 600, lote.leite: 20, lote.gordura: 3.8, lote.proteina: 3.3, lote.dias_gestacao: 200}
+  espera:
+    disparadas: [CLS-06, EXG-02C]
+    aprox: {exig.ell_gestacao: [2.68, 0.05]}
+
+- id: T14B
+  descricao: 189 dias de gestação ainda não soma exigência
+  testa: CLS-06
+  modulos: [classificacao, exigencias]
+  fatos: {lote.estado: lactacao, lote.del: 250, lote.pv: 600, lote.dias_gestacao: 189}
+  espera:
+    nao_disparadas: [CLS-06]
+    ausentes: [exig.ell_gestacao]
+
+- id: T15
+  descricao: Primíparas em lactação — exigência de crescimento incluída
+  testa: CLS-07, EXG-02D
+  modulos: [classificacao, exigencias]
+  fatos: {lote.estado: lactacao, lote.del: 90, lote.pv: 480, lote.fracao_primiparas: 1.0}
+  espera:
+    disparadas: [CLS-07, EXG-02D]
+    aprox: {exig.ell_crescimento: [1.65, 0.05]}
+
+- id: T16
+  descricao: PV 600 kg e dieta com 40% de FDN — teto de fibra 18,75 kg; CMS é o menor valor
+  testa: EXG-01D, EXG-01E
+  modulos: [classificacao, exigencias]
+  fatos: {lote.estado: lactacao, lote.del: 100, lote.grupo_genetico: holandes, lote.pv: 600, lote.leite: 40, lote.gordura: 3.6, lote.proteina: 3.1, dieta.fdn_pct: 40}
+  espera:
+    aprox: {exig.cms_teto_fibra: [18.75, 0.001], exig.cms: [18.75, 0.001]}
+
+- id: T17
+  descricao: ECC 2,5 no meio da lactação com meta 3,0 em 100 dias — ≈ +2,1 Mcal/dia
+  testa: EXG-06A
+  modulos: [classificacao, exigencias]
+  fatos: {lote.estado: lactacao, lote.del: 150, lote.pv: 650, lote.ecc: 2.5}
+  espera:
+    aprox: {exig.ell_ecc: [2.085, 0.01]}
+
+- id: T18
+  descricao: Leite caiu 12% em 7 dias com ITU > 72, sem troca de volumoso — calor, não dieta
+  testa: ACP-10, META-02
+  modulos: [acompanhamento_diario, meta]
+  fatos: {mon.queda_7d: -0.12, mon.itu_2d: 76, mon.itu_limiar: 72, mon.litros_vaca: 26, mon.residuo: -0.12, mon.corrida_dias: 3, mon.corrida_pior: -0.12}
+  espera:
+    alertas: [ACP-10]
+    disparadas: [META-02]
+    nao_disparadas: [ACP-08]
+
+- id: G1
+  descricao: Gestação de 250 dias (bezerro 44 kg) — ELl ≈ 3,4 Mcal e PM ≈ 306 g (tabela NRC/Drackley)
+  testa: EXG-02C
+  modulos: [classificacao, exigencias]
+  fatos: {lote.estado: seca, lote.dias_para_parto: 30, lote.pv: 600, lote.dias_gestacao: 250}
+  espera:
+    aprox: {exig.ell_gestacao: [3.41, 0.02], exig.pm_gestacao: [306, 2]}
+
+- id: B1
+  descricao: BR-Leite Eq. 1.1 — Girolando de 550 kg, 15 kg a 4%, 150 DEL → ≈ 16,9 kg MS
+  testa: CLS-08, EXG-01B
+  modulos: [classificacao, exigencias]
+  fatos: {lote.estado: lactacao, lote.del: 150, lote.grupo_genetico: girolando, lote.pv: 550, lote.leite: 15, lote.gordura: 4.0, lote.proteina: 3.2}
+  espera:
+    aprox: {exig.cms_equacao: [16.87, 0.05]}
+    fatos: {perfil.equacao_cms: brleite}
+
+- id: D1
+  descricao: Dieta completa calculada a partir dos alimentos (silagem + milho + soja) e parecer
+  testa: EXG-00, VER-00A..C
+  modulos: [classificacao, exigencias, verificacao]
+  fatos: {lote.estado: lactacao, lote.del: 120, lote.grupo_genetico: girolando, lote.sistema: confinado, lote.pv: 550, lote.leite: 18, lote.gordura: 3.8, lote.proteina: 3.2, lote.ecc: 3.0}
+  dieta:
+    - {alimento: silagem_milho, kg_mn: 35}
+    - {alimento: milho_moido, kg_mn: 2.5}
+    - {alimento: farelo_soja, kg_mn: 3.2}
+    - {alimento: nucleo_mineral, kg_mn: 0.2}
+  espera:
+    aprox: {dieta.ms_kg: [16.04, 0.05]}
+    fatos: {parecer.dieta: adequada}
+
+- id: N1
+  descricao: MS da silagem 35 → 32% confirmada em 2 leituras — recalcular kg MN
+  testa: ACP-S01
+  modulos: [acompanhamento_semanal, meta]
+  fatos: {mon.ms_delta_abs: 3.0, mon.ms_leituras_confirmadas: 2, mon.ms_silagem_formulacao: 35, mon.ms_silagem_atual: 32, mon.silagem_kg_ms: 10.5, mon.silagem_kg_mn_atual: 30}
+  espera:
+    aprox: {mon.silagem_kg_mn_novo: [32.8, 0.05]}
+    alertas: [ACP-S01]
+    nao_disparadas: [ACP-S02]
+
+- id: N2
+  descricao: Sobras de 6% (média de 3 dias) em lote de início — reduzir oferta
+  testa: ACP-S03A, ACP-S04
+  modulos: [classificacao, acompanhamento_semanal, meta]
+  fatos: {lote.estado: lactacao, lote.del: 60, mon.sobras_mm3: 6}
+  espera:
+    alertas: [ACP-S04]
+
+- id: N3
+  descricao: Cocho vazio em 2 leituras em lote de início — alerta crítico
+  testa: ACP-06
+  modulos: [classificacao, acompanhamento_semanal, meta]
+  fatos: {lote.estado: lactacao, lote.del: 40, mon.dias_cocho_vazio: 2}
+  espera:
+    alertas: [ACP-06]
+
+- id: N4
+  descricao: Laudo com ureia 45 mg/dL → NUL ≈ 21 — alerta reprodutivo
+  testa: ACP-M00, ACP-01R
+  modulos: [acompanhamento_mensal, meta]
+  fatos: {laudo.ureia: 45}
+  espera:
+    aprox: {laudo.nul: [21.0, 0.05]}
+    alertas: [ACP-01R]
+
+- id: N5
+  descricao: NUL 7 em lote de baixa produção sem queda — nenhum alerta
+  testa: ACP-02 (não dispara)
+  modulos: [acompanhamento_diario, acompanhamento_mensal, meta]
+  fatos: {laudo.nul: 7, mon.residuo: 0.02, mon.corrida_dias: 0, mon.corrida_pior: 0}
+  espera:
+    so_alertas: []
+
+- id: N6
+  descricao: Lactose 4,1% com CCS subindo e NUL alto — mastite primeiro, alerta de dieta suprimido
+  testa: ACP-M05, META-01
+  modulos: [acompanhamento_mensal, meta]
+  fatos: {laudo.lactose: 4.1, laudo.ccs_tendencia: subindo, laudo.nul: 17.5}
+  espera:
+    alertas: [ACP-M05]
+    suprimidos: [ACP-01]
+
+- id: N7
+  descricao: Queda sustentada logo após movimentação de vacas — alerta de produção suprimido por 48 h
+  testa: META-03
+  modulos: [acompanhamento_diario, meta]
+  fatos: {mon.corrida_dias: 6, mon.corrida_pior: -0.11, mon.litros_vaca: 20, mon.residuo: -0.09, mon.horas_desde_movimentacao: 24}
+  espera:
+    suprimidos: [ACP-D04]
+
+- id: N8
+  descricao: Dia sem registro — só lembrete, nenhum alerta zootécnico
+  testa: ACP-D00
+  modulos: [acompanhamento_diario, acompanhamento_semanal, acompanhamento_mensal, meta]
+  fatos: {mon.sem_registro_hoje: true}
+  espera:
+    so_alertas: [ACP-D00]
+
+- id: N9
+  descricao: Resposta de 0,4 L por kg extra de concentrado com razão de preços 0,8 — não se paga
+  testa: ACP-D06
+  modulos: [acompanhamento_diario, meta]
+  fatos: {mon.resposta_marginal: 0.4, mon.razao_precos: 0.8}
+  espera:
+    alertas: [ACP-D06]
+
+- id: N10
+  descricao: Queda sustentada 3 dias após troca de silagem — causa provável novo volumoso
+  testa: ACP-D02, ACP-08
+  modulos: [acompanhamento_diario, meta]
+  fatos: {mon.corrida_dias: 6, mon.corrida_pior: -0.13, mon.litros_vaca: 19, mon.residuo: -0.12, mon.dias_desde_troca_volumoso: 3, mon.itu_2d: 70, mon.itu_limiar: 76}
+  espera:
+    alertas: [ACP-D04, ACP-08]
+    nao_disparadas: [ACP-10]
+
+- id: N11
+  descricao: CCS 650 mil (média geométrica 3 m) — crítico com perda em R$ (interpolação em log entre 6% a 500k e 18% a 1.000k)
+  testa: ACP-M06
+  modulos: [acompanhamento_mensal, meta]
+  fatos: {laudo.ccs_mg3: 650, mon.litros_lote: 500, fazenda.preco_leite: 2.5}
+  espera:
+    alertas: [ACP-M06]
+    aprox: {mon.perda_ccs.pct: [10.54, 0.05]}
+
+- id: N12
+  descricao: Início de lactação com ECC adequado tolera 90% da energia (mobilização)
+  testa: EXG-07, VER-01
+  modulos: [classificacao, exigencias, verificacao]
+  fatos: {lote.estado: lactacao, lote.del: 50, lote.grupo_genetico: holandes, lote.pv: 600, lote.leite: 30, lote.gordura: 3.6, lote.proteina: 3.1, lote.ecc: 3.0,
+          dieta.ms_kg: 18, dieta.fdn_pct: 32, dieta.fdnf_pct: 24, dieta.cnf_pct: 38, dieta.pb_pct: 16.5, dieta.ee_pct: 4, dieta.ureia_pct: 0, dieta.ell_mcal_kg: 1.55}
+  espera:
+    disparadas: [EXG-07]
+    nao_disparadas: [VER-01]

@@ -1,0 +1,314 @@
+# Módulo C — Verificação da dieta: oferta × exigência e restrições. Termina num parecer.
+- id: VER-00A
+  versao: 1
+  modulo: verificacao
+  descricao: Energia efetivamente consumida (a vaca não come mais que o CMS previsto)
+  prioridade: 90
+  se:
+    - {fato: dieta.ms_kg, op: ">", valor: 0}
+    - {fato: exig.cms, op: existe}
+  entao:
+    - calcular: {fato: ver.ell_consumida, funcao: energia_consumida, args: {ms: $dieta.ms_kg, cms: $exig.cms, ell_kg: $dieta.ell_mcal_kg}}
+    - calcular: {fato: ver.razao_ms, funcao: razao, args: {a: $dieta.ms_kg, b: $exig.cms}}
+  fonte: "NRC 2001"
+  forca: B
+
+- id: VER-00B
+  versao: 1
+  modulo: verificacao
+  descricao: Razão entre energia consumida e exigida
+  prioridade: 85
+  se:
+    - {fato: ver.ell_consumida, op: existe}
+    - {fato: exig.ell_total, op: existe}
+  entao:
+    - calcular: {fato: ver.razao_energia, funcao: razao, args: {a: $ver.ell_consumida, b: $exig.ell_total}}
+  fonte: "NRC 2001"
+  forca: B
+
+- id: VER-00C
+  versao: 1
+  modulo: verificacao
+  descricao: Razão entre PB da dieta e PB alvo
+  prioridade: 85
+  se:
+    - {fato: dieta.pb_pct, op: existe}
+    - {fato: exig.pb_pct_alvo, op: existe}
+  entao:
+    - calcular: {fato: ver.razao_pb, funcao: razao, args: {a: $dieta.pb_pct, b: $exig.pb_pct_alvo}}
+  fonte: "MSD Vet Manual"
+  forca: B
+
+- id: VER-01
+  versao: 1
+  modulo: verificacao
+  descricao: Energia consumida abaixo da exigência — déficit energético
+  prioridade: 60
+  cf: 0.9
+  se:
+    - {fato: ver.razao_energia, op: "<", valor: "$meta.fator_energia_min|@params.fator_energia_min"}
+  entao:
+    - concluir: {fato: ver.deficit_energetico, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Déficit energético: a dieta cobre {ver.razao_energia:.0%} da exigência"
+        causa: "Consome {ver.ell_consumida:.1f} Mcal de ELl/dia contra {exig.ell_total:.1f} exigidas. Tende a perder ECC e produção."
+        acao: "Aumentar a densidade energética (milho, polpa) ou melhorar o volumoso; rever a meta de leite."
+  fonte: "Dossiê VER-01; NRC 2001"
+  forca: B
+
+- id: VER-02
+  versao: 1
+  modulo: verificacao
+  descricao: PB da dieta abaixo do alvo — déficit proteico
+  prioridade: 60
+  cf: 0.85
+  se:
+    - {fato: ver.razao_pb, op: "<", valor: "@params.fator_pb_min"}
+  entao:
+    - concluir: {fato: ver.deficit_proteico, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Déficit proteico: PB {dieta.pb_pct:.1f}% contra alvo de {exig.pb_pct_alvo:.1f}%"
+        causa: "Proteína abaixo do necessário para a produção do lote."
+        acao: "Incluir fonte proteica (farelo de soja, caroço de algodão) ou ureia até 1% da MS."
+  fonte: "Dossiê VER-02; MSD Vet Manual"
+  forca: B
+
+- id: VER-02B
+  versao: 1
+  modulo: verificacao
+  descricao: PB muito acima do alvo — desperdício de proteína
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: ver.razao_pb, op: ">", valor: "@params.fator_pb_max"}
+  entao:
+    - alerta:
+        nivel: informativo
+        categoria: economia
+        titulo: "Proteína acima do necessário ({dieta.pb_pct:.1f}% contra {exig.pb_pct_alvo:.1f}%)"
+        causa: "Proteína é o nutriente mais caro; o excesso vira ureia (NUL alto) e pode afetar a reprodução."
+        acao: "Reduzir a fonte proteica e conferir o NUL no próximo laudo."
+  fonte: "Penn State (NUL)"
+  forca: C
+
+- id: VER-03
+  versao: 1
+  modulo: verificacao
+  descricao: FDN da dieta abaixo da meta — risco de acidose ruminal
+  prioridade: 60
+  cf: 0.85
+  se:
+    - {fato: dieta.fdn_pct, op: "<", valor: $meta.fdn_min}
+  entao:
+    - concluir: {fato: ver.risco_acidose, valor: true}
+  fonte: "NRC 2001 (FDN ≥ 25% MS)"
+  forca: B
+
+- id: VER-03B
+  versao: 1
+  modulo: verificacao
+  descricao: CNF acima do máximo — risco de acidose ruminal
+  prioridade: 60
+  cf: 0.8
+  se:
+    - {fato: dieta.cnf_pct, op: ">", valor: $meta.cnf_max}
+  entao:
+    - concluir: {fato: ver.risco_acidose, valor: true}
+  fonte: "NRC 2001 (CNF ≤ 44% MS)"
+  forca: B
+
+- id: VER-03C
+  versao: 1
+  modulo: verificacao
+  descricao: FDN de forragem abaixo de 19% — pouca fibra efetiva
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: dieta.fdnf_pct, op: "<", valor: $meta.fdnf_min}
+  entao:
+    - concluir: {fato: ver.risco_acidose, valor: true}
+  fonte: "NRC 2001 (FDNf ≥ 19% MS)"
+  forca: B
+
+- id: VER-03Z
+  versao: 1
+  modulo: verificacao
+  descricao: Emitir alerta de acidose com o CF combinado das evidências
+  prioridade: 40
+  se:
+    - {fato: ver.risco_acidose, op: "=", valor: true}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        cf_de: ver.risco_acidose
+        titulo: "Risco de acidose ruminal"
+        causa: "FDN {dieta.fdn_pct:.1f}% (mín. {meta.fdn_min:.0f}%), FDNf {dieta.fdnf_pct:.1f}% (mín. {meta.fdnf_min:.0f}%), CNF {dieta.cnf_pct:.1f}% (máx. {meta.cnf_max:.0f}%)."
+        acao: "Aumentar volumoso/fibra efetiva e reduzir amido rápido; conferir tamanho de partícula."
+  fonte: "NRC 2001"
+  forca: B
+
+- id: VER-04
+  versao: 1
+  modulo: verificacao
+  descricao: Ureia acima de 1% da MS — dieta bloqueada
+  prioridade: 95
+  se:
+    - {fato: dieta.ureia_pct, op: ">", valor: $meta.ureia_max}
+  entao:
+    - concluir: {fato: parecer.bloqueio, valor: true}
+    - alerta:
+        nivel: critico
+        categoria: dieta
+        titulo: "Ureia acima do limite: {dieta.ureia_pct:.2f}% da MS (máx. {meta.ureia_max}%)"
+        causa: "Excesso de ureia pode intoxicar os animais."
+        acao: "Reduzir a ureia para no máximo 1% da MS, sempre misturada ao volumoso ou concentrado."
+  fonte: "Semadesc-MS"
+  forca: B
+
+- id: VER-05
+  versao: 1
+  modulo: verificacao
+  descricao: Gordura da dieta acima de 6% da MS
+  prioridade: 60
+  cf: 0.8
+  se:
+    - {fato: dieta.ee_pct, op: ">", valor: $meta.ee_max}
+  entao:
+    - concluir: {fato: ver.excesso_gordura, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Gordura excessiva: EE {dieta.ee_pct:.1f}% da MS"
+        causa: "Acima de ~6% a gordura prejudica a fermentação ruminal e pode derrubar a gordura do leite."
+        acao: "Reduzir caroço de algodão ou outras fontes de gordura."
+  fonte: "Cultivar"
+  forca: C
+
+- id: VER-06
+  versao: 1
+  modulo: verificacao
+  descricao: MS ofertada muito acima do CMS previsto — dieta não será consumida
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: ver.razao_ms, op: ">", valor: "@params.fator_oferta_max"}
+  entao:
+    - concluir: {fato: ver.oferta_excessiva, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Oferta acima do consumo previsto ({dieta.ms_kg:.1f} kg MS contra {exig.cms:.1f})"
+        causa: "Parte da dieta vai sobrar no cocho; a vaca escolhe o que come."
+        acao: "Reduzir a oferta ou conferir a MS da silagem e o peso dos animais."
+  fonte: "Dossiê VER-06"
+  forca: D
+
+- id: VER-06B
+  versao: 1
+  modulo: verificacao
+  descricao: MS ofertada abaixo do CMS possível — subalimentação
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: ver.razao_ms, op: "<", valor: "@params.fator_oferta_min"}
+  entao:
+    - concluir: {fato: ver.subalimentacao, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Oferta abaixo do consumo possível ({dieta.ms_kg:.1f} kg MS contra {exig.cms:.1f})"
+        causa: "O lote poderia comer mais; produção limitada pela oferta."
+        acao: "Aumentar o volumoso ofertado e acompanhar a leitura de cocho."
+  fonte: "Escolha de engenharia"
+  forca: D
+
+- id: VER-07
+  versao: 1
+  modulo: verificacao
+  descricao: Cana como único volumoso limita lotes de produção mais alta
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: dieta.cana_unico_volumoso, op: "=", valor: true}
+    - {fato: lote.leite, op: ">", valor: "@params.leite_max_cana"}
+  entao:
+    - concluir: {fato: ver.volumoso_limitante, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Cana como único volumoso para {lote.leite:.0f} kg/vaca"
+        causa: "FDN da cana é pouco digestível e limita o consumo."
+        acao: "Associar silagem ou capim de melhor qualidade para lotes acima de {@params.leite_max_cana} kg."
+  fonte: "Semadesc-MS"
+  forca: C
+
+- id: VER-09
+  versao: 1
+  modulo: verificacao
+  descricao: CMS fora de 2,5–4% do PV — conferir dados de entrada
+  prioridade: 60
+  cf: 0.8
+  se:
+    - qualquer:
+        - {fato: perfil.cms_pct_pv, op: "<", valor: "@params.cms_pct_pv_min"}
+        - {fato: perfil.cms_pct_pv, op: ">", valor: "@params.cms_pct_pv_max"}
+  entao:
+    - alerta:
+        nivel: informativo
+        categoria: dados
+        titulo: "Consumo previsto incomum ({perfil.cms_pct_pv:.1f}% do PV)"
+        causa: "Consumo de vacas em lactação raramente sai de 2,5–4% do peso vivo."
+        acao: "Conferir peso vivo, produção e DEL informados."
+  fonte: "Dossiê"
+  forca: C
+
+- id: VER-90
+  versao: 1
+  modulo: verificacao
+  descricao: Parecer — dieta bloqueada
+  prioridade: 10
+  se:
+    - {fato: parecer.bloqueio, op: "=", valor: true}
+  entao:
+    - concluir: {fato: parecer.dieta, valor: bloqueada}
+  fonte: "Dossiê VER-04"
+  forca: B
+
+- id: VER-91
+  versao: 1
+  modulo: verificacao
+  descricao: Parecer — dieta precisa de ajustes
+  prioridade: 10
+  se:
+    - {fato: parecer.bloqueio, op: ausente}
+    - qualquer:
+        - {fato: ver.deficit_energetico, op: existe}
+        - {fato: ver.deficit_proteico, op: existe}
+        - {fato: ver.risco_acidose, op: existe}
+        - {fato: ver.excesso_gordura, op: existe}
+        - {fato: ver.oferta_excessiva, op: existe}
+        - {fato: ver.subalimentacao, op: existe}
+        - {fato: ver.volumoso_limitante, op: existe}
+  entao:
+    - concluir: {fato: parecer.dieta, valor: ajustar}
+  fonte: "Dossiê VER-08"
+  forca: C
+
+- id: VER-08
+  versao: 1
+  modulo: verificacao
+  descricao: Parecer — dieta adequada (nenhuma regra crítica disparou)
+  prioridade: 5
+  se:
+    - {fato: dieta.ms_kg, op: ">", valor: 0}
+    - {fato: ver.razao_energia, op: existe}
+    - {fato: parecer.dieta, op: ausente}
+  entao:
+    - concluir: {fato: parecer.dieta, valor: adequada}
+  fonte: "Dossiê VER-08"
+  forca: C

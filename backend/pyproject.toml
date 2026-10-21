@@ -1,0 +1,28 @@
+[project]
+name = "leite-especialista"
+version = "0.1.0"
+description = "Sistema especialista de dietas por lote para vacas leiteiras (Hackathon UFJF 2026, T2)"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "sqlmodel>=0.0.16",
+  "pulp>=2.8",
+  "numpy>=1.26",
+  "highspy>=1.7",
+  "pyyaml>=6.0",
+  "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

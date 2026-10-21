@@ -1,0 +1,48 @@
+# Meta-regras: resolvem conflitos entre conclusões e evitam fadiga de alertas.
+- id: META-01
+  versao: 1
+  modulo: meta
+  descricao: Mastite primeiro — suprime recomendações de dieta
+  prioridade: 90
+  se:
+    - {fato: hipotese.mastite, op: "=", valor: true}
+  entao:
+    - suprimir: {categorias: [dieta, dieta_queda], motivo: "lactose baixa com CCS subindo: tratar mastite antes de mudar a dieta"}
+  fonte: "Inferências (lactose/ESD baixos com CCS = mastite primeiro)"
+  forca: C
+
+- id: META-02
+  versao: 1
+  modulo: meta
+  descricao: Calor explica — rebaixa a informativos os alertas de dieta motivados pela queda
+  prioridade: 80
+  se:
+    - {fato: hipotese.causa_calor, op: "=", valor: true}
+  entao:
+    - rebaixar: {categorias: [dieta_queda], para: informativo, motivo: "queda coincide com ITU alto: manejo de calor antes de mudar a dieta"}
+  fonte: "Dossiê ACP-10"
+  forca: B
+
+- id: META-03
+  versao: 1
+  modulo: meta
+  descricao: Reagrupamento recente — suprime alertas de queda de produção por 48 h
+  prioridade: 80
+  se:
+    - {fato: mon.horas_desde_movimentacao, op: "<=", valor: "@params.janela_supressao_h"}
+  entao:
+    - suprimir: {categorias: [producao], motivo: "vacas movimentadas há {mon.horas_desde_movimentacao:.0f} h: queda transitória (~8%) esperada por 1–2 dias"}
+  fonte: "UBC/Farmwest"
+  forca: B
+
+- id: META-04
+  versao: 1
+  modulo: meta
+  descricao: Correção recente da MS — suprime alertas de queda de produção por 48 h
+  prioridade: 80
+  se:
+    - {fato: mon.horas_desde_correcao_ms, op: "<=", valor: "@params.janela_supressao_h"}
+  entao:
+    - suprimir: {categorias: [producao], motivo: "dieta corrigida pela MS há {mon.horas_desde_correcao_ms:.0f} h: aguardar resposta"}
+  fonte: "Inferências"
+  forca: D

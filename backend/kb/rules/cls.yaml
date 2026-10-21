@@ -1,0 +1,225 @@
+# Módulo A — Classificação do lote: transforma fatos brutos no fato derivado PerfilLote (perfil.*).
+- id: CLS-01
+  versao: 1
+  modulo: classificacao
+  descricao: Lote em lactação com DEL até 21 dias é recém-parido
+  prioridade: 90
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: lote.del, op: "<=", valor: "@params.del_recem_parida_max"}
+  entao:
+    - concluir: {fato: perfil.fase, valor: recem_parida}
+  fonte: "Dossiê CLS-01"
+  forca: C
+
+- id: CLS-02
+  versao: 1
+  modulo: classificacao
+  descricao: Lote em lactação com DEL entre 22 e 100 dias está no início/pico
+  prioridade: 90
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: lote.del, op: ">", valor: "@params.del_recem_parida_max"}
+    - {fato: lote.del, op: "<=", valor: "@params.del_inicio_max"}
+  entao:
+    - concluir: {fato: perfil.fase, valor: inicio}
+  fonte: "Dossiê CLS-02"
+  forca: C
+
+- id: CLS-03
+  versao: 1
+  modulo: classificacao
+  descricao: Lote em lactação com DEL entre 101 e 200 dias está no meio da lactação
+  prioridade: 90
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: lote.del, op: ">", valor: "@params.del_inicio_max"}
+    - {fato: lote.del, op: "<=", valor: "@params.del_meio_max"}
+  entao:
+    - concluir: {fato: perfil.fase, valor: meio}
+  fonte: "Dossiê CLS-03"
+  forca: C
+
+- id: CLS-04
+  versao: 1
+  modulo: classificacao
+  descricao: Lote em lactação com DEL acima de 200 dias está no final da lactação
+  prioridade: 90
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: lote.del, op: ">", valor: "@params.del_meio_max"}
+  entao:
+    - concluir: {fato: perfil.fase, valor: final}
+  fonte: "Dossiê CLS-04"
+  forca: C
+
+- id: CLS-05
+  versao: 1
+  modulo: classificacao
+  descricao: Vaca seca a até 21 dias do parto está no pré-parto (transição)
+  prioridade: 90
+  se:
+    - {fato: lote.estado, op: "=", valor: seca}
+    - {fato: lote.dias_para_parto, op: "<=", valor: "@params.preparto_dias"}
+  entao:
+    - concluir: {fato: perfil.fase, valor: pre_parto}
+  fonte: "Dossiê CLS-05; Santos et al. 2019"
+  forca: B
+
+- id: CLS-05B
+  versao: 1
+  modulo: classificacao
+  descricao: Vaca seca a mais de 21 dias do parto é vaca seca (fase inicial do período seco)
+  prioridade: 90
+  se:
+    - {fato: lote.estado, op: "=", valor: seca}
+    - {fato: lote.dias_para_parto, op: ">", valor: "@params.preparto_dias"}
+  entao:
+    - concluir: {fato: perfil.fase, valor: seca}
+  fonte: "Dossiê CLS-05"
+  forca: C
+
+- id: CLS-06
+  versao: 1
+  modulo: classificacao
+  descricao: Gestação com 190 dias ou mais soma exigência de gestação
+  prioridade: 80
+  se:
+    - {fato: lote.dias_gestacao, op: ">=", valor: "@params.gestacao_dias_exigencia"}
+  entao:
+    - concluir: {fato: perfil.gestacao_avancada, valor: true}
+  fonte: "NRC 2001 via AgModel"
+  forca: B
+
+- id: CLS-07
+  versao: 1
+  modulo: classificacao
+  descricao: Lote em lactação com primíparas soma exigência de crescimento
+  prioridade: 80
+  cf: 0.9
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: lote.fracao_primiparas, op: ">", valor: 0}
+  entao:
+    - concluir: {fato: perfil.crescimento, valor: true}
+  fonte: "RBZ (primíparas perdem mais peso e ainda crescem)"
+  forca: B
+
+- id: CLS-08
+  versao: 1
+  modulo: classificacao
+  descricao: Zebuínos e cruzados em lactação usam a equação de consumo BR-Leite
+  prioridade: 80
+  cf: 0.8
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: lote.grupo_genetico, op: in, valor: "@params.grupos_zebuinos"}
+  entao:
+    - concluir: {fato: perfil.equacao_cms, valor: brleite}
+  fonte: "BR-Leite 2024 (Embrapa)"
+  forca: B
+
+- id: CLS-08B
+  versao: 1
+  modulo: classificacao
+  descricao: Holandês e Jersey em lactação usam a equação de consumo NRC 2001
+  prioridade: 80
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: lote.grupo_genetico, op: nao_in, valor: "@params.grupos_zebuinos"}
+  entao:
+    - concluir: {fato: perfil.equacao_cms, valor: nrc2001}
+  fonte: "NRC 2001"
+  forca: B
+
+- id: CLS-09
+  versao: 1
+  modulo: classificacao
+  descricao: Lote em pasto tem gasto de energia com atividade de pastejo
+  prioridade: 80
+  cf: 0.8
+  se:
+    - {fato: lote.sistema, op: "=", valor: pasto}
+  entao:
+    - concluir: {fato: perfil.atividade_pastejo, valor: true}
+  fonte: "NRC 2001 via eOrganic"
+  forca: B
+
+- id: CLS-ITU
+  versao: 1
+  modulo: classificacao
+  descricao: Calcular o ITU a partir de temperatura e umidade
+  prioridade: 85
+  se:
+    - {fato: lote.temp, op: existe}
+    - {fato: lote.ur, op: existe}
+  entao:
+    - calcular: {fato: clima.itu, funcao: itu, args: {temp: $lote.temp, ur: $lote.ur}}
+  fonte: "IFSULDEMINAS"
+  forca: B
+
+- id: CLS-10
+  versao: 1
+  modulo: classificacao
+  descricao: ITU entre 72 e 78 indica estresse térmico brando (consumo esperado menor)
+  prioridade: 70
+  cf: 0.7
+  se:
+    - {fato: clima.itu, op: ">", valor: "@params.itu_alerta"}
+    - {fato: clima.itu, op: "<=", valor: "@params.itu_forte"}
+  entao:
+    - concluir: {fato: perfil.estresse_termico, valor: brando}
+    - alerta:
+        nivel: atencao
+        categoria: calor
+        titulo: "Risco de estresse térmico (ITU {clima.itu:.1f})"
+        causa: "ITU acima de {@params.itu_alerta}: consumo e produção tendem a cair."
+        acao: "Garantir sombra, água à vontade e tratos nas horas mais frescas."
+  fonte: "Embrapa COT42"
+  forca: B
+
+- id: CLS-11
+  versao: 1
+  modulo: classificacao
+  descricao: ITU acima de 78 indica estresse térmico acima do brando
+  prioridade: 70
+  cf: 0.8
+  se:
+    - {fato: clima.itu, op: ">", valor: "@params.itu_forte"}
+  entao:
+    - concluir: {fato: perfil.estresse_termico, valor: forte}
+    - alerta:
+        nivel: critico
+        categoria: calor
+        titulo: "Estresse térmico forte (ITU {clima.itu:.1f})"
+        causa: "ITU acima de {@params.itu_forte}: queda forte de consumo, leite e fertilidade."
+        acao: "Aspersão/ventilação, sombra, água, tratos à noite e de madrugada; priorizar IATF."
+  fonte: "Embrapa COT42"
+  forca: B
+
+- id: CLS-12
+  versao: 1
+  modulo: classificacao
+  descricao: Mestiças em pasto tropical têm predição de consumo pouco confiável
+  prioridade: 70
+  cf: 0.6
+  se:
+    - {fato: lote.sistema, op: "=", valor: pasto}
+    - {fato: lote.grupo_genetico, op: in, valor: "@params.grupos_zebuinos"}
+  entao:
+    - concluir: {fato: perfil.cms_baixa_confianca, valor: true}
+  fonte: "Embrapa 2012 (NRC com R² 0,029 em pasto tropical)"
+  forca: B
+
+- id: CLS-13
+  versao: 1
+  modulo: classificacao
+  descricao: Calcular a semana de lactação a partir do DEL
+  prioridade: 85
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: lote.del, op: existe}
+  entao:
+    - calcular: {fato: perfil.semana_lactacao, funcao: semana_lactacao, args: {del_: $lote.del}}
+  fonte: "NRC 2001"
+  forca: B

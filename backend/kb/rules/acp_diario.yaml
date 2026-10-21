@@ -1,0 +1,200 @@
+# Módulo D1 — Acompanhamento diário: litros/vaca × esperado pela curva, persistência, calor e concentrado.
+# Os fatos mon.* vêm do monitor de séries (app/monitor) a partir dos registros diários do lote.
+- id: ACP-D00
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Dia sem registro gera lembrete, nunca alerta zootécnico
+  prioridade: 95
+  se:
+    - {fato: mon.sem_registro_hoje, op: "=", valor: true}
+  entao:
+    - alerta:
+        nivel: informativo
+        categoria: registro
+        titulo: "Sem registro de hoje"
+        causa: "Sem os números do dia o sistema não consegue comparar com o esperado."
+        acao: "Registrar nº de vacas, litros e kg de concentrado do lote."
+  fonte: "de Mol et al. 2012 (dado faltante não é alerta)"
+  forca: D
+
+- id: ACP-D01
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Queda brusca de um dia (resíduo abaixo de −3σ) sem queda sustentada em curso
+  prioridade: 50
+  cf: 0.7
+  se:
+    - {fato: mon.z, op: "<", valor: "@params.shewhart_z"}
+    - {fato: hipotese.queda_sustentada, op: ausente}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: producao
+        titulo: "Queda brusca hoje: {mon.litros_vaca:.1f} L/vaca contra {mon.esperado_vaca:.1f} esperados"
+        causa: "Um dia isolado muito abaixo costuma ser falha de ordenha, erro de registro ou tanque não coletado."
+        acao: "Conferir o registro e a ordenha antes de mexer na dieta."
+  fonte: "SPC (Shewhart) sobre resíduo padronizado"
+  forca: D
+
+- id: ACP-D02
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Corrida de dias abaixo do esperado com ao menos um dia abaixo de −10%
+  prioridade: 70
+  cf: 0.8
+  se:
+    - {fato: mon.corrida_dias, op: ">=", valor: "@params.corrida_dias_min"}
+    - {fato: mon.corrida_pior, op: "<=", valor: "@params.corrida_queda_min"}
+    - {fato: mon.residuo, op: "<", valor: "@params.residuo_queda_atual"}
+  entao:
+    - concluir: {fato: hipotese.queda_sustentada, valor: true}
+  fonte: "Frontiers in Genetics 2022 (perturbação de lactação)"
+  forca: B
+
+- id: ACP-D03
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: EWMA do resíduo abaixo do limite inferior (queda sustentada de 3–5%)
+  prioridade: 70
+  cf: 0.6
+  se:
+    - {fato: mon.ewma, op: "<", valor: $mon.ewma_limite_inf}
+    - {fato: mon.residuo, op: "<", valor: "@params.residuo_queda_atual"}
+  entao:
+    - concluir: {fato: hipotese.queda_sustentada, valor: true}
+  fonte: "Archiv Tierzucht 2009; SPC"
+  forca: C
+
+- id: ACP-D03B
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Queda de mais de 10% em 7 dias
+  prioridade: 70
+  cf: 0.6
+  se:
+    - {fato: mon.queda_7d, op: "<=", valor: "@params.queda_7d"}
+  entao:
+    - concluir: {fato: hipotese.queda_sustentada, valor: true}
+  fonte: "Dossiê ACP-08/ACP-10"
+  forca: C
+
+- id: ACP-D04
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Alerta de queda sustentada de produção (CF combinado das evidências)
+  prioridade: 40
+  se:
+    - {fato: hipotese.queda_sustentada, op: "=", valor: true}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: producao
+        cf_de: hipotese.queda_sustentada
+        titulo: "Queda sustentada de produção: {mon.litros_vaca:.1f} L/vaca ({mon.residuo:.0%} do esperado)"
+        causa: "{mon.corrida_dias} dia(s) seguidos abaixo da curva esperada para o DEL do lote."
+        acao: "Checar silagem/MS, ITU, vacas doentes e mudanças registradas na semana."
+  fonte: "Frontiers in Genetics 2022; de Mol 2012 (persistência)"
+  forca: B
+
+- id: ACP-08
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Queda logo após troca de volumoso — causa provável é o novo volumoso
+  prioridade: 60
+  cf: 0.6
+  se:
+    - {fato: hipotese.queda_sustentada, op: "=", valor: true}
+    - {fato: mon.dias_desde_troca_volumoso, op: "<=", valor: "@params.janela_troca_volumoso"}
+  entao:
+    - concluir: {fato: hipotese.causa_volumoso, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: dieta_queda
+        titulo: "Causa provável da queda: troca de volumoso há {mon.dias_desde_troca_volumoso} dia(s)"
+        causa: "Degrau de produção 1–3 dias após a troca, só neste lote."
+        acao: "Medir a MS do novo volumoso, recalcular os kg de matéria natural e pedir bromatologia (com FDND)."
+  fonte: "Dossiê ACP-08; Inferências (assinatura de troca de silagem)"
+  forca: C
+
+- id: ACP-10
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Queda de produção com ITU alto nos 2 dias anteriores — causa provável é calor, não a dieta
+  prioridade: 60
+  cf: 0.6
+  se:
+    - qualquer:
+        - {fato: hipotese.queda_sustentada, op: "=", valor: true}
+        - {fato: mon.queda_7d, op: "<=", valor: "@params.queda_7d"}
+    - {fato: mon.itu_2d, op: ">", valor: $mon.itu_limiar}
+    - qualquer:
+        - {fato: mon.dias_desde_troca_volumoso, op: ausente}
+        - {fato: mon.dias_desde_troca_volumoso, op: ">", valor: "@params.janela_troca_volumoso"}
+    - {fato: hipotese.mastite, op: ausente}
+  entao:
+    - concluir: {fato: hipotese.causa_calor, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: calor
+        titulo: "Calor explica a queda (ITU médio de 2 dias = {mon.itu_2d:.1f})"
+        causa: "Queda acompanhando ITU acima de {mon.itu_limiar:.0f}, sem troca recente de dieta."
+        acao: "Sombra, aspersão, água e tratos nas horas frescas antes de mudar a dieta."
+  fonte: "Dossiê ACP-10; Negri 2021; LUME UFRGS"
+  forca: B
+
+- id: ACP-D05
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Menos de 2 litros por kg de concentrado
+  prioridade: 60
+  cf: 0.6
+  se:
+    - {fato: mon.litros_por_kg_conc, op: "<", valor: "@params.litros_por_kg_conc_min"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: economia
+        titulo: "Baixa eficiência do concentrado: {mon.litros_por_kg_conc:.1f} L/kg"
+        causa: "Excesso de suplementação ou volumoso/pasto limitante."
+        acao: "Rever a quantidade de concentrado por vaca e checar o volumoso."
+  fonte: "Inferências (C/D)"
+  forca: D
+
+- id: ACP-D06
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Resposta ao último aumento de concentrado não paga o custo
+  prioridade: 60
+  cf: 0.8
+  se:
+    - {fato: mon.resposta_marginal, op: existe}
+    - {fato: mon.resposta_marginal, op: "<", valor: $mon.razao_precos}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: economia
+        titulo: "Concentrado extra não se paga: {mon.resposta_marginal:+.2f} L por kg"
+        causa: "Cada kg a mais de concentrado precisa render {mon.razao_precos:.2f} L para se pagar (preço conc./preço leite)."
+        acao: "Voltar ao nível anterior de concentrado; em mestiças de baixa produção o ótimo costuma ficar abaixo de 1 kg/vaca."
+  fonte: "de Abreu, Lana et al. 2013 (resposta marginal 0,15–0,97 kg/kg)"
+  forca: B
+
+- id: ACP-D07
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Custo de concentrado por litro acima da mediana de 30 dias
+  prioridade: 50
+  cf: 0.6
+  se:
+    - {fato: mon.custo_conc_litro, op: existe}
+    - {fato: mon.custo_conc_litro_ref, op: existe}
+    - {fato: mon.custo_conc_razao, op: ">", valor: "@params.custo_conc_litro_tolerancia"}
+  entao:
+    - alerta:
+        nivel: informativo
+        categoria: economia
+        titulo: "Custo de concentrado subiu: R$ {mon.custo_conc_litro:.2f}/L (ref. R$ {mon.custo_conc_litro_ref:.2f})"
+        causa: "Mais concentrado por litro produzido do que no último mês."
+        acao: "Rever alocação e preços; conferir se a produção caiu."
+  fonte: "Penn State (IOFC); Inferências"
+  forca: D
