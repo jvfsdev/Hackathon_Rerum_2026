@@ -137,6 +137,9 @@ def registrar(lote_id: int, dados: RegistroIn):
             else:
                 s.add(Registro(lote_id=lote_id, data=dados.data, indicador=ind, valor=valor, metodo=dados.metodo))
         s.commit()
+        hoje = date.today()
+        if dados.data < hoje:   # registro retroativo: os dias seguintes dependem dele (série, corrida, médias)
+            services.reprocessar(s, lote, dados.data + timedelta(days=1), hoje)
         return services.monitorar(s, lote, dados.data)
 
 

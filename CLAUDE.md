@@ -53,9 +53,22 @@ cd frontend && npm install && npm run dev   # UI em :5173
   - `ACP-` acompanhamento
   - `META-` resolução de conflito/supressão
 - **Nunca coloque número fixo dentro da regra.** Limiares vão em `params.yaml`, com `valor, unidade, fonte, forca (A–D), editavel`, e são referenciados como `@params.nome`.
-- Todo alimento em `foods.yaml` tem `fonte`, `forca` e `cf` (0,8 = tabela publicada; 0,6 = estimado/padrão). Resposta "não sei" do usuário entra com `@params.cf_padrao` (0,6); medição recente com CF 1,0.
+- Todo alimento em `foods.yaml` tem `fonte`, `forca` e `cf` (0,8 = tabela publicada; 0,6 = estimado/padrão). Resposta "não sei" do usuário entra com `@params.cf_padrao` (0,6); medição com `@params.cf_medido_recente`. Premissa com CF abaixo de `@params.cf_limiar` não dispara regra.
+- Pergunta sem valor padrão seguro (peso vivo, temperatura) não tem `padrao`; se for dispensável, é `opcional: true` ("não sei" pula as regras que dependem dela).
 - Mudou regra ou parâmetro: suba `kb_version`, anote em `kb/CHANGELOG.md` e adicione ou ajuste o caso em `tests/cases.yaml`.
 - Valores ⚠ NV ou conflitantes (ver a última seção de `Inferências...md`) viram parâmetro com força explícita, nunca constante escondida.
+
+## Garantias que os testes cobram (não quebre)
+- **Contrato PL × verificação:** toda restrição do PL (`optimizer/lp.py`) é a MESMA definição da regra VER
+  correspondente, apertada por `@params.pl_margem`. Criou regra VER que reprova dieta? Crie a restrição no PL.
+  `tests/test_consistencia.py` roda 300 perfis × conjuntos de alimentos: dieta "otimo" ⇒ parecer "adequada".
+- **Dieta que muda o próprio CMS** (teto de fibra, equação com cana): a formulação itera até ponto fixo
+  (`services._formular_ate_ponto_fixo`). **Só energia/proteína inatingíveis** ⇒ status "parcial" (melhor dieta possível).
+- **Manutenção de verdade:** continuar sessão (`executar(wm, resultado)`) descarta conclusões e recalcula do zero.
+- **Validador da base** (`rules_loader.validar`) falha ao carregar com operador, função/argumento, ação, nível,
+  fato desconhecido (que nenhuma regra conclui e não é pergunta/entrada) ou `@params` inexistente — inclusive em textos.
+- **Acompanhamento:** um dia isolado nunca vira queda sustentada; reanalisar um dia substitui os alertas dele;
+  registro retroativo reprocessa os dias seguintes. Regressões em `tests/test_auditoria.py`.
 
 ## Convenções do motor e do cálculo
 - `calc/` não acessa banco nem motor: entra número, sai número. Cada função tem um teste com valor publicado.

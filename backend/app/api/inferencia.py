@@ -51,12 +51,14 @@ def acompanhar(lote_id: int, data: date | None = None):
 
 # ------------------------------------------------------------- consulta guiada (encadeamento regressivo)
 def _proximas(c: dict) -> list[dict]:
-    wm = services.memoria(c["fatos"])
+    wm = services.memoria(c["fatos"], padroes=c["padroes"])
+    # classifica antes de procurar o que falta: fatos derivados (fase, equação) podam perguntas desnecessárias
+    Motor(services.kb(), ["classificacao"]).executar(wm)
     motor = Motor(services.kb(), services.MODULOS_AVALIACAO)
     vistas, perguntas = set(), []
     for objetivo in OBJETIVOS_CONSULTA:
         for p in motor.faltantes(objetivo, wm):
-            if p["fato"] not in vistas and p["fato"] not in c["fatos"]:
+            if p["fato"] not in vistas and p["fato"] not in c["fatos"] and p["fato"] not in c["ignorados"]:
                 vistas.add(p["fato"])
                 regras = {r["id"]: r for r in services.kb().regras}
                 p["por_que"] = [{"regra": rid, "descricao": regras[rid].get("descricao", "")} for rid in p["cadeia"]]
@@ -77,7 +79,7 @@ def _estado(cid: str) -> dict:
 @router.post("/consulta")
 def iniciar_consulta(dados: ConsultaIn):
     cid = uuid.uuid4().hex[:10]
-    _CONSULTAS[cid] = {"fatos": dict(dados.fatos), "padroes": set(),
+    _CONSULTAS[cid] = {"fatos": services.normalizar(dados.fatos), "padroes": set(), "ignorados": set(),
                        "itens": [i.model_dump() for i in dados.itens] if dados.itens else None}
     return _estado(cid)
 
@@ -89,12 +91,15 @@ def responder(cid: str, r: RespostaIn):
     c = _CONSULTAS[cid]
     if r.nao_sei:
         pergunta = services.kb().perguntas.get(r.fato, {})
-        if "padrao" not in pergunta:
-            raise HTTPException(400, "esta pergunta não tem valor padrão; é necessária para a conclusão")
-        c["fatos"][r.fato] = pergunta["padrao"]
-        c["padroes"].add(r.fato)
+        if "padrao" in pergunta:
+            c["fatos"][r.fato] = pergunta["padrao"]
+            c["padroes"].add(r.fato)
+        elif pergunta.get("opcional"):
+            c["ignorados"].add(r.fato)     # regras que dependem dele simplesmente não se aplicam
+        else:
+            raise HTTPException(400, "esta informação é necessária para a conclusão e não tem valor padrão seguro")
     else:
-        c["fatos"][r.fato] = r.valor
+        c["fatos"].update(services.normalizar({r.fato: r.valor}))
         c["padroes"].discard(r.fato)
     return _estado(cid)
 

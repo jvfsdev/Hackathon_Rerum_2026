@@ -17,6 +17,23 @@
   fonte: "de Mol et al. 2012 (dado faltante não é alerta)"
   forca: D
 
+- id: ACP-D00B
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Curva da fazenda ainda em calibração — sem alertas de produção até ter dias suficientes
+  prioridade: 95
+  se:
+    - {fato: mon.calibrando_dias, op: existe}
+  entao:
+    - alerta:
+        nivel: informativo
+        categoria: registro
+        titulo: "Calibrando a curva de lactação do lote ({mon.calibrando_dias} dia(s) de registro)"
+        causa: "A produção esperada é ajustada à fazenda com pelo menos {@params.calibracao_dias_min} dias sem calor forte."
+        acao: "Continue registrando; os alertas de queda começam após a calibração."
+  fonte: "Inferências (ajuste da escala da curva nas primeiras semanas)"
+  forca: D
+
 - id: ACP-D01
   versao: 1
   modulo: acompanhamento_diario
@@ -73,6 +90,7 @@
   cf: 0.6
   se:
     - {fato: mon.queda_7d, op: "<=", valor: "@params.queda_7d"}
+    - {fato: mon.residuo, op: "<", valor: "@params.residuo_queda_atual"}
   entao:
     - concluir: {fato: hipotese.queda_sustentada, valor: true}
   fonte: "Dossiê ACP-08/ACP-10"

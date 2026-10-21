@@ -63,20 +63,47 @@ def litros_vaca(h: HistoricoLote, d: date) -> float | None:
     return litros / vacas if litros is not None and vacas else None
 
 
-def ajustar_k(lote, h: HistoricoLote, ate: date, dias: int = 14) -> float:
-    """Escala da curva ajustada nos primeiros dias com registro (sem calor forte)."""
+TIPOS_TRANSICAO = ("movimentacao", "correcao_ms")
+
+
+def em_transicao(h: HistoricoLote, d: date, horas: float) -> bool:
+    """Dia dentro da janela após movimentação de vacas ou correção de MS: queda transitória esperada."""
+    fim = datetime.combine(d, time(23, 59))
+    for tipo in TIPOS_TRANSICAO:
+        ev = h.ultimo_evento(tipo, fim)
+        if ev and (fim - ev.data_hora).total_seconds() / 3600 <= horas:
+            return True
+    return False
+
+
+def ajustar_k(lote, h: HistoricoLote, params, ate: date, dias: int = 14) -> float | None:
+    """Escala da curva da fazenda ajustada nos primeiros dias DESTA lactação (DEL > 0), excluindo dias de calor
+    acima do limiar e dias de transição. Com menos de `calibracao_dias_min` pontos devolve None (curva ainda
+    não calibrada: sem alertas de produção)."""
     if lote.k_curva:
         return lote.k_curva
-    datas = sorted(h.por_ind.get("litros", {}))[:dias]
-    obs = [(del_em(lote, d), litros_vaca(h, d)) for d in datas if d <= ate and litros_vaca(h, d) is not None]
-    obs = [(t, y) for t, y in obs if t is not None and t > 0]
-    return lactation_curve.ajustar_k(obs) if obs else 1.0
+    limiar, _ = parametros_itu(lote, params)
+    horas = params["janela_supressao_h"]["valor"]
+    obs = []
+    for d in sorted(h.por_ind.get("litros", {})):
+        if d > ate or len(obs) >= dias:
+            break
+        t, y, i2 = del_em(lote, d), litros_vaca(h, d), itu_2d(h, d)
+        if t is None or t <= 0 or y is None or (i2 is not None and i2 > limiar) or em_transicao(h, d, horas):
+            continue
+        obs.append((t, y))
+    if len(obs) < params["calibracao_dias_min"]["valor"]:
+        return None
+    return lactation_curve.ajustar_k(obs)
 
 
 def serie_esperado(lote, h: HistoricoLote, params, ate: date, janela: int = 60) -> list[dict]:
-    """Observado × esperado por dia (para o motor e para os gráficos)."""
-    k = ajustar_k(lote, h, ate)
+    """Observado × esperado por dia (para o motor e para os gráficos). Dias de transição vêm marcados."""
+    k = ajustar_k(lote, h, params, ate)
+    if k is None:
+        return []
     limiar, perda = parametros_itu(lote, params)
+    horas = params["janela_supressao_h"]["valor"]
     pontos = []
     for d, _ in h.serie("litros", ate, janela):
         obs, t = litros_vaca(h, d), del_em(lote, d)
@@ -85,8 +112,12 @@ def serie_esperado(lote, h: HistoricoLote, params, ate: date, janela: int = 60) 
         i2 = itu_2d(h, d)
         esp = lactation_curve.esperado_por_vaca(t, k, i2, limiar, perda)
         pontos.append({"data": d, "del": t, "observado": obs, "esperado": esp, "itu_2d": i2, "itu": itu_do_dia(h, d),
-                       "residuo": series.residuo_relativo(obs, esp)})
+                       "residuo": series.residuo_relativo(obs, esp), "transicao": em_transicao(h, d, horas)})
     return pontos
+
+
+def dias_calibrados(lote, h: HistoricoLote, ate: date) -> int:
+    return sum(1 for d in h.por_ind.get("litros", {}) if d <= ate and (del_em(lote, d) or 0) > 0)
 
 
 def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimentos, d: date) -> dict:
@@ -98,23 +129,31 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
     f["fazenda.preco_leite"] = fazenda.preco_leite
 
     # --- diário: produção × esperado
-    if h.valor("litros", d) is None:
+    if lote.estado == "lactacao" and h.valor("litros", d) is None:
         f["mon.sem_registro_hoje"] = True
     pontos = serie_esperado(lote, h, params, d)
+    if lote.estado == "lactacao" and not pontos and h.valor("litros", d) is not None:
+        f["mon.calibrando_dias"] = dias_calibrados(lote, h, d)
     if pontos and pontos[-1]["data"] == d:
-        res = [p["residuo"] for p in pontos]
-        z = series.padronizar(res)
+        uteis = [p for p in pontos if not p["transicao"]]          # transição não entra nos detectores
+        res = [p["residuo"] for p in uteis]
+        z = series.padronizar(res) if res else [0.0]
         lam, L = params["ewma_lambda"]["valor"], params["ewma_L"]["valor"]
         ew = series.ewma(z, lam)
-        dias, pior = series.corrida_abaixo(res)
+        dias, pior = series.corrida_abaixo([(p["data"], p["residuo"]) for p in uteis], d,
+                                           params["corrida_residuo_min"]["valor"], params["corrida_janela"]["valor"])
         hoje = pontos[-1]
         f.update({"mon.litros_vaca": hoje["observado"], "mon.esperado_vaca": hoje["esperado"],
-                  "mon.residuo": hoje["residuo"], "mon.z": z[-1], "mon.ewma": ew[-1],
-                  "mon.ewma_limite_inf": -series.limite_ewma(lam, L), "mon.corrida_dias": dias,
-                  "mon.corrida_pior": pior, "mon.litros_lote": h.valor("litros", d)})
-        lv = [p["observado"] for p in pontos]
-        if len(lv) >= 10:
-            agora, antes = sum(lv[-3:]) / 3, sum(lv[-10:-7]) / 3
+                  "mon.residuo": hoje["residuo"], "mon.corrida_dias": dias, "mon.corrida_pior": pior,
+                  "mon.ewma_limite_inf": -series.limite_ewma(lam, L), "mon.litros_lote": h.valor("litros", d)})
+        if not hoje["transicao"]:
+            f.update({"mon.z": z[-1], "mon.ewma": ew[-1]})
+        # variação de 7 dias por data, com medianas (um dia anômalo não decide)
+        lv = [(p["data"], p["observado"]) for p in uteis]
+        agora = series.mediana_janela(lv, d - timedelta(days=2), d)
+        antes = series.mediana_janela(lv, d - timedelta(days=9), d - timedelta(days=7))
+        n_agora = sum(1 for x, _ in lv if d - timedelta(days=2) <= x <= d)
+        if agora and antes and n_agora >= 2:
             f["mon.queda_7d"] = agora / antes - 1
     i2 = itu_2d(h, d)
     if i2 is not None:
@@ -134,19 +173,20 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
             f["mon.custo_conc_razao"] = custo / ref
     f["mon.razao_precos"] = economics.razao_precos(fazenda.preco_concentrado, fazenda.preco_leite)
     ev = h.ultimo_evento("mudanca_concentrado", fim_do_dia)
-    if ev:
+    if ev and pontos:
         dias_ev = (d - ev.data_hora.date()).days
         if 5 <= dias_ev <= 14:
-            antes = [dd for dd in (ev.data_hora.date() - timedelta(days=i) for i in range(1, 6))]
+            desvio = {p["data"]: p["observado"] - p["esperado"] for p in pontos if not p["transicao"]}  # L/vaca acima da curva
+            antes = [ev.data_hora.date() - timedelta(days=i) for i in range(1, 6)]
             depois = [d - timedelta(days=i) for i in range(3)]
-            la = [litros_vaca(h, x) for x in antes if litros_vaca(h, x)]
-            ld = [litros_vaca(h, x) for x in depois if litros_vaca(h, x)]
+            da = [desvio[x] for x in antes if x in desvio]
+            dd = [desvio[x] for x in depois if x in desvio]
             ca = [h.valor("concentrado_kg_vaca", x) for x in antes if h.valor("concentrado_kg_vaca", x)]
             cd = [h.valor("concentrado_kg_vaca", x) for x in depois if h.valor("concentrado_kg_vaca", x)]
-            if la and ld and ca and cd:
-                rm = economics.resposta_marginal(sum(la) / len(la), sum(ld) / len(ld), sum(ca) / len(ca), sum(cd) / len(cd))
-                if rm is not None and sum(cd) / len(cd) > sum(ca) / len(ca):
-                    f["mon.resposta_marginal"] = rm
+            if da and dd and ca and cd and sum(cd) / len(cd) > sum(ca) / len(ca):
+                # ΔL/Δkg medido sobre o desvio da curva: desconta a queda natural da lactação no período
+                f["mon.resposta_marginal"] = economics.resposta_marginal(
+                    sum(da) / len(da), sum(dd) / len(dd), sum(ca) / len(ca), sum(cd) / len(cd))
 
     # --- eventos (janelas de supressão e atribuição de causa)
     for tipo, fato in (("movimentacao", "mon.horas_desde_movimentacao"), ("correcao_ms", "mon.horas_desde_correcao_ms")):
@@ -195,9 +235,12 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
                 break
         if vazio:
             f["mon.dias_cocho_vazio"] = vazio
-    ecc = h.serie("ecc", d, 42)
+    ecc = [v for _, v in h.serie("ecc", d, 42)]
     if len(ecc) >= 2:
-        perda = max(v for _, v in ecc) - ecc[-1][1]
+        # mediana de 3 nos pontos internos: uma leitura isolada fora da curva não vira "perda de ECC",
+        # mas as pontas ficam como medidas (senão uma tendência real de queda é achatada)
+        suave = [statistics.median(ecc[i - 1:i + 2]) if 0 < i < len(ecc) - 1 else ecc[i] for i in range(len(ecc))]
+        perda = max(suave) - suave[-1]
         if perda > 0:
             f["mon.ecc_perda"] = perda
     fz = h.serie("escore_fezes", d, 7)
@@ -207,22 +250,25 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
     if len(rum) >= 6:
         f["mon.ruminacao_queda"] = sum(v for _, v in rum[:-3]) / len(rum[:-3]) - sum(v for _, v in rum[-3:]) / 3
 
-    # --- mensal: laudo (último dos últimos 35 dias) e tendências
+    # --- mensal: laudo (último dos últimos 35 dias), base de comparação até 120 dias, média geométrica de 3 meses
+    janela_laudo, janela_base = params["laudo_validade_dias"]["valor"], params["laudo_base_dias"]["valor"]
     for ind in INDICADORES_LAUDO:
         pts = h.serie(f"laudo_{ind}", d)
-        if pts and (d - pts[-1][0]).days <= 35:
+        if pts and (d - pts[-1][0]).days <= janela_laudo:
             f[f"laudo.{ind}"] = pts[-1][1]
-    gord, prot = h.serie("laudo_gordura", d), h.serie("laudo_proteina", d)
-    if len(gord) >= 2 and "laudo.gordura" in f:
-        base = [v for _, v in gord[-4:-1]]
-        f["laudo.gordura_delta"] = gord[-1][1] - sum(base) / len(base)
-    if len(prot) >= 2 and "laudo.proteina" in f:
-        base = [v for _, v in prot[-4:-1]]
-        f["laudo.proteina_delta_abs"] = abs(prot[-1][1] - sum(base) / len(base))
+    for ind, fato in (("gordura", "laudo.gordura_delta"), ("proteina", "laudo.proteina_delta_abs")):
+        pts = h.serie(f"laudo_{ind}", d, janela_base)
+        if len(pts) >= 2 and f"laudo.{ind}" in f:
+            base = [v for _, v in pts[-4:-1]]
+            delta = pts[-1][1] - sum(base) / len(base)
+            f[fato] = abs(delta) if fato.endswith("_abs") else delta
     for ind in ("ccs", "cbt"):
-        pts = h.serie(f"laudo_{ind}", d)
-        if pts and f"laudo.{ind}" in f:
+        pts = h.serie(f"laudo_{ind}", d, 100)          # ~3 meses
+        if f"laudo.{ind}" not in f:
+            continue
+        if len(pts) >= 3:                               # IN 76: média geométrica de 3 meses exige 3 amostras
             f[f"laudo.{ind}_mg3"] = economics.media_geometrica([v for _, v in pts[-3:]])
-            if ind == "ccs" and len(pts) >= 2 and pts[-1][1] >= 1.2 * pts[-2][1]:
-                f["laudo.ccs_tendencia"] = "subindo"
+        if ind == "ccs" and len(pts) >= 2 and pts[-1][1] >= 1.2 * pts[-2][1] \
+                and pts[-1][1] >= params["ccs_tendencia_min"]["valor"]:
+            f["laudo.ccs_tendencia"] = "subindo"
     return f

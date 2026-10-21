@@ -20,8 +20,10 @@ def ell_alimento(alimento: dict) -> float:
 
 def composicao(itens: list[dict]) -> dict:
     """itens: [{"alimento": {...}, "kg_mn": float}]. Teores em % da MS; ELl total em Mcal/dia."""
-    ms_total = pb = fdn = fdnf = cnf = ee = ndt = ell = ureia = custo = forragem = 0.0
+    ms_total = pb = fdn = fdnf = cnf = ee = ndt = ell = ureia = custo = forragem = mineral = 0.0
     volumosos = set()
+    kg_ms_por_alimento: dict[str, float] = {}
+    tem_pastejo = False
     for item in itens:
         a, kg_mn = item["alimento"], item["kg_mn"]
         kg_ms = mn_para_ms(kg_mn, a["ms"])
@@ -40,6 +42,11 @@ def composicao(itens: list[dict]) -> dict:
                 volumosos.add(a["id"])
         if a.get("tipo") == "ureia":
             ureia += kg_ms
+        if a.get("tipo") == "mineral":
+            mineral += kg_ms
+        if a.get("pastejo") and kg_mn > 0:
+            tem_pastejo = True
+        kg_ms_por_alimento[a["id"]] = kg_ms_por_alimento.get(a["id"], 0.0) + kg_ms
     if ms_total == 0:
         return {"ms_kg": 0.0}
     return {
@@ -57,4 +64,13 @@ def composicao(itens: list[dict]) -> dict:
         "custo_vaca_dia": custo,
         "cana_unico_volumoso": volumosos == {"cana"},
         "n_volumosos": len(volumosos),
+        "tem_pastejo": tem_pastejo,
+        "mineral_kg_ms": mineral,
+        "inclusao_excedida": sorted(
+            aid for aid, kg in kg_ms_por_alimento.items()
+            if _limite(itens, aid) is not None and 100 * kg / ms_total > _limite(itens, aid) + 0.5),
     }
+
+
+def _limite(itens: list[dict], aid: str):
+    return next((i["alimento"].get("max_pct_ms") for i in itens if i["alimento"]["id"] == aid), None)

@@ -147,15 +147,15 @@
   forca: B
 
 - id: EXG-02C
-  versao: 1
+  versao: 2
   modulo: exigencias
-  descricao: Energia de gestação (a partir de 190 dias)
+  descricao: Energia e proteína de gestação (a partir de 190 dias)
   prioridade: 80
   se:
     - {fato: perfil.gestacao_avancada, op: "=", valor: true}
   entao:
-    - calcular: {fato: exig.ell_gestacao, funcao: ell_gestacao, args: {dias: $lote.dias_gestacao, peso_bezerro: "@params.peso_bezerro_kg"}}
-    - calcular: {fato: exig.pm_gestacao, funcao: pm_gestacao, args: {dias: $lote.dias_gestacao, peso_bezerro: "@params.peso_bezerro_kg"}}
+    - calcular: {fato: exig.ell_gestacao, funcao: ell_gestacao, args: {dias: $perfil.dias_gestacao, peso_bezerro: "@params.peso_bezerro_kg", inicio: "@params.gestacao_dias_exigencia"}}
+    - calcular: {fato: exig.pm_gestacao, funcao: pm_gestacao, args: {dias: $perfil.dias_gestacao, peso_bezerro: "@params.peso_bezerro_kg", inicio: "@params.gestacao_dias_exigencia"}}
   fonte: "NRC 2001 (Bell & Ehrhardt); confere com tabela de Drackley 2021"
   forca: B
 
@@ -193,9 +193,9 @@
   forca: B
 
 - id: EXG-06A
-  versao: 1
+  versao: 2
   modulo: exigencias
-  descricao: ECC abaixo do mínimo no meio da lactação — somar energia para recuperar
+  descricao: ECC abaixo do mínimo no meio da lactação — somar energia para recuperar (escala pelo peso)
   prioridade: 80
   cf: 0.8
   se:
@@ -205,14 +205,14 @@
     - calcular:
         fato: exig.ell_ecc
         funcao: ell_ajuste_ecc
-        args: {ecc: $lote.ecc, meta: "@params.ecc_meta_meio", dias: "@params.dias_recuperacao_ecc", mcal_por_ponto: "@params.mcal_por_ponto_ecc"}
-  fonte: "Penn State (417 Mcal por ponto de ECC)"
+        args: {ecc: $lote.ecc, meta: "@params.ecc_meta_meio", dias: "@params.dias_recuperacao_ecc", mcal_por_ponto: "@params.mcal_por_ponto_ecc", pv: $lote.pv, pv_ref: "@params.pv_ref_ecc"}
+  fonte: "Penn State (417 Mcal por ponto de ECC numa vaca de ~650 kg; escalado pelo PV)"
   forca: B
 
 - id: EXG-06B
-  versao: 1
+  versao: 2
   modulo: exigencias
-  descricao: ECC abaixo do mínimo no final da lactação — somar energia para recuperar antes da secagem
+  descricao: ECC abaixo do mínimo no final da lactação, antes da secagem — somar energia para recuperar (escala pelo peso)
   prioridade: 80
   cf: 0.8
   se:
@@ -222,64 +222,88 @@
     - calcular:
         fato: exig.ell_ecc
         funcao: ell_ajuste_ecc
-        args: {ecc: $lote.ecc, meta: "@params.ecc_meta_final", dias: "@params.dias_recuperacao_ecc", mcal_por_ponto: "@params.mcal_por_ponto_ecc"}
-  fonte: "Penn State"
+        args: {ecc: $lote.ecc, meta: "@params.ecc_meta_final", dias: "@params.dias_recuperacao_ecc", mcal_por_ponto: "@params.mcal_por_ponto_ecc", pv: $lote.pv, pv_ref: "@params.pv_ref_ecc"}
+  fonte: "Penn State (417 Mcal por ponto de ECC numa vaca de ~650 kg; escalado pelo PV)"
   forca: B
 
 - id: EXG-06C
-  versao: 1
+  versao: 2
   modulo: exigencias
-  descricao: ECC abaixo do mínimo no início da lactação — somar energia para recuperar
+  descricao: ECC abaixo do mínimo no início/pico (não na recém-parida, quando recuperar ECC não é realista) — somar energia para recuperar (escala pelo peso)
   prioridade: 80
   cf: 0.8
   se:
-    - {fato: perfil.fase, op: in, valor: [recem_parida, inicio]}
+    - {fato: perfil.fase, op: "=", valor: inicio}
     - {fato: lote.ecc, op: "<", valor: "@params.ecc_min_inicio"}
   entao:
     - calcular:
         fato: exig.ell_ecc
         funcao: ell_ajuste_ecc
-        args: {ecc: $lote.ecc, meta: "@params.ecc_meta_inicio", dias: "@params.dias_recuperacao_ecc", mcal_por_ponto: "@params.mcal_por_ponto_ecc"}
-  fonte: "Penn State"
+        args: {ecc: $lote.ecc, meta: "@params.ecc_meta_inicio", dias: "@params.dias_recuperacao_ecc", mcal_por_ponto: "@params.mcal_por_ponto_ecc", pv: $lote.pv, pv_ref: "@params.pv_ref_ecc"}
+  fonte: "Penn State (417 Mcal por ponto de ECC numa vaca de ~650 kg; escalado pelo PV)"
   forca: B
 
 - id: EXG-07
-  versao: 1
+  versao: 2
   modulo: exigencias
-  descricao: Início de lactação com ECC adequado pode mobilizar reserva — tolerar oferta de energia um pouco menor
-  prioridade: 80
+  descricao: Pós-parto/início com ECC adequado mobiliza reserva — a dieta precisa cobrir só o que a mobilização aceitável não cobre
+  prioridade: 25
   cf: 0.8
   se:
     - {fato: perfil.fase, op: in, valor: [recem_parida, inicio]}
     - {fato: lote.ecc, op: ">=", valor: "@params.ecc_min_inicio"}
+    - {fato: exig.ell_total, op: existe}
   entao:
-    - concluir: {fato: meta.fator_energia_min, valor: "@params.fator_energia_mobilizacao"}
-  fonte: "Penn State; USC"
+    - calcular:
+        fato: meta.fator_energia_min
+        funcao: fator_mobilizacao
+        args: {ell_total: $exig.ell_total, mcal_por_ponto: "@params.mcal_por_ponto_ecc", pv: $lote.pv, pv_ref: "@params.pv_ref_ecc", perda_aceitavel: "@params.ecc_mobilizacao_aceitavel", dias: "@params.dias_mobilizacao"}
+  fonte: "Penn State (417 Mcal/ponto); OMAFRA (perda aceitável 0,5–0,75 ponto); Dossiê ACP-05 (5 semanas)"
   forca: B
 
 - id: EXG-02Z
-  versao: 1
+  versao: 2
   modulo: exigencias
-  descricao: Exigência total de ELl = mantença + leite + gestação + crescimento + atividade ± ECC
+  descricao: Exigência total de ELl em lactação = mantença + leite + gestação + crescimento + atividade ± ECC (leite é obrigatório)
   prioridade: 30
   se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: exig.ell_mantenca, op: existe}
+    - {fato: exig.ell_leite, op: existe}
+  entao:
+    - calcular:
+        fato: exig.ell_total
+        funcao: soma
+        args:
+          partes: [$exig.ell_mantenca, $exig.ell_leite, "$exig.ell_gestacao|0", "$exig.ell_crescimento|0", "$exig.ell_atividade|0", "$exig.ell_ecc|0"]
+  fonte: "NRC 2001"
+  forca: B
+
+- id: EXG-02Y
+  versao: 1
+  modulo: exigencias
+  descricao: Exigência total de ELl da vaca seca = mantença + gestação + atividade
+  prioridade: 30
+  se:
+    - {fato: lote.estado, op: "=", valor: seca}
     - {fato: exig.ell_mantenca, op: existe}
   entao:
     - calcular:
         fato: exig.ell_total
         funcao: soma
         args:
-          partes: [$exig.ell_mantenca, "$exig.ell_leite|0", "$exig.ell_gestacao|0", "$exig.ell_crescimento|0", "$exig.ell_atividade|0", "$exig.ell_ecc|0"]
+          partes: [$exig.ell_mantenca, "$exig.ell_gestacao|0", "$exig.ell_atividade|0"]
   fonte: "NRC 2001"
   forca: B
 
 - id: EXG-PB1
-  versao: 1
+  versao: 2
   modulo: exigencias
-  descricao: PB alvo por produção — Holandês/Jersey
+  descricao: PB alvo por produção — Holandês
   prioridade: 80
   se:
-    - {fato: perfil.equacao_cms, op: "=", valor: nrc2001}
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: lote.grupo_genetico, op: "=", valor: holandes}
   entao:
     - calcular: {fato: exig.pb_pct_alvo, funcao: pb_alvo, args: {leite: $lote.leite, tabela: "@params.pb_tabela_holandes"}}
     - calcular: {fato: exig.pm_leite, funcao: pm_leite, args: {leite: $lote.leite, proteina: $lote.proteina, eficiencia: "@params.eficiencia_pm"}}
@@ -287,12 +311,13 @@
   forca: B
 
 - id: EXG-PB2
-  versao: 1
+  versao: 2
   modulo: exigencias
-  descricao: PB alvo por produção — zebuínos e cruzados
+  descricao: PB alvo por produção — raças menores (Jersey), zebuínos e cruzados
   prioridade: 80
   se:
-    - {fato: perfil.equacao_cms, op: "=", valor: brleite}
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: lote.grupo_genetico, op: "!=", valor: holandes}
   entao:
     - calcular: {fato: exig.pb_pct_alvo, funcao: pb_alvo, args: {leite: $lote.leite, tabela: "@params.pb_tabela_mestico"}}
     - calcular: {fato: exig.pm_leite, funcao: pm_leite, args: {leite: $lote.leite, proteina: $lote.proteina, eficiencia: "@params.eficiencia_pm"}}
@@ -363,19 +388,31 @@
     - calcular:
         fato: meta
         funcao: metas_fibra
-        args: {fdnf_dieta: $dieta.fdnf_pct, fdn_min: "@params.fdn_min", fdnf_min: "@params.fdnf_min", cnf_max: "@params.cnf_max", passo: "@params.passo_fibra"}
+        args: {fdnf_dieta: $dieta.fdnf_pct, fdn_min: "@params.fdn_min", fdnf_min: "@params.fdnf_min", cnf_max: "@params.cnf_max", passo: "@params.passo_fibra", fdnf_min_absoluto: "@params.fdnf_min_absoluto"}
   fonte: "NRC 2001 via CompreRural"
   forca: B
 
 - id: EXG-09
-  versao: 1
+  versao: 2
   modulo: exigencias
-  descricao: Calcular CMS como % do PV para checagem de plausibilidade
+  descricao: CMS da equação como % do PV para checar os dados de entrada (fora do pós-parto, quando consumo baixo é normal)
   prioridade: 20
   se:
-    - {fato: exig.cms, op: existe}
-    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: exig.cms_equacao, op: existe}
+    - {fato: perfil.fase, op: in, valor: [inicio, meio, final]}
   entao:
-    - calcular: {fato: perfil.cms_pct_pv, funcao: cms_pct_pv, args: {cms: $exig.cms, pv: $lote.pv}}
+    - calcular: {fato: perfil.cms_pct_pv, funcao: cms_pct_pv, args: {cms: $exig.cms_equacao, pv: $lote.pv}}
   fonte: "Dossiê (CMS de lactação entre 2,5 e 4% do PV)"
   forca: C
+
+- id: EXG-ECC
+  versao: 1
+  modulo: exigencias
+  descricao: ECC máximo da fase (vaca gorda tem mais risco metabólico no parto)
+  prioridade: 80
+  se:
+    - {fato: perfil.fase, op: existe}
+  entao:
+    - calcular: {fato: meta.ecc_max, funcao: valor_tabela, args: {chave: $perfil.fase, tabela: "@params.ecc_max_fases"}}
+  fonte: "USC; Embrapa/IFRO (metas de ECC por fase)"
+  forca: B

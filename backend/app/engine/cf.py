@@ -7,7 +7,10 @@ def combinar(cf1: float, cf2: float) -> float:
         return cf1 + cf2 * (1 - cf1)
     if cf1 < 0 and cf2 < 0:
         return cf1 + cf2 * (1 + cf1)
-    return (cf1 + cf2) / (1 - min(abs(cf1), abs(cf2)))
+    denominador = 1 - min(abs(cf1), abs(cf2))
+    if denominador == 0:      # certeza total a favor e contra: evidência contraditória, fica neutra
+        return 0.0
+    return (cf1 + cf2) / denominador
 
 
 def propagar(cf_regra: float, cfs_premissas: list[float]) -> float:

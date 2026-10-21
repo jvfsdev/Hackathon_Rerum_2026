@@ -14,12 +14,13 @@
 - id: META-02
   versao: 1
   modulo: meta
-  descricao: Calor explica — rebaixa a informativos os alertas de dieta motivados pela queda
+  descricao: Calor explica — rebaixa os alertas de dieta motivados pela queda e a própria queda (a ação é manejo de calor)
   prioridade: 80
   se:
     - {fato: hipotese.causa_calor, op: "=", valor: true}
   entao:
     - rebaixar: {categorias: [dieta_queda], para: informativo, motivo: "queda coincide com ITU alto: manejo de calor antes de mudar a dieta"}
+    - rebaixar: {categorias: [producao], para: atencao, motivo: "queda coincide com ITU alto: ver alerta de calor (ACP-10)"}
   fonte: "Dossiê ACP-10"
   forca: B
 

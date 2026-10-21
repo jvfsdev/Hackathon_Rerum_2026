@@ -65,6 +65,11 @@ export default function ConsultaPagina() {
                   Não sei (usar {fmt(p.padrao)})
                 </button>
               )}
+              {p.padrao === undefined && p.opcional && (
+                <button className="btn-secundario" onClick={() => responder(true)} disabled={carregando} title="As regras que dependem desta informação não serão aplicadas">
+                  Não sei (pular)
+                </button>
+              )}
               <button className="text-sm font-medium text-campo-600 hover:underline" onClick={() => setVerPorQue(!verPorQue)}>Por que estou perguntando?</button>
             </div>
             {verPorQue && (

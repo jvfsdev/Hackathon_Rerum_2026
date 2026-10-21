@@ -6,9 +6,9 @@ def pm_leite(leite: float, proteina_pct: float, eficiencia: float = 0.67) -> flo
     return 10 * leite * proteina_pct / eficiencia
 
 
-def pm_gestacao(dias_gestacao: float, peso_bezerro: float) -> float:
-    """PM de gestação (g/d), NRC 2001; zero antes de 190 dias."""
-    if dias_gestacao < 190:
+def pm_gestacao(dias_gestacao: float, peso_bezerro: float, inicio: float = 190) -> float:
+    """PM de gestação (g/d), NRC 2001; zero antes do início da exigência (190 dias)."""
+    if dias_gestacao < inicio:
         return 0.0
     return (0.69 * dias_gestacao - 69.2) * (peso_bezerro / 45) / 0.33
 

@@ -325,7 +325,7 @@ function ResultadoPL({ pl, nome, onAceitar }: { pl: any; nome: (id: string) => s
   if (st === 'dados_insuficientes') return <Erro msg="Faltam dados do lote para calcular as exigências." />
   return (
     <div className="mt-4 space-y-3">
-      {alertas.filter((a) => a.nivel !== 'informativo').map((a, i) => (
+      {alertas.filter((a) => a.nivel === 'critico').map((a, i) => (
         <div key={i} className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm">
           <div className="flex items-center gap-2"><NivelBadge nivel={a.nivel} /><span className="font-mono text-xs">{a.regra}</span></div>
           <p className="mt-1 font-medium text-stone-900">{a.titulo}</p>
@@ -334,9 +334,18 @@ function ResultadoPL({ pl, nome, onAceitar }: { pl: any; nome: (id: string) => s
         </div>
       ))}
       {st === 'inviavel' && <p className="text-sm text-stone-600">Restrições que impedem a solução: <b>{pl.pl.restricoes_violadas.join(', ')}</b>.</p>}
-      {st === 'otimo' && (
+      {pl.pl.iteracoes?.length > 1 && (
+        <p className="text-xs text-stone-500">A dieta mudou o próprio consumo previsto (teto de fibra / equação de consumo); a formulação foi refeita {pl.pl.iteracoes.length - 1} vez(es) até ficar consistente.</p>
+      )}
+      {(st === 'otimo' || st === 'parcial') && (
         <>
-          <div className="rounded-lg bg-campo-50 p-3">
+          {st === 'parcial' && (
+            <p className="rounded-lg bg-amber-50 p-2 text-sm text-atencao">
+              Melhor dieta possível com estes alimentos: não atinge {pl.pl.restricoes_violadas.join(' e ')}
+              {pl.pl.deficit?.energia_mcal > 0.01 && ` (faltam ${pl.pl.deficit.energia_mcal.toFixed(1)} Mcal/dia)`}. Todas as demais restrições são respeitadas.
+            </p>
+          )}
+          <div className={`rounded-lg p-3 ${st === 'otimo' ? 'bg-campo-50' : 'bg-stone-50'}`}>
             <p className="num text-sm font-semibold text-campo-900">R$ {pl.pl.custo.toFixed(2)} por vaca/dia · {fmt(pl.pl.composicao.ms_kg)} kg MS · PB {fmt(pl.pl.composicao.pb_pct)}% · FDN {fmt(pl.pl.composicao.fdn_pct)}%</p>
             <ul className="mt-1 text-sm text-stone-700">
               {pl.pl.itens.map((i: ItemDieta) => <li key={i.alimento} className="num">{nome(i.alimento)}: <b>{i.kg_mn}</b> kg MN</li>)}
@@ -346,7 +355,7 @@ function ResultadoPL({ pl, nome, onAceitar }: { pl: any; nome: (id: string) => s
               <p key={a.regra} className="mt-1 text-xs text-atencao"><span className="font-mono">{a.regra}</span> {a.titulo}</p>
             ))}
           </div>
-          <button className="btn-primario" onClick={() => onAceitar(pl.pl.itens)}>Aceitar como nova versão</button>
+          <button className="btn-primario" onClick={() => onAceitar(pl.pl.itens)}>{st === 'parcial' ? 'Aceitar mesmo assim' : 'Aceitar como nova versão'}</button>
         </>
       )}
     </div>

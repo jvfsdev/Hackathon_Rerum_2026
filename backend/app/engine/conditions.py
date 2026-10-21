@@ -87,8 +87,9 @@ def avaliar(cond: dict, res: Resolvedor) -> tuple[bool, list[dict], list[str]]:
         return True, [_premissa(nome, op, None, fato)], []
     usados: list = []
     esperado = res.valor(cond.get("valor"), usados)
-    if esperado is FALTA:
-        return False, [], [cond["valor"][1:].partition("|")[0]]
+    if esperado is FALTA or (isinstance(esperado, list) and FALTA in esperado):
+        refs = cond["valor"] if isinstance(cond["valor"], list) else [cond["valor"]]
+        return False, [], [r[1:].partition("|")[0] for r in refs if isinstance(r, str) and r.startswith("$")]
     try:
         ok = bool(OPERADORES[op](fato.valor, esperado))
     except TypeError:

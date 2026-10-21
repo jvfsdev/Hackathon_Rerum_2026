@@ -7,7 +7,7 @@
   cf: 0.8
   se:
     - {fato: mon.ms_delta_abs, op: ">=", valor: "@params.ms_delta_recalcular"}
-    - {fato: mon.ms_leituras_confirmadas, op: ">=", valor: 2}
+    - {fato: mon.ms_leituras_confirmadas, op: ">=", valor: "@params.ms_leituras_confirmacao"}
   entao:
     - calcular: {fato: mon.silagem_kg_mn_novo, funcao: ms_para_mn, args: {kg_ms: $mon.silagem_kg_ms, ms_pct: $mon.ms_silagem_atual}}
     - alerta:
@@ -27,7 +27,9 @@
   cf: 0.8
   se:
     - qualquer:
-        - {fato: mon.ms_delta_abs, op: ">=", valor: "@params.ms_delta_reformular"}
+        - todos:
+            - {fato: mon.ms_delta_abs, op: ">=", valor: "@params.ms_delta_reformular"}
+            - {fato: mon.ms_leituras_confirmadas, op: ">=", valor: "@params.ms_leituras_confirmacao"}
         - {fato: mon.silo_novo, op: "=", valor: true}
   entao:
     - alerta:

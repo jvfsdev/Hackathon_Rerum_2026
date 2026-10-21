@@ -31,20 +31,20 @@ def _kb_mini(tmp_path: Path, regras: list[dict]):
 
 def test_resolucao_de_conflito_por_prioridade_e_especificidade(tmp_path):
     regras = [
-        {"id": "R-BAIXA", "modulo": "classificacao", "prioridade": 10, "se": [{"fato": "x", "op": "existe"}],
-         "entao": [{"concluir": {"fato": "ordem.baixa", "valor": True}}]},
-        {"id": "R-ALTA", "modulo": "classificacao", "prioridade": 90, "se": [{"fato": "x", "op": "existe"}],
-         "entao": [{"concluir": {"fato": "ordem.alta", "valor": True}}]},
+        {"id": "R-BAIXA", "modulo": "classificacao", "prioridade": 10, "se": [{"fato": "lote.x", "op": "existe"}],
+         "entao": [{"concluir": {"fato": "lote.ordem_baixa", "valor": True}}]},
+        {"id": "R-ALTA", "modulo": "classificacao", "prioridade": 90, "se": [{"fato": "lote.x", "op": "existe"}],
+         "entao": [{"concluir": {"fato": "lote.ordem_alta", "valor": True}}]},
         {"id": "R-ESPECIFICA", "modulo": "classificacao", "prioridade": 10,
-         "se": [{"fato": "x", "op": "existe"}, {"fato": "y", "op": "existe"}],
-         "entao": [{"concluir": {"fato": "ordem.especifica", "valor": True}}]},
-        {"id": "R-MODULO2", "modulo": "exigencias", "prioridade": 100, "se": [{"fato": "x", "op": "existe"}],
-         "entao": [{"concluir": {"fato": "ordem.modulo2", "valor": True}}]},
+         "se": [{"fato": "lote.x", "op": "existe"}, {"fato": "lote.y", "op": "existe"}],
+         "entao": [{"concluir": {"fato": "lote.ordem_especifica", "valor": True}}]},
+        {"id": "R-MODULO2", "modulo": "exigencias", "prioridade": 100, "se": [{"fato": "lote.x", "op": "existe"}],
+         "entao": [{"concluir": {"fato": "lote.ordem_modulo2", "valor": True}}]},
     ]
     kb = _kb_mini(tmp_path, regras)
     wm = MemoriaTrabalho()
-    wm.declarar("x", 1)
-    wm.declarar("y", 1)
+    wm.declarar("lote.x", 1)
+    wm.declarar("lote.y", 1)
     r = Motor(kb).executar(wm)
     assert r.disparadas() == ["R-ALTA", "R-ESPECIFICA", "R-BAIXA", "R-MODULO2"]
     assert set(r.traco[0]["concorrentes"]) == {"R-ESPECIFICA", "R-BAIXA", "R-MODULO2"}

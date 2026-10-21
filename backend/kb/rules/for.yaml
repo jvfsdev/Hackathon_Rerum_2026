@@ -2,14 +2,15 @@
 - id: FOR-01
   versao: 1
   modulo: formulacao
-  descricao: Faixa de matéria seca total do PL (CMS ± 5%)
+  descricao: Faixa de matéria seca do PL — mesmos limites de oferta que a verificação usa (VER-06/06B)
   prioridade: 80
   se:
     - {fato: formulacao.solicitada, op: "=", valor: true}
     - {fato: exig.cms, op: existe}
   entao:
-    - calcular: {fato: pl.folga_ms, funcao: produto, args: {a: $exig.cms, b: "@params.pl_folga_cms"}}
-  fonte: "Inferências (CMS ± 5%)"
+    - calcular: {fato: pl.ms_min, funcao: produto, args: {a: $exig.cms, b: "@params.pl_fator_ms_min"}}
+    - calcular: {fato: pl.ms_max, funcao: produto, args: {a: $exig.cms, b: "@params.fator_oferta_max"}}
+  fonte: "Inferências (CMS ± 5%); Dossiê VER-06"
   forca: D
 
 - id: FOR-02
@@ -25,17 +26,30 @@
   fonte: "Dossiê VER-01"
   forca: D
 
+- id: FOR-02B
+  versao: 1
+  modulo: formulacao
+  descricao: Energia máxima do PL — o mesmo teto que a verificação usa para apontar excesso (VER-10)
+  prioridade: 80
+  se:
+    - {fato: formulacao.solicitada, op: "=", valor: true}
+    - {fato: exig.ell_total, op: existe}
+  entao:
+    - calcular: {fato: pl.ell_max, funcao: produto, args: {a: $exig.ell_total, b: "@params.fator_energia_max"}}
+  fonte: "Dossiê VER-10"
+  forca: D
+
 - id: FOR-03
   versao: 1
   modulo: formulacao
-  descricao: Faixa de PB do PL = alvo até alvo + folga
+  descricao: Faixa de PB do PL = alvo até o máximo que a verificação aceita sem apontar excesso (VER-02B)
   prioridade: 80
   se:
     - {fato: formulacao.solicitada, op: "=", valor: true}
     - {fato: exig.pb_pct_alvo, op: existe}
   entao:
     - concluir: {fato: pl.pb_min, valor: $exig.pb_pct_alvo}
-    - calcular: {fato: pl.pb_max, funcao: soma, args: {partes: [$exig.pb_pct_alvo, "@params.pl_pb_folga_max"]}}
+    - calcular: {fato: pl.pb_max, funcao: produto, args: {a: $exig.pb_pct_alvo, b: "@params.fator_pb_max"}}
   fonte: "MSD Vet Manual"
   forca: D
 
@@ -84,7 +98,7 @@
   descricao: PL inviável por energia — faltam alimentos energéticos
   prioridade: 60
   se:
-    - {fato: pl.status, op: "=", valor: inviavel}
+    - {fato: pl.status, op: in, valor: [inviavel, parcial]}
     - {fato: pl.restricoes_violadas, op: contem, valor: energia}
   entao:
     - alerta:
@@ -102,7 +116,7 @@
   descricao: PL inviável por proteína
   prioridade: 60
   se:
-    - {fato: pl.status, op: "=", valor: inviavel}
+    - {fato: pl.status, op: in, valor: [inviavel, parcial]}
     - {fato: pl.restricoes_violadas, op: contem, valor: proteina}
   entao:
     - alerta:
@@ -187,6 +201,58 @@
         acao: "Marcar outro volumoso disponível (silagem de milho ou sorgo, capim-elefante)."
   fonte: "Semadesc-MS"
   forca: C
+
+- id: FOR-16
+  versao: 1
+  modulo: formulacao
+  descricao: Informar alimentos escolhidos que não podem entrar na dieta deste lote
+  prioridade: 55
+  se:
+    - {fato: pl.alimentos_excluidos, op: "!=", valor: []}
+  entao:
+    - alerta:
+        nivel: informativo
+        categoria: formulacao
+        titulo: "Não entraram na formulação: {pl.alimentos_excluidos}"
+        causa: "Forragem de pastejo não é oferecida a lote confinado (FOR-06)."
+        acao: "Escolha volumosos fornecidos no cocho."
+  fonte: "Definição do sistema de produção"
+  forca: A
+
+- id: FOR-17
+  versao: 1
+  modulo: formulacao
+  descricao: PL inviável porque todos os alimentos têm energia demais para a exigência (vaca seca, final de lactação)
+  prioridade: 60
+  se:
+    - {fato: pl.status, op: in, valor: [inviavel, parcial]}
+    - {fato: pl.restricoes_violadas, op: contem, valor: excesso_energia}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: formulacao
+        titulo: "Alimentos energéticos demais para este lote"
+        causa: "Mesmo no consumo mínimo, a energia passa de {pl.ell_max:.1f} Mcal/dia: o lote engordaria."
+        acao: "Incluir volumoso menos energético (capim, silagem de sorgo, braquiária) ou reduzir o concentrado."
+  fonte: "Penn State; OMAFRA"
+  forca: C
+
+- id: FOR-21
+  versao: 1
+  modulo: formulacao
+  descricao: Só energia/proteína são inatingíveis — entregar a melhor dieta possível com o déficit explícito
+  prioridade: 55
+  se:
+    - {fato: pl.status, op: "=", valor: parcial}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: formulacao
+        titulo: "Melhor dieta possível com estes alimentos: R$ {pl.custo:.2f}/vaca/dia"
+        causa: "Ela respeita fibra, consumo e limites de inclusão, mas não cobre toda a exigência (veja a verificação)."
+        acao: "No pós-parto o balanço energético negativo é esperado: maximize a densidade e acompanhe o ECC; fora dele, inclua alimentos mais energéticos/proteicos."
+  fonte: "Programação por metas (folgas penalizadas)"
+  forca: D
 
 - id: FOR-20
   versao: 1

@@ -16,14 +16,17 @@ def como(resultado: Resultado, fato: str, profundidade: int = 6) -> dict:
         entrada = next((t for t in resultado.traco if t["regra"] == rid), None)
         if entrada is None:
             continue
-        no["regras"].append({
-            "regra": rid, "descricao": entrada["descricao"], "cf_regra": entrada["cf_regra"],
-            "fonte": entrada["fonte"], "forca": entrada["forca"],
-            "premissas": [como(resultado, p["fato"], profundidade - 1) | {"op": p["op"], "esperado": p["esperado"]}
-                          for p in entrada["premissas"] if p["op"] != "ausente"],
-            "calculo": next((a for a in entrada["acoes"] if a.get("tipo") == "calcular" and
-                             (a["fato"] == fato or fato.startswith(a["fato"] + "."))), None),
-        })
+        calculo = next((a for a in entrada["acoes"] if a.get("tipo") == "calcular" and
+                        (a["fato"] == fato or fato.startswith(a["fato"] + "."))), None)
+        premissas = [como(resultado, p["fato"], profundidade - 1) | {"op": p["op"], "esperado": p["esperado"]}
+                     for p in entrada["premissas"] if p["op"] != "ausente"]
+        ja = {p["fato"] for p in premissas}
+        # entradas do cálculo também explicam o valor e o CF (ex.: PV informado como padrão reduz o CF do CMS)
+        premissas += [como(resultado, u, profundidade - 1) | {"op": "entrada do cálculo", "esperado": None}
+                      for u in (calculo or {}).get("usados", []) if u not in ja]
+        no["regras"].append({"regra": rid, "descricao": entrada["descricao"], "cf_regra": entrada["cf_regra"],
+                             "fonte": entrada["fonte"], "forca": entrada["forca"], "premissas": premissas,
+                             "calculo": calculo})
     return no
 
 
@@ -44,11 +47,16 @@ def por_que(motor: Motor, fato: str, objetivo: str) -> list[dict]:
     return [{"regra": r["id"], "descricao": r.get("descricao", ""), "fonte": r.get("fonte", "")} for r in caminho or []]
 
 
+def _cita(requeridos: list[str], fato: str) -> bool:
+    """A regra usa o fato, ou algum fato dentro dele (cálculo que devolve dicionário: `dieta` → `dieta.fdn_pct`)."""
+    return any(r == fato or r.startswith(fato + ".") for r in requeridos)
+
+
 def _caminho(motor, fato, objetivo, visitados):
-    if fato == objetivo:
+    if fato == objetivo or objetivo.startswith(fato + "."):
         return []
     for regra in motor.regras:
-        if regra["id"] in visitados or fato not in fatos_requeridos(regra):
+        if regra["id"] in visitados or not _cita(fatos_requeridos(regra), fato):
             continue
         for concluido in fatos_concluidos(regra):
             sub = _caminho(motor, concluido, objetivo, visitados | {regra["id"]})

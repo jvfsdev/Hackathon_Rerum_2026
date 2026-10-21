@@ -134,6 +134,24 @@
   fonte: "NRC 2001 (FDNf ≥ 19% MS)"
   forca: B
 
+- id: VER-03D
+  versao: 1
+  modulo: verificacao
+  descricao: FDN de forragem abaixo de 15% da MS — fora da tabela NRC, dieta bloqueada
+  prioridade: 95
+  se:
+    - {fato: dieta.fdnf_pct, op: "<", valor: "@params.fdnf_min_absoluto"}
+  entao:
+    - concluir: {fato: parecer.bloqueio, valor: true}
+    - alerta:
+        nivel: critico
+        categoria: dieta
+        titulo: "Volumoso insuficiente: FDN de forragem {dieta.fdnf_pct:.1f}% da MS"
+        causa: "Abaixo de {@params.fdnf_min_absoluto}% de FDN de forragem o NRC não tem recomendação segura: risco alto de acidose."
+        acao: "Aumentar o volumoso da dieta."
+  fonte: "NRC 2001 (tabela de FDN mínimo vai até FDNf 15%)"
+  forca: B
+
 - id: VER-03Z
   versao: 1
   modulo: verificacao
@@ -267,6 +285,100 @@
   fonte: "Dossiê"
   forca: C
 
+- id: VER-10
+  versao: 1
+  modulo: verificacao
+  descricao: Energia consumida muito acima da exigência — risco de engorda (ECC alto ao parto)
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: ver.razao_energia, op: ">", valor: "@params.fator_energia_max"}
+  entao:
+    - concluir: {fato: ver.excesso_energetico, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Energia acima do necessário: a dieta cobre {ver.razao_energia:.0%} da exigência"
+        causa: "Excesso de energia engorda o lote; vaca gorda ao parto tem mais cetose e deslocamento de abomaso."
+        acao: "Reduzir concentrado ou usar volumoso menos energético; especialmente em vacas secas e no final da lactação."
+  fonte: "Penn State; OMAFRA (ECC alto ao parto)"
+  forca: C
+
+- id: VER-11
+  versao: 1
+  modulo: verificacao
+  descricao: ECC acima do máximo da fase
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: lote.ecc, op: ">", valor: $meta.ecc_max}
+  entao:
+    - concluir: {fato: ver.ecc_alto, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: condicao_corporal
+        titulo: "ECC {lote.ecc} acima da meta da fase (máx. {meta.ecc_max})"
+        causa: "Lote engordando: risco metabólico no próximo parto."
+        acao: "Reduzir a densidade energética da dieta desta fase."
+  fonte: "USC; Embrapa/IFRO; Dossiê ACP-09 (ajuste conforme direção do desvio)"
+  forca: B
+
+- id: VER-12
+  versao: 1
+  modulo: verificacao
+  descricao: Alimento acima do limite de inclusão
+  prioridade: 60
+  cf: 0.8
+  se:
+    - {fato: dieta.inclusao_excedida, op: "!=", valor: []}
+  entao:
+    - concluir: {fato: ver.inclusao_excedida, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Alimento acima do limite de inclusão: {dieta.inclusao_excedida}"
+        causa: "Cada alimento tem um teto prático na MS (ex.: caroço de algodão 15%, polpa cítrica 30%)."
+        acao: "Reduzir esse alimento e completar com outro de função parecida."
+  fonte: "Limites de inclusão de foods.yaml"
+  forca: C
+
+- id: VER-13
+  versao: 1
+  modulo: verificacao
+  descricao: Forragem de pastejo na dieta de lote confinado
+  prioridade: 60
+  se:
+    - {fato: lote.sistema, op: "=", valor: confinado}
+    - {fato: dieta.tem_pastejo, op: "=", valor: true}
+  entao:
+    - concluir: {fato: ver.pastejo_em_confinado, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Dieta de lote confinado com forragem de pastejo"
+        causa: "Lote confinado não tem acesso ao pasto: essa parte da dieta não será consumida."
+        acao: "Trocar por volumoso fornecido no cocho (silagem, capim picado, cana)."
+  fonte: "Definição do sistema de produção"
+  forca: A
+
+- id: VER-14
+  versao: 1
+  modulo: verificacao
+  descricao: Dieta sem núcleo mineral
+  prioridade: 60
+  cf: 0.8
+  se:
+    - {fato: dieta.mineral_kg_ms, op: "<", valor: "@params.mineral_min_kg_ms"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Sem núcleo mineral suficiente na dieta"
+        causa: "Minerais (Ca, P, Mg, Na…) vêm do núcleo/sal mineral."
+        acao: "Incluir núcleo mineral conforme o rótulo (mín. {@params.mineral_min_kg_ms} kg MS/vaca/dia)."
+  fonte: "Rótulo do produto; Dossiê (minerais via núcleo)"
+  forca: C
+
 - id: VER-90
   versao: 1
   modulo: verificacao
@@ -280,7 +392,7 @@
   forca: B
 
 - id: VER-91
-  versao: 1
+  versao: 2
   modulo: verificacao
   descricao: Parecer — dieta precisa de ajustes
   prioridade: 10
@@ -294,6 +406,9 @@
         - {fato: ver.oferta_excessiva, op: existe}
         - {fato: ver.subalimentacao, op: existe}
         - {fato: ver.volumoso_limitante, op: existe}
+        - {fato: ver.excesso_energetico, op: existe}
+        - {fato: ver.inclusao_excedida, op: existe}
+        - {fato: ver.pastejo_em_confinado, op: existe}
   entao:
     - concluir: {fato: parecer.dieta, valor: ajustar}
   fonte: "Dossiê VER-08"

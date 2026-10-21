@@ -43,5 +43,12 @@ class MemoriaTrabalho:
             return "substituido"
         return "mantido"
 
+    def reiniciar_derivados(self):
+        """Manutenção de verdade por recomputação: descarta tudo que regras concluíram e mantém só as entradas.
+        Usado quando uma sessão continua com fatos novos — o motor reconstrói as conclusões do zero, então
+        nenhuma conclusão fica apoiada em premissas que mudaram ou em componentes que chegaram depois."""
+        self.fatos = {n: f for n, f in self.fatos.items() if f.origem != "regra"}
+        self.disparadas = set()
+
     def to_dict(self) -> dict:
         return {n: f.to_dict() for n, f in sorted(self.fatos.items())}

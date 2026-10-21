@@ -3,16 +3,16 @@
 lote.estado: {texto: "O lote está em lactação ou seco?", tipo: opcao, opcoes: [lactacao, seca], ajuda: "Define se o sistema calcula exigência de leite ou de vaca seca."}
 lote.del: {texto: "Quantos dias em lactação (DEL) em média?", tipo: numero, unidade: dias, ajuda: "O consumo é menor nas primeiras semanas e define a fase (recém-parida, início, meio, final).", padrao: 150}
 lote.dias_para_parto: {texto: "Quantos dias faltam, em média, para o parto?", tipo: numero, unidade: dias, ajuda: "Vacas a 21 dias do parto vão para o pré-parto (dieta de transição)."}
-lote.dias_gestacao: {texto: "Dias de gestação médios do lote (0 se vazias)", tipo: numero, unidade: dias, ajuda: "A partir de 190 dias a gestação passa a exigir energia e proteína.", padrao: 0}
+lote.dias_gestacao: {texto: "Dias de gestação médios do lote (0 se vazias)", tipo: numero, unidade: dias, ajuda: "A partir de 190 dias a gestação passa a exigir energia e proteína. (Para vaca seca, o sistema deriva dos dias para o parto.)", padrao: 0}
 lote.grupo_genetico: {texto: "Qual o grupo genético predominante?", tipo: opcao, opcoes: [holandes, jersey, girolando, gir, mestica], ajuda: "Escolhe a equação de consumo (NRC 2001 para Holandês, BR-Leite para zebuínos e cruzados)."}
 lote.sistema: {texto: "Qual o sistema de produção?", tipo: opcao, opcoes: [confinado, semiconfinado, pasto], ajuda: "Em pasto há gasto de energia com caminhada e o consumo é menos previsível."}
-lote.pv: {texto: "Peso vivo médio (kg)", tipo: numero, unidade: kg, ajuda: "Entra em quase toda equação (mantença e consumo). Balança ou fita.", padrao: 500}
+lote.pv: {texto: "Peso vivo médio (kg)", tipo: numero, unidade: kg, ajuda: "Entra em quase toda equação (mantença e consumo). Balança ou fita; não há valor padrão seguro (Holandês ~600–650, Girolando ~500, Jersey ~420)."}
 lote.leite: {texto: "Produção média por vaca (kg/dia)", tipo: numero, unidade: "kg/d", ajuda: "Define a exigência de energia e proteína para leite. Tanque ÷ nº de vacas serve."}
 lote.gordura: {texto: "Gordura do leite (%)", tipo: numero, unidade: "%", ajuda: "Vem no laudo mensal do laticínio. Corrige o leite para 4% e define a energia do leite.", padrao: 3.5}
 lote.proteina: {texto: "Proteína do leite (%)", tipo: numero, unidade: "%", ajuda: "Vem no laudo do laticínio. Entra na energia e na proteína metabolizável do leite.", padrao: 3.2}
 lote.fracao_primiparas: {texto: "Que fração do lote é de primíparas (0 a 1)?", tipo: numero, unidade: fração, ajuda: "Primíparas ainda crescem e precisam de energia extra.", padrao: 0.3}
-lote.ecc: {texto: "Escore de condição corporal médio (1 a 5)", tipo: numero, unidade: "1-5", ajuda: "Se estiver abaixo da meta da fase, o sistema soma energia para recuperar.", padrao: 3.0}
+lote.ecc: {texto: "Escore de condição corporal médio (1 a 5)", tipo: numero, unidade: "1-5", ajuda: "Abaixo da meta da fase o sistema soma energia para recuperar; acima, aponta excesso. Sem ECC essas regras não se aplicam.", opcional: true}
 lote.distancia_km: {texto: "Distância caminhada por dia (km)", tipo: numero, unidade: km, ajuda: "Caminhada até o piquete e a sala de ordenha gasta energia.", padrao: 1.0}
 lote.relevo: {texto: "Relevo do pasto", tipo: opcao, opcoes: [plano, ondulado, acidentado], ajuda: "Terreno acidentado aumenta muito o gasto de energia.", padrao: plano}
-lote.temp: {texto: "Temperatura média do dia (°C)", tipo: numero, unidade: "°C", ajuda: "Com a umidade, calcula o ITU (estresse térmico reduz consumo e leite).", padrao: 25}
-lote.ur: {texto: "Umidade relativa média (%)", tipo: numero, unidade: "%", ajuda: "Com a temperatura, calcula o ITU.", padrao: 65}
+lote.temp: {texto: "Temperatura média do dia (°C)", tipo: numero, unidade: "°C", ajuda: "Com a umidade, calcula o ITU (estresse térmico reduz consumo e leite). Sem ela, o ITU não é avaliado.", opcional: true}
+lote.ur: {texto: "Umidade relativa média (%)", tipo: numero, unidade: "%", ajuda: "Com a temperatura, calcula o ITU. Sem ela, o ITU não é avaliado.", opcional: true}

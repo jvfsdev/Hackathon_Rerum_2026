@@ -1,5 +1,4 @@
 """Orquestra banco, motor de inferência, otimizador e monitor. Não contém regras de decisão."""
-import math
 from datetime import date, timedelta
 
 from sqlmodel import Session, select
@@ -80,14 +79,38 @@ def cf_itens(itens: list[dict]) -> float:
     return min((i["alimento"].get("cf", kb().params["cf_tabela"]["valor"]) for i in itens), default=1.0)
 
 
+class EntradaInvalida(ValueError):
+    pass
+
+
+def normalizar(fatos: dict) -> dict:
+    """Converte e valida os tipos das entradas pelo que perguntas.yaml declara (número / opção)."""
+    perguntas = kb().perguntas
+    out = {}
+    for nome, valor in fatos.items():
+        p = perguntas.get(nome)
+        if p and valor is not None:
+            if p["tipo"] == "numero":
+                try:
+                    valor = float(str(valor).replace(",", "."))
+                except ValueError:
+                    raise EntradaInvalida(f"{nome}: '{valor}' não é número")
+            elif p["tipo"] == "opcao" and valor not in p["opcoes"]:
+                raise EntradaInvalida(f"{nome}: '{valor}' não é uma opção válida ({', '.join(p['opcoes'])})")
+        out[nome] = valor
+    return out
+
+
 def memoria(fatos: dict, origem: str = "usuario", padroes: set | None = None) -> MemoriaTrabalho:
     wm = MemoriaTrabalho()
-    cf_padrao = kb().params["cf_padrao"]["valor"]
-    for nome, valor in fatos.items():
+    params = kb().params
+    cf_entrada = params["cf_medido_recente"]["valor"] if origem == "medido" else 1.0
+    for nome, valor in normalizar(fatos).items():
         if padroes and nome in padroes:
-            wm.declarar(nome, valor, cf=cf_padrao, origem="padrao", nota="valor padrão (usuário não informou)")
+            wm.declarar(nome, valor, cf=params["cf_padrao"]["valor"], origem="padrao",
+                        nota="valor padrão (usuário não informou)")
         else:
-            wm.declarar(nome, valor, cf=1.0, origem=origem)
+            wm.declarar(nome, valor, cf=cf_entrada, origem=origem)
     return wm
 
 
@@ -158,33 +181,59 @@ def formular(fatos: dict, alimentos_ids: list[str], precos: dict | None = None) 
         out = _pacote(resultado, ["exig.cms", "exig.ell_total"])
         out["pl"] = {"status": "dados_insuficientes"}
         return out
-    restricoes = {"cms": v("exig.cms"), "folga_ms": v("pl.folga_ms"), "ell_min": v("pl.ell_min"),
+    restricoes = {"cms": v("exig.cms"), "ms_min": v("pl.ms_min"), "ms_max": v("pl.ms_max"), "ell_min": v("pl.ell_min"),
                   "pb_min": v("pl.pb_min"), "pb_max": v("pl.pb_max"), "fdn_min": v("meta.fdn_min"),
                   "fdnf_min": v("meta.fdnf_min"), "cnf_max": v("meta.cnf_max"), "ee_max": v("meta.ee_max"),
                   "ureia_max": v("meta.ureia_max"), "fdn_max_kg": v("pl.fdn_max_kg"),
-                  "cana_max_pct_volumoso": v("pl.cana_max_pct_volumoso"), "excluir_pastejo": v("pl.excluir_pastejo")}
+                  "cana_max_pct_volumoso": v("pl.cana_max_pct_volumoso"), "excluir_pastejo": v("pl.excluir_pastejo"),
+                  "margem": base.params["pl_margem"]["valor"], "fator_ms_min": base.params["pl_fator_ms_min"]["valor"],
+                  "teto_fibra_aplica": v("exig.cms_equacao") is not None, "ell_max": v("pl.ell_max")}
     alimentos = [dict(base.alimentos[a], **({"preco_kg_mn": precos[a]} if precos and a in precos else {}))
                  for a in alimentos_ids]
-    pl = lp.formular(alimentos, restricoes)
+    excluidos = [a["nome"] for a in alimentos if restricoes["excluir_pastejo"] and a.get("pastejo")]
+    wm.declarar("pl.alimentos_excluidos", excluidos, origem="sistema")
+    pl, verificacao, iteracoes = _formular_ate_ponto_fixo(fatos, alimentos, restricoes, base.params)
     wm.declarar("pl.status", pl["status"], origem="sistema")
     wm.declarar("pl.restricoes_violadas", pl["restricoes_violadas"], origem="sistema")
-    if pl["status"] == "otimo":
+    if pl["status"] in ("otimo", "parcial"):
         wm.declarar("pl.custo", pl["custo"], origem="sistema")
     motor.executar(wm, resultado)   # segunda fase: regras de diagnóstico do resultado do PL
     out = _pacote(resultado, ["exig.cms", "exig.ell_total", "exig.pb_pct_alvo", "pl.ell_min"])
-    out["pl"] = {"status": pl["status"], "restricoes": restricoes, "restricoes_violadas": pl["restricoes_violadas"]}
-    if pl["status"] == "otimo":
-        itens = [{"alimento": i["alimento"]["id"], "kg_mn": _arredondar(i)} for i in pl["itens"]]
-        out["pl"].update({"custo": pl["custo"], "itens": itens, "composicao": pl["composicao"]})
-        out["verificacao"] = avaliar(fatos, itens)   # a dieta do PL passa pela verificação das regras
+    out["pl"] = {"status": pl["status"], "restricoes": restricoes, "restricoes_violadas": pl["restricoes_violadas"],
+                 "iteracoes": iteracoes}
+    if pl["status"] in ("otimo", "parcial"):
+        out["pl"].update({"custo": pl["custo"], "itens": pl["itens_arredondados"], "composicao": pl["composicao"],
+                          "deficit": pl.get("deficit")})
+        out["verificacao"] = verificacao
     return out
 
 
-def _arredondar(item: dict) -> float:
-    """kg MN com 2 casas; ureia arredonda para baixo para não passar do limite (o PL a deixa exatamente nele)."""
-    if item["alimento"]["tipo"] == "ureia":
-        return math.floor(item["kg_mn"] * 100) / 100
-    return round(item["kg_mn"], 2)
+def _formular_ate_ponto_fixo(fatos: dict, alimentos: list[dict], restricoes: dict, params: dict, max_iter: int = 4):
+    """Resolve o PL e verifica a dieta com as regras. Exigências que dependem da própria dieta (teto de consumo
+    pela fibra, equação de CMS com cana…) só são conhecidas depois: se a verificação recalcular o CMS da dieta
+    proposta, o PL é refeito com o menor CMS visto (monótono, então converge). Retorna (pl, verificação, iterações)."""
+    iteracoes = []
+    for _ in range(max_iter):
+        pl = lp.formular(alimentos, restricoes)
+        if pl["status"] not in ("otimo", "parcial"):
+            return pl, None, iteracoes
+        pl["itens_arredondados"] = [{"alimento": i["alimento"]["id"], "kg_mn": arredondar_kg(i["kg_mn"])} for i in pl["itens"]]
+        verificacao = avaliar(fatos, pl["itens_arredondados"])   # a dieta do PL passa pela verificação das regras
+        cms_verif = verificacao["fatos"].get("exig.cms", {}).get("valor")
+        iteracoes.append({"cms_usado": restricoes["cms"], "cms_da_dieta": cms_verif,
+                          "parecer": verificacao["fatos"].get("parecer.dieta", {}).get("valor")})
+        if cms_verif is None or cms_verif >= restricoes["cms"] * 0.999:
+            return pl, verificacao, iteracoes
+        cms = cms_verif
+        restricoes.update({"cms": cms, "ms_min": cms * params["pl_fator_ms_min"]["valor"],
+                           "ms_max": cms * params["fator_oferta_max"]["valor"]})
+    return pl, verificacao, iteracoes
+
+
+def arredondar_kg(kg: float) -> float:
+    """Arredonda para pesar na fazenda com erro relativo ≤ 0,5% (abaixo da margem do PL): 2 casas a partir de
+    1 kg, gramas abaixo disso (ureia e mineral são pesados em gramas)."""
+    return round(kg, 2) if kg >= 1 else round(kg, 3)
 
 
 def formular_lote(s: Session, lote: Lote, alimentos_ids: list[str], precos: dict | None = None) -> dict:
@@ -214,14 +263,21 @@ def monitorar(s: Session, lote: Lote, d: date, h: HistoricoLote | None = None, p
 
 
 def _persistir_alertas(s: Session, lote_id: int, d: date, resultado: Resultado, sessao_id: int):
+    """Grava os alertas do dia d. Reanalisar um dia SUBSTITUI os alertas dele (dado corrigido → alerta revisto).
+    Repetições da mesma regra dentro da janela do módulo são agrupadas, exceto quando o alerta se agrava
+    (nível maior ou CF bem maior) ou muda de status."""
+    for antigo in s.exec(select(AlertaDB).where(AlertaDB.lote_id == lote_id, AlertaDB.data == d)).all():
+        s.delete(antigo)
+    s.flush()
     modulo_de = {r["id"]: r["modulo"] for r in kb().regras}
+    ordem = {"informativo": 0, "atencao": 1, "critico": 2}
     for a in resultado.alertas:
         modulo = modulo_de.get(a.regra, "")
         janela = JANELA_DEDUP.get(modulo, 3)
-        recente = s.exec(select(AlertaDB).where(AlertaDB.lote_id == lote_id, AlertaDB.regra == a.regra,
-                                                AlertaDB.status == a.status,
-                                                AlertaDB.data > d - timedelta(days=janela), AlertaDB.data <= d)).first()
-        if recente:
+        recentes = s.exec(select(AlertaDB).where(AlertaDB.lote_id == lote_id, AlertaDB.regra == a.regra,
+                                                 AlertaDB.status == a.status, AlertaDB.data < d,
+                                                 AlertaDB.data > d - timedelta(days=janela))).all()
+        if any(ordem[r.nivel] >= ordem[a.nivel] and a.cf <= r.cf + 0.1 for r in recentes):
             continue
         s.add(AlertaDB(lote_id=lote_id, data=d, regra=a.regra, modulo=modulo, nivel=a.nivel, titulo=a.titulo,
                        causa=a.causa, acao=a.acao, categoria=a.categoria, cf=a.cf, fonte=a.fonte, forca=a.forca,

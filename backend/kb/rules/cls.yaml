@@ -79,13 +79,39 @@
   fonte: "Dossiê CLS-05"
   forca: C
 
-- id: CLS-06
+- id: CLS-00A
   versao: 1
+  modulo: classificacao
+  descricao: Em lactação, os dias de gestação são os informados
+  prioridade: 95
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: lote.dias_gestacao, op: existe}
+  entao:
+    - concluir: {fato: perfil.dias_gestacao, valor: $lote.dias_gestacao}
+  fonte: "Registro do lote"
+  forca: A
+
+- id: CLS-00B
+  versao: 1
+  modulo: classificacao
+  descricao: Vaca seca está prenhe — dias de gestação = duração da gestação − dias para o parto
+  prioridade: 95
+  se:
+    - {fato: lote.estado, op: "=", valor: seca}
+    - {fato: lote.dias_para_parto, op: existe}
+  entao:
+    - calcular: {fato: perfil.dias_gestacao, funcao: diferenca, args: {a: "@params.gestacao_duracao", b: $lote.dias_para_parto}}
+  fonte: "Inferências (parto previsto = IA fecundante + 280 d)"
+  forca: C
+
+- id: CLS-06
+  versao: 2
   modulo: classificacao
   descricao: Gestação com 190 dias ou mais soma exigência de gestação
   prioridade: 80
   se:
-    - {fato: lote.dias_gestacao, op: ">=", valor: "@params.gestacao_dias_exigencia"}
+    - {fato: perfil.dias_gestacao, op: ">=", valor: "@params.gestacao_dias_exigencia"}
   entao:
     - concluir: {fato: perfil.gestacao_avancada, valor: true}
   fonte: "NRC 2001 via AgModel"
@@ -106,18 +132,32 @@
   forca: B
 
 - id: CLS-08
-  versao: 1
+  versao: 2
   modulo: classificacao
-  descricao: Zebuínos e cruzados em lactação usam a equação de consumo BR-Leite
+  descricao: Girolando em lactação usa a equação de consumo BR-Leite (população da equação)
   prioridade: 80
-  cf: 0.8
+  cf: 0.9
   se:
     - {fato: lote.estado, op: "=", valor: lactacao}
-    - {fato: lote.grupo_genetico, op: in, valor: "@params.grupos_zebuinos"}
+    - {fato: lote.grupo_genetico, op: "=", valor: girolando}
   entao:
     - concluir: {fato: perfil.equacao_cms, valor: brleite}
-  fonte: "BR-Leite 2024 (Embrapa)"
+  fonte: "BR-Leite 2024 (Embrapa), Eq. 1.1: Holandês e Girolando"
   forca: B
+
+- id: CLS-08C
+  versao: 1
+  modulo: classificacao
+  descricao: Gir e mestiças usam BR-Leite por extrapolação (fora da população da equação) — confiança menor
+  prioridade: 80
+  cf: 0.7
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: lote.grupo_genetico, op: in, valor: [gir, mestica]}
+  entao:
+    - concluir: {fato: perfil.equacao_cms, valor: brleite}
+  fonte: "BR-Leite 2024 (superestima CMS abaixo de 20 kg/d — Inferências)"
+  forca: C
 
 - id: CLS-08B
   versao: 1
@@ -133,13 +173,13 @@
   forca: B
 
 - id: CLS-09
-  versao: 1
+  versao: 2
   modulo: classificacao
-  descricao: Lote em pasto tem gasto de energia com atividade de pastejo
+  descricao: Lote em pasto ou semiconfinado tem gasto de energia com caminhada/pastejo
   prioridade: 80
   cf: 0.8
   se:
-    - {fato: lote.sistema, op: "=", valor: pasto}
+    - {fato: lote.sistema, op: in, valor: [pasto, semiconfinado]}
   entao:
     - concluir: {fato: perfil.atividade_pastejo, valor: true}
   fonte: "NRC 2001 via eOrganic"
@@ -158,14 +198,26 @@
   fonte: "IFSULDEMINAS"
   forca: B
 
-- id: CLS-10
+- id: CLS-ITUL
   versao: 1
   modulo: classificacao
-  descricao: ITU entre 72 e 78 indica estresse térmico brando (consumo esperado menor)
+  descricao: Limiar de estresse térmico do grupo genético (Girolando/zebuínos toleram mais calor)
+  prioridade: 90
+  se:
+    - {fato: lote.grupo_genetico, op: in, valor: "@params.grupos_zebuinos"}
+  entao:
+    - concluir: {fato: perfil.itu_limiar, valor: "@params.itu_limiar_zebuino"}
+  fonte: "LUME UFRGS; Embrapa (ITU crítico de mestiços)"
+  forca: B
+
+- id: CLS-10
+  versao: 2
+  modulo: classificacao
+  descricao: ITU acima do limiar do grupo (72 Holandês; 76 zebuínos) e até 78 — estresse térmico brando
   prioridade: 70
   cf: 0.7
   se:
-    - {fato: clima.itu, op: ">", valor: "@params.itu_alerta"}
+    - {fato: clima.itu, op: ">", valor: "$perfil.itu_limiar|@params.itu_alerta"}
     - {fato: clima.itu, op: "<=", valor: "@params.itu_forte"}
   entao:
     - concluir: {fato: perfil.estresse_termico, valor: brando}
@@ -173,9 +225,9 @@
         nivel: atencao
         categoria: calor
         titulo: "Risco de estresse térmico (ITU {clima.itu:.1f})"
-        causa: "ITU acima de {@params.itu_alerta}: consumo e produção tendem a cair."
-        acao: "Garantir sombra, água à vontade e tratos nas horas mais frescas."
-  fonte: "Embrapa COT42"
+        causa: "ITU acima do limiar do grupo genético: consumo e produção tendem a cair."
+        acao: "Garantir sombra, água à vontade e tratos nas horas mais frescas; acompanhar as sobras (consumo pode ficar abaixo do previsto)."
+  fonte: "Embrapa COT42; Negri 2021; LUME UFRGS"
   forca: B
 
 - id: CLS-11

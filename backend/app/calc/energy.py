@@ -13,9 +13,9 @@ def ell_leite_por_kg(gordura_pct: float, proteina_pct: float, lactose_pct: float
     return 0.0929 * gordura_pct + 0.0547 * proteina_pct + 0.0395 * lactose_pct
 
 
-def gestacao(dias_gestacao: float, peso_bezerro: float) -> float:
-    """NRC 2001 (Bell & Ehrhardt): zero antes de 190 dias."""
-    if dias_gestacao < 190:
+def gestacao(dias_gestacao: float, peso_bezerro: float, inicio: float = 190) -> float:
+    """NRC 2001 (Bell & Ehrhardt): zero antes do início da exigência (190 dias)."""
+    if dias_gestacao < inicio:
         return 0.0
     return (0.00318 * dias_gestacao - 0.0352) * (peso_bezerro / 45) / 0.218
 
@@ -36,11 +36,21 @@ def atividade_pastejo(pv: float, distancia_km: float, relevo: str) -> float:
     return base + extra * pv
 
 
-def ajuste_ecc(ecc_atual: float, ecc_meta: float, dias: float, mcal_por_ponto: float) -> float:
-    """Energia/dia para levar o ECC à meta (Penn State: ~417 Mcal por ponto). Negativo = mobilização."""
+def ajuste_ecc(ecc_atual: float, ecc_meta: float, dias: float, mcal_por_ponto: float,
+               pv: float | None = None, pv_ref: float | None = None) -> float:
+    """Energia/dia para levar o ECC à meta (Penn State: ~417 Mcal por ponto numa vaca de ~650 kg, escalado pelo PV)."""
     if dias <= 0:
         return 0.0
-    return mcal_por_ponto * (ecc_meta - ecc_atual) / dias
+    escala = pv / pv_ref if pv and pv_ref else 1.0
+    return mcal_por_ponto * escala * (ecc_meta - ecc_atual) / dias
+
+
+def fator_mobilizacao(ell_total: float, mcal_por_ponto: float, pv: float, pv_ref: float,
+                      perda_aceitavel: float, dias: float) -> float:
+    """Fração da exigência que a dieta precisa cobrir quando o lote pode mobilizar `perda_aceitavel` pontos de ECC
+    em `dias`: 1 − (energia da reserva por dia ÷ exigência)."""
+    reserva_dia = mcal_por_ponto * pv / pv_ref * perda_aceitavel / dias
+    return max(0.0, 1 - reserva_dia / ell_total)
 
 
 def soma(*partes: float | None) -> float:

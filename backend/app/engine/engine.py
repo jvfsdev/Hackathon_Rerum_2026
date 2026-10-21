@@ -39,11 +39,21 @@ class Motor:
 
     # ------------------------------------------------------------------ forward
     def executar(self, wm: MemoriaTrabalho, resultado: Resultado | None = None, max_ciclos: int = 1000) -> Resultado:
-        """Roda até não haver regra aplicável. Passe `resultado` para continuar uma sessão (o traço é acumulado)."""
+        """Roda até não haver regra aplicável (refração: cada regra dispara uma vez por execução).
+
+        Passe `resultado` para continuar uma sessão depois de declarar fatos novos: as conclusões anteriores são
+        descartadas e recalculadas a partir das entradas (manutenção de verdade por recomputação), e o traço e os
+        alertas passam a refletir só o estado atual."""
         res = Resolvedor(wm, self.kb.params)
         self._wm_atual = wm
-        resultado = resultado or Resultado(wm, kb_version=self.kb.versao)
-        disparadas = wm.disparadas   # refração: cada regra dispara uma vez por sessão
+        if resultado is None:
+            resultado = Resultado(wm, kb_version=self.kb.versao)
+        else:
+            wm.reiniciar_derivados()
+            resultado.traco.clear()
+            resultado.alertas.clear()
+            resultado.supressoes.clear()
+        disparadas = wm.disparadas
         for _ in range(max_ciclos):
             conjunto = []
             for regra in self.regras:
@@ -66,10 +76,12 @@ class Motor:
 
 
     def _casar(self, regra: dict, res: Resolvedor) -> tuple[bool, list[dict]]:
+        """Casa as condições. Premissa com CF abaixo do limiar (@params.cf_limiar) não sustenta conclusão."""
         premissas = []
+        limiar = self.kb.params["cf_limiar"]["valor"]
         for cond in regra["se"]:
             ok, usadas, _ = avaliar(cond, res)
-            if not ok:
+            if not ok or any(p["op"] != "ausente" and p["cf"] < limiar for p in usadas):
                 return False, []
             premissas += usadas
         return True, premissas
@@ -106,7 +118,7 @@ class Motor:
                 for cat in spec["categorias"]:
                     if resultado.supressoes.get(cat, {}).get("tipo") == "suprimir":
                         continue  # suprimir prevalece sobre rebaixar
-                    resultado.supressoes[cat] = {"tipo": tipo, "regra": regra["id"],
+                    resultado.supressoes[cat] = {"tipo": tipo, "regra": regra["id"], "para": spec.get("para", "informativo"),
                                                  "motivo": formatar(spec["motivo"], res)}
                 acoes.append({"tipo": tipo, "categorias": spec["categorias"]})
         return {"ciclo": res.wm.ciclo, "regra": regra["id"], "descricao": regra.get("descricao", ""),
@@ -121,15 +133,20 @@ class Motor:
             if v is FALTA or (isinstance(v, list) and FALTA in v):
                 return {"tipo": "calcular", "fato": spec["fato"], "efeito": "ignorado", "motivo": f"falta {nome}"}
             args[nome] = v
-        saida = FUNCOES[spec["funcao"]](**args)
+        try:
+            saida = FUNCOES[spec["funcao"]](**args)
+        except (TypeError, ValueError, ZeroDivisionError) as e:   # dado de tipo/valor inválido não derruba a sessão
+            return {"tipo": "calcular", "fato": spec["fato"], "efeito": "ignorado", "motivo": f"erro no cálculo: {e}"}
         cf_calc = propagar(regra["cf"], cfs + [u.cf for u in usados])
+        efeitos = {}
         if isinstance(saida, dict):
             for k, v in saida.items():
-                res.wm.concluir(f"{spec['fato']}.{k}", v, cf_calc, regra["id"])
+                efeitos[f"{spec['fato']}.{k}"] = res.wm.concluir(f"{spec['fato']}.{k}", v, cf_calc, regra["id"])
         elif saida is not None:
-            res.wm.concluir(spec["fato"], saida, cf_calc, regra["id"])
+            efeitos[spec["fato"]] = res.wm.concluir(spec["fato"], saida, cf_calc, regra["id"])
         return {"tipo": "calcular", "fato": spec["fato"], "funcao": spec["funcao"],
-                "args": {k: _resumo(v) for k, v in args.items()}, "valor": _resumo(saida), "cf": round(cf_calc, 3)}
+                "args": {k: _resumo(v) for k, v in args.items()}, "valor": _resumo(saida), "cf": round(cf_calc, 3),
+                "usados": sorted({u.nome for u in usados}), "efeito": efeitos}
 
     def _alerta(self, spec: dict, regra: dict, cf: float, res: Resolvedor) -> Alerta:
         if "cf_de" in spec:  # alerta que reporta o CF combinado de uma hipótese
@@ -147,8 +164,10 @@ class Motor:
                 continue
             if sup["tipo"] == "suprimir":
                 alerta.status = "suprimido"
+            elif NIVEIS.index(sup["para"]) < NIVEIS.index(alerta.nivel):
+                alerta.nivel = sup["para"]
             else:
-                alerta.nivel = "informativo"
+                continue
             alerta.nota = f"{sup['regra']}: {sup['motivo']}"
 
     # ----------------------------------------------------------------- backward
@@ -217,6 +236,8 @@ def formatar(texto: str, res: Resolvedor) -> str:
         v = res.valor(nome if nome.startswith("@") else "$" + nome)
         if v is FALTA:
             return "?"
+        if isinstance(v, (list, tuple)):
+            return ", ".join(str(x) for x in v) or "—"
         try:
             return format(v, spec) if spec else (f"{v:.2f}".rstrip("0").rstrip(".") if isinstance(v, float) else str(v))
         except (ValueError, TypeError):

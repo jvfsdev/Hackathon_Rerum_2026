@@ -142,12 +142,15 @@ def gerar():
                     reg(lote, i, "escore_fezes", 3.0)
             # laudos mensais (controle leiteiro por lote)
         laudos = {
-            1: [(20, dict(gordura=3.7, proteina=3.2, lactose=4.6, nul=14.5, ccs=240, cbt=60)),
+            1: [(2, dict(gordura=3.75, proteina=3.2, lactose=4.6, nul=14.0, ccs=230, cbt=65)),
+                (20, dict(gordura=3.7, proteina=3.2, lactose=4.6, nul=14.5, ccs=240, cbt=60)),
                 (50, dict(gordura=3.3, proteina=3.22, lactose=4.55, nul=21.0, ccs=260, cbt=55))],
-            2: [(20, dict(gordura=3.9, proteina=3.3, lactose=4.6, nul=12.0, ccs=300, cbt=70)),
+            2: [(2, dict(gordura=3.9, proteina=3.3, lactose=4.6, nul=12.2, ccs=290, cbt=75)),
+                (20, dict(gordura=3.9, proteina=3.3, lactose=4.6, nul=12.0, ccs=300, cbt=70)),
                 (50, dict(gordura=3.85, proteina=3.3, lactose=4.6, nul=12.5, ccs=310, cbt=65))],
             3: [(50, dict(gordura=4.6, proteina=3.0, lactose=4.7, nul=13.0, ccs=180, cbt=50))],
-            4: [(20, dict(gordura=4.0, proteina=3.4, lactose=4.4, nul=15.0, ccs=380, cbt=90)),
+            4: [(2, dict(gordura=4.0, proteina=3.4, lactose=4.45, nul=14.8, ccs=330, cbt=85)),
+                (20, dict(gordura=4.0, proteina=3.4, lactose=4.4, nul=15.0, ccs=380, cbt=90)),
                 (50, dict(gordura=4.1, proteina=3.35, lactose=4.1, nul=17.5, ccs=520, cbt=95))],
         }
         for n, lista in laudos.items():

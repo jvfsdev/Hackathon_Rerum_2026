@@ -37,10 +37,24 @@ Tudo roda em localhost. O motor de inferência é o único componente que decide
    - "calor explica" rebaixa os alertas de dieta motivados pela queda;
    - movimentação de vacas ou correção da MS suprime os alertas de queda por 48 h.
 
+## Garantias verificadas por teste
+
+- **Formulação × verificação:** cada restrição do PL tem a mesma definição numérica da regra de verificação
+  correspondente. Por exemplo, a energia consumida = min(MS, CMS) × densidade é linearizada em duas restrições.
+  O teste de consistência roda 300 perfis × conjuntos de alimentos e exige que toda dieta "ótima" seja aprovada
+  pelas regras. Numa medição com 1.500 cenários: 0 reprovadas.
+- **Ponto fixo:** se a dieta escolhida muda o próprio CMS (teto de fibra, equação com cana), o PL é refeito com o
+  novo CMS até ficar estável.
+- **Melhor dieta possível:** se só energia e/ou proteína são inatingíveis, o PL entra em modo de metas com folgas
+  penalizadas e entrega a dieta que mais se aproxima, com o déficit explícito.
+- **Manutenção de verdade:** continuar uma sessão recalcula todas as conclusões a partir das entradas.
+- **Validação estática da base:** o carregamento falha com operador, função, argumento, ação, nível ou fato
+  desconhecido, inclusive dentro dos textos de alerta.
+
 ## Motor de inferência (`backend/app/engine/`)
 
 - **Fatos** (`facts.py`): valor, CF, origem (usuário, medido, tabela, padrão, regra) e ciclo (recência).
-- **Ciclo** (`engine.py`): monta o conjunto de conflito, ordena por **módulo → prioridade → especificidade → recência** e dispara uma regra por ciclo. A **refração** vale na sessão: cada regra dispara uma vez. Cada entrada do traço registra as regras concorrentes.
+- **Ciclo** (`engine.py`): monta o conjunto de conflito, ordena por **módulo → prioridade → especificidade → recência** e dispara uma regra por ciclo. A **refração** faz cada regra disparar uma vez por execução. Cada entrada do traço registra as regras concorrentes. Uma premissa com CF abaixo do limiar (0,2) não sustenta conclusão.
 - **Incerteza** (`cf.py`): CF da conclusão = CF da regra × menor CF das premissas. A mesma conclusão vinda de regras diferentes combina como CF1 + CF2·(1−CF1). Exemplo: G:P baixa (0,7) + fezes fluidas (0,6) → acidose com CF 0,88.
 - **Encadeamento regressivo** (`faltantes`): parte do objetivo, percorre as regras que o concluem, poda as que têm condição já falsa ou inalcançável e pergunta só os fatos perguntáveis que faltam. A cadeia de regras percorrida é o "por quê".
 - **Explicação** (`explain.py`): "como?" é a árvore de derivação a partir do traço (regra, fonte, força, premissas, cálculo); "por quê?" é a cadeia do dado até o objetivo. As sessões ficam salvas, então qualquer alerta antigo pode ser explicado.

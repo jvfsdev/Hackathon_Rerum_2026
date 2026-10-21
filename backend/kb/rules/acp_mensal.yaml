@@ -71,7 +71,7 @@
     - {fato: laudo.nul, op: "<", valor: "@params.nul_min"}
     - qualquer:
         - {fato: hipotese.queda_sustentada, op: "=", valor: true}
-        - {fato: mon.residuo, op: "<", valor: -0.05}
+        - {fato: mon.residuo, op: "<", valor: "@params.residuo_baixo"}
   entao:
     - alerta:
         nivel: atencao
@@ -135,7 +135,7 @@
   cf: 0.7
   se:
     - {fato: perfil.fase, op: in, valor: [recem_parida, inicio]}
-    - {fato: lote.del, op: "<=", valor: 40}
+    - {fato: lote.del, op: "<=", valor: "@params.gp_ben_del_max"}
     - {fato: laudo.gp, op: ">", valor: "@params.gp_ben_min"}
   entao:
     - alerta:
@@ -257,7 +257,7 @@
   entao:
     - alerta:
         nivel: atencao
-        categoria: qualidade
+        categoria: producao
         titulo: "Causa provável da queda: mastite"
         causa: "Queda de produção junto com lactose baixa e CCS em alta."
         acao: "Priorizar o controle de mastite; a dieta não é a causa provável."

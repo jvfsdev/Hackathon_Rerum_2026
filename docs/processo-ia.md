@@ -25,6 +25,17 @@ Agente usado: **Claude Code** (Anthropic), no VS Code. A IA ajudou a pesquisar, 
    - "calor explica" rebaixando alertas do laudo sem relação com a queda;
    - queda atribuída ao calor quando havia mastite.
 
+7. **Auditoria com subagentes (21/10).** Um teste manual mostrou o lote 3 recebendo uma dieta "ótima" que a própria
+   verificação reprovava. Em vez de corrigir o caso:
+   - medimos em massa: 34% das dietas ótimas eram reprovadas;
+   - unificamos as definições do PL e da verificação;
+   - três subagentes auditaram em paralelo, só lendo o código e entregando um relatório com reprodutores executados:
+     o motor de inferência, a base de regras contra os documentos de referência, e o acompanhamento diário.
+   - Os cerca de 35 achados viraram correções agrupadas por causa e testes de regressão (`tests/test_auditoria.py`).
+   - Exemplos: um único dia digitado errado virava "queda sustentada" crítica; vaca seca sem os dias de gestação
+     ficava com 26% menos energia; continuar uma sessão deixava conclusões obsoletas; o validador aceitava regra com
+     operador inexistente.
+
 ## O que os testes pegaram
 
 - Casos que o agente escreveu com expectativa errada: perda por CCS interpolada linearmente em vez de em escala logarítmica, e soma da MS da dieta. Foi corrigida a expectativa, não o código, e o motivo ficou registrado.

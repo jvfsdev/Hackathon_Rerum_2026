@@ -3,6 +3,10 @@
 As metas e restrições vêm das conclusões do motor (fatos pl.*, meta.*, exig.*): o PL é uma ferramenta
 chamada pelo sistema especialista, não o sistema especialista. Se for inviável, identifica qual grupo de
 restrições impede a solução relaxando um grupo por vez.
+
+Contrato com a verificação (VER): cada restrição aqui é a mesma definição numérica que a regra de verificação
+correspondente usa, apertada por `margem` para a dieta continuar aprovada depois de arredondada. O teste
+tests/test_consistencia.py garante que nenhuma dieta ótima seja reprovada pelas regras.
 """
 from itertools import combinations
 
@@ -10,31 +14,63 @@ import pulp
 
 from ..calc.diet import cnf_alimento, composicao, ell_alimento
 
-GRUPOS = ["consumo", "energia", "proteina", "fibra", "enchimento", "cnf", "gordura", "ureia", "cana"]
+GRUPOS = ["consumo", "energia", "excesso_energia", "proteina", "fibra", "enchimento", "cnf", "gordura", "ureia", "cana"]
 
 
-def _modelo(alimentos: list[dict], r: dict, ignorar: tuple[str, ...] = ()):
+# Penalidade das metas flexíveis (melhor dieta possível): muito acima de qualquer custo de alimento,
+# então o solver só aceita déficit quando não há outro jeito.
+PENALIDADE_MCAL = 100.0       # R$ por Mcal de ELl faltante
+PENALIDADE_PB = 10.0          # R$ por (p.p. de PB × kg MS) faltante
+
+
+def _modelo(alimentos: list[dict], r: dict, ignorar: tuple[str, ...] = (), metas_flexiveis: bool = False):
     prob = pulp.LpProblem("dieta_custo_minimo", pulp.LpMinimize)
     x = {a["id"]: prob.add_variable(f"x_{a['id']}", lowBound=0) for a in alimentos}
     total = pulp.lpSum(x.values())
-    prob += pulp.lpSum(a["preco_kg_mn"] / (a["ms"] / 100) * x[a["id"]] for a in alimentos)
+    custo = pulp.lpSum(a["preco_kg_mn"] / (a["ms"] / 100) * x[a["id"]] for a in alimentos)
+    folga_e = prob.add_variable("deficit_energia", lowBound=0) if metas_flexiveis else 0
+    folga_p = prob.add_variable("deficit_proteina", lowBound=0) if metas_flexiveis else 0
+    prob += custo + (PENALIDADE_MCAL * folga_e + PENALIDADE_PB * folga_p if metas_flexiveis else 0)
 
     def grupo(nome, restricoes):
         if nome not in ignorar:
             for i, c in enumerate(restricoes):
                 prob.addConstraint(c, f"{nome}_{i}")
 
-    grupo("consumo", [total >= r["cms"] - r["folga_ms"], total <= r["cms"] + r["folga_ms"]])
-    grupo("energia", [pulp.lpSum(ell_alimento(a) * x[a["id"]] for a in alimentos) >= r["ell_min"]])
-    grupo("proteina", [pulp.lpSum((a.get("pb", 0) - r["pb_min"]) * x[a["id"]] for a in alimentos) >= 0,
-                       pulp.lpSum((a.get("pb", 0) - r["pb_max"]) * x[a["id"]] for a in alimentos) <= 0])
-    grupo("fibra", [pulp.lpSum((a.get("fdn", 0) - r["fdn_min"]) * x[a["id"]] for a in alimentos) >= 0,
+    m = r.get("margem", 0.0)
+    mais, menos = 1 + m, 1 - m                       # aperta mínimos para cima e máximos para baixo
+    energia = pulp.lpSum(ell_alimento(a) * x[a["id"]] for a in alimentos)
+    fdn_kg = pulp.lpSum(a.get("fdn", 0) / 100 * x[a["id"]] for a in alimentos)
+    # VER-06/06B: oferta entre os fatores do CMS. Em lactação a verificação usa CMS = min(equação, teto de fibra),
+    # então o mínimo é uma disjunção: come ≥ 95% do CMS da equação OU enche o rúmen (FDN ≥ 95% do teto).
+    if r.get("teto_fibra_aplica"):
+        enche = prob.add_variable("limitado_pelo_rumen", cat="Binary")
+        grupo("consumo", [total >= r["ms_min"] * mais - r["ms_min"] * mais * enche,
+                          fdn_kg >= r["fdn_max_kg"] * r["fator_ms_min"] * mais - r["fdn_max_kg"] * (1 - enche),
+                          total <= r["ms_max"] * menos])
+    else:
+        grupo("consumo", [total >= r["ms_min"] * mais, total <= r["ms_max"] * menos])
+    # VER-01: energia consumida = min(MS, CMS) × densidade ≥ mínimo. Equivale, de forma linear, a
+    #   Σ ELl·x ≥ E   (quando MS ≤ CMS)   e   CMS·Σ ELl·x ≥ E·Σx   (quando MS > CMS)
+    grupo("energia", [energia + folga_e >= r["ell_min"] * mais,
+                      r["cms"] * (energia + folga_e) - r["ell_min"] * mais * total >= 0])
+    # VER-10: energia consumida ≤ teto (Σ ELl·x ≥ consumida, então limitar Σ ELl·x é suficiente)
+    if r.get("ell_max") is not None:
+        grupo("excesso_energia", [energia <= r["ell_max"] * menos])
+    # VER-02/02B: PB entre o alvo e o máximo sem desperdício
+    grupo("proteina", [pulp.lpSum((a.get("pb", 0) - r["pb_min"] * mais) * x[a["id"]] for a in alimentos) + folga_p >= 0,
+                       pulp.lpSum((a.get("pb", 0) - r["pb_max"] * menos) * x[a["id"]] for a in alimentos) <= 0])
+    # VER-03/03C: FDN e FDN de forragem mínimos (com FDNf ≥ mínimo, a meta de FDN não sobe pela EXG-05)
+    grupo("fibra", [pulp.lpSum((a.get("fdn", 0) - r["fdn_min"] * mais) * x[a["id"]] for a in alimentos) >= 0,
                     pulp.lpSum(a.get("fdn", 0) * x[a["id"]] for a in alimentos if a["tipo"] == "volumoso")
-                    - r["fdnf_min"] * total >= 0])
-    grupo("enchimento", [pulp.lpSum(a.get("fdn", 0) / 100 * x[a["id"]] for a in alimentos) <= r["fdn_max_kg"]])
-    grupo("cnf", [pulp.lpSum((cnf_alimento(a) - r["cnf_max"]) * x[a["id"]] for a in alimentos) <= 0])
-    grupo("gordura", [pulp.lpSum((a.get("ee", 0) - r["ee_max"]) * x[a["id"]] for a in alimentos) <= 0])
-    grupo("ureia", [pulp.lpSum(100 * x[a["id"]] for a in alimentos if a["tipo"] == "ureia") - r["ureia_max"] * total <= 0])
+                    - r["fdnf_min"] * mais * total >= 0])
+    # EXG-01D: consumo de FDN ≤ 1,25% do PV (garante MS ≤ teto de fibra, o CMS que a verificação usa)
+    grupo("enchimento", [fdn_kg <= r["fdn_max_kg"] * menos])
+    # VER-03B, VER-05, VER-04
+    grupo("cnf", [pulp.lpSum((cnf_alimento(a) - r["cnf_max"] * menos) * x[a["id"]] for a in alimentos) <= 0])
+    grupo("gordura", [pulp.lpSum((a.get("ee", 0) - r["ee_max"] * menos) * x[a["id"]] for a in alimentos) <= 0])
+    grupo("ureia", [pulp.lpSum(100 * x[a["id"]] for a in alimentos if a["tipo"] == "ureia")
+                    - r["ureia_max"] * menos * total <= 0])
     if r.get("cana_max_pct_volumoso") is not None:   # FOR-05: cana não pode ser o único volumoso
         volumoso = pulp.lpSum(x[a["id"]] for a in alimentos if a["tipo"] == "volumoso")
         grupo("cana", [pulp.lpSum(x[a["id"]] for a in alimentos if a["id"] == "cana")
@@ -49,7 +85,7 @@ def _modelo(alimentos: list[dict], r: dict, ignorar: tuple[str, ...] = ()):
             prob += x[a["id"]] >= a["min_kg_ms"], f"inclusao_min_{a['id']}"
         if a.get("max_kg_ms") is not None:
             prob += x[a["id"]] <= a["max_kg_ms"], f"inclusao_maxkg_{a['id']}"
-    return prob, x
+    return prob, x, (folga_e, folga_p)
 
 
 def _resolver(prob) -> str:
@@ -62,7 +98,7 @@ def diagnosticar(alimentos: list[dict], restricoes: dict) -> list[str]:
     for tamanho in (1, 2, 3):
         violadas = set()
         for grupos in combinations(GRUPOS, tamanho):
-            p, _ = _modelo(alimentos, restricoes, ignorar=grupos)
+            p, _, _ = _modelo(alimentos, restricoes, ignorar=grupos)
             if _resolver(p) == "Optimal":
                 violadas.update(grupos)
         if violadas:
@@ -70,12 +106,31 @@ def diagnosticar(alimentos: list[dict], restricoes: dict) -> list[str]:
     return ["combinacao"]
 
 
+METAS_NUTRICIONAIS = {"energia", "proteina"}
+
+
 def formular(alimentos: list[dict], restricoes: dict) -> dict:
-    """alimentos: dicionários de foods.yaml (com preço); restricoes: cms, folga_ms, ell_min, pb_min, pb_max,
-    fdn_min, fdnf_min, cnf_max, ee_max, ureia_max, fdn_max_kg e, opcionais, cana_max_pct_volumoso e excluir_pastejo."""
-    prob, x = _modelo(alimentos, restricoes)
-    if _resolver(prob) != "Optimal":
-        return {"status": "inviavel", "restricoes_violadas": diagnosticar(alimentos, restricoes), "restricoes": restricoes}
+    """alimentos: dicionários de foods.yaml (com preço); restricoes: cms, ms_min, ms_max, fator_ms_min, ell_min,
+    pb_min, pb_max, fdn_min, fdnf_min, cnf_max, ee_max, ureia_max, fdn_max_kg, margem, teto_fibra_aplica e, opcionais,
+    cana_max_pct_volumoso e excluir_pastejo.
+
+    status: "otimo" (atende tudo), "parcial" (só energia e/ou proteína são inatingíveis com estes alimentos:
+    devolve a melhor dieta possível, com o déficit) ou "inviavel" (nenhuma dieta respeita as demais restrições)."""
+    prob, x, _ = _modelo(alimentos, restricoes)
+    if _resolver(prob) == "Optimal":
+        return _saida("otimo", prob, x, alimentos, restricoes, [])
+    violadas = diagnosticar(alimentos, restricoes)
+    if set(violadas) <= METAS_NUTRICIONAIS:
+        prob, x, (folga_e, folga_p) = _modelo(alimentos, restricoes, metas_flexiveis=True)
+        if _resolver(prob) == "Optimal":
+            out = _saida("parcial", prob, x, alimentos, restricoes, violadas)
+            out["deficit"] = {"energia_mcal": folga_e.value() or 0.0,
+                              "proteina_pp": (folga_p.value() or 0.0) / max(out["composicao"]["ms_kg"], 1e-9)}
+            return out
+    return {"status": "inviavel", "restricoes_violadas": violadas, "restricoes": restricoes}
+
+
+def _saida(status, prob, x, alimentos, restricoes, violadas) -> dict:
     porid = {a["id"]: a for a in alimentos}
     itens = []
     for aid, var in x.items():
@@ -83,6 +138,6 @@ def formular(alimentos: list[dict], restricoes: dict) -> dict:
         if kg_ms > 1e-4:
             a = porid[aid]
             itens.append({"alimento": a, "kg_ms": kg_ms, "kg_mn": kg_ms / (a["ms"] / 100)})
-    return {"status": "otimo", "custo": pulp.value(prob.objective), "itens": itens,
-            "composicao": composicao([{"alimento": i["alimento"], "kg_mn": i["kg_mn"]} for i in itens]),
-            "restricoes_violadas": [], "restricoes": restricoes}
+    comp = composicao([{"alimento": i["alimento"], "kg_mn": i["kg_mn"]} for i in itens])
+    return {"status": status, "custo": comp["custo_vaca_dia"], "itens": itens, "composicao": comp,
+            "restricoes_violadas": violadas, "restricoes": restricoes}

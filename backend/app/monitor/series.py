@@ -1,5 +1,8 @@
 """Séries diárias por lote: esperado × observado, resíduo, detectores com persistência."""
 import statistics
+from datetime import timedelta
+
+_um_dia = timedelta(days=1)
 
 
 def residuo_relativo(observado: float, esperado: float) -> float:
@@ -25,10 +28,12 @@ def padronizar(residuos: list[float], janela: int = 45, piso: float = 0.02) -> l
     return z
 
 
-def ewma(valores: list[float], lam: float) -> list[float]:
+def ewma(valores: list[float], lam: float, limite_z: float = 3.5) -> list[float]:
+    """EWMA sobre a série padronizada. Cada z é limitado a ±limite_z para um único dia anômalo (erro de registro)
+    não cruzar o limite sozinho — dia isolado é papel do Shewhart (ACP-D01), não de queda sustentada."""
     out, atual = [], 0.0
     for v in valores:
-        atual = lam * v + (1 - lam) * atual
+        atual = lam * max(-limite_z, min(limite_z, v)) + (1 - lam) * atual
         out.append(atual)
     return out
 
@@ -47,15 +52,24 @@ def cusum_negativo(z: list[float], k: float) -> list[float]:
     return out
 
 
-def corrida_abaixo(residuos: list[float]) -> tuple[int, float]:
-    """Dias consecutivos (até hoje) abaixo do esperado e o pior resíduo nessa corrida."""
+def corrida_abaixo(pontos: list[tuple], ate, limiar: float = -0.02, janela: int = 14) -> tuple[int, float]:
+    """Dias consecutivos de calendário, terminando em `ate`, com resíduo abaixo de `limiar` (ruído não conta),
+    olhando no máximo `janela` dias; devolve (dias, pior resíduo nessa corrida). Dia sem dado quebra a corrida."""
+    por_dia = dict(pontos)
     dias, pior = 0, 0.0
-    for r in reversed(residuos):
-        if r >= 0:
+    for i in range(janela):
+        r = por_dia.get(ate - _um_dia * i)
+        if r is None or r >= limiar:
             break
         dias += 1
         pior = min(pior, r)
     return dias, pior
+
+
+def mediana_janela(pontos: list[tuple], inicio, fim) -> float | None:
+    """Mediana dos valores com data em [inicio, fim] (robusta a um dia anômalo)."""
+    vals = [v for d, v in pontos if inicio <= d <= fim]
+    return statistics.median(vals) if vals else None
 
 
 def media_movel(valores: list[float], n: int) -> float | None:

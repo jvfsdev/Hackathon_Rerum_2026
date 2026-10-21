@@ -1,6 +1,6 @@
-# Regras de produção — base v1.1.0
+# Regras de produção — base v1.3.0
 
-114 regras · 82 parâmetros · 12 alimentos. Gerado automaticamente de `backend/kb/` (não editar à mão).
+131 regras · 98 parâmetros · 12 alimentos. Gerado automaticamente de `backend/kb/` (não editar à mão).
 
 Formato: **SE** condições **ENTÃO** ações [CF da regra]. Limiares `@params.*` estão na tabela de parâmetros no fim.
 Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão com dados; C = extensão sem dados ou população diferente; D = escolha de engenharia.
@@ -15,13 +15,17 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | CLS-04 | Lote em lactação com DEL acima de 200 dias está no final da lactação | `lote.estado` = lactacao E `lote.del` > @params.del_meio_max | concluir `perfil.fase` = final | 1.0 | C | Dossiê CLS-04 |
 | CLS-05 | Vaca seca a até 21 dias do parto está no pré-parto (transição) | `lote.estado` = seca E `lote.dias_para_parto` <= @params.preparto_dias | concluir `perfil.fase` = pre_parto | 1.0 | B | Dossiê CLS-05; Santos et al. 2019 |
 | CLS-05B | Vaca seca a mais de 21 dias do parto é vaca seca (fase inicial do período seco) | `lote.estado` = seca E `lote.dias_para_parto` > @params.preparto_dias | concluir `perfil.fase` = seca | 1.0 | C | Dossiê CLS-05 |
-| CLS-06 | Gestação com 190 dias ou mais soma exigência de gestação | `lote.dias_gestacao` >= @params.gestacao_dias_exigencia | concluir `perfil.gestacao_avancada` = True | 1.0 | B | NRC 2001 via AgModel |
+| CLS-00A | Em lactação, os dias de gestação são os informados | `lote.estado` = lactacao E `lote.dias_gestacao` existe | concluir `perfil.dias_gestacao` = $lote.dias_gestacao | 1.0 | A | Registro do lote |
+| CLS-00B | Vaca seca está prenhe — dias de gestação = duração da gestação − dias para o parto | `lote.estado` = seca E `lote.dias_para_parto` existe | calcular `perfil.dias_gestacao` = diferenca(…) | 1.0 | C | Inferências (parto previsto = IA fecundante + 280 d) |
+| CLS-06 | Gestação com 190 dias ou mais soma exigência de gestação | `perfil.dias_gestacao` >= @params.gestacao_dias_exigencia | concluir `perfil.gestacao_avancada` = True | 1.0 | B | NRC 2001 via AgModel |
 | CLS-07 | Lote em lactação com primíparas soma exigência de crescimento | `lote.estado` = lactacao E `lote.fracao_primiparas` > 0 | concluir `perfil.crescimento` = True | 0.9 | B | RBZ (primíparas perdem mais peso e ainda crescem) |
-| CLS-08 | Zebuínos e cruzados em lactação usam a equação de consumo BR-Leite | `lote.estado` = lactacao E `lote.grupo_genetico` in @params.grupos_zebuinos | concluir `perfil.equacao_cms` = brleite | 0.8 | B | BR-Leite 2024 (Embrapa) |
+| CLS-08 | Girolando em lactação usa a equação de consumo BR-Leite (população da equação) | `lote.estado` = lactacao E `lote.grupo_genetico` = girolando | concluir `perfil.equacao_cms` = brleite | 0.9 | B | BR-Leite 2024 (Embrapa), Eq. 1.1: Holandês e Girolando |
+| CLS-08C | Gir e mestiças usam BR-Leite por extrapolação (fora da população da equação) — confiança menor | `lote.estado` = lactacao E `lote.grupo_genetico` in ['gir', 'mestica'] | concluir `perfil.equacao_cms` = brleite | 0.7 | C | BR-Leite 2024 (superestima CMS abaixo de 20 kg/d — Inferências) |
 | CLS-08B | Holandês e Jersey em lactação usam a equação de consumo NRC 2001 | `lote.estado` = lactacao E `lote.grupo_genetico` nao_in @params.grupos_zebuinos | concluir `perfil.equacao_cms` = nrc2001 | 1.0 | B | NRC 2001 |
-| CLS-09 | Lote em pasto tem gasto de energia com atividade de pastejo | `lote.sistema` = pasto | concluir `perfil.atividade_pastejo` = True | 0.8 | B | NRC 2001 via eOrganic |
+| CLS-09 | Lote em pasto ou semiconfinado tem gasto de energia com caminhada/pastejo | `lote.sistema` in ['pasto', 'semiconfinado'] | concluir `perfil.atividade_pastejo` = True | 0.8 | B | NRC 2001 via eOrganic |
 | CLS-ITU | Calcular o ITU a partir de temperatura e umidade | `lote.temp` existe E `lote.ur` existe | calcular `clima.itu` = itu(…) | 1.0 | B | IFSULDEMINAS |
-| CLS-10 | ITU entre 72 e 78 indica estresse térmico brando (consumo esperado menor) | `clima.itu` > @params.itu_alerta E `clima.itu` <= @params.itu_forte | concluir `perfil.estresse_termico` = brando; alerta **atencao** (calor): Risco de estresse térmico (ITU {clima.itu:.1f}) | 0.7 | B | Embrapa COT42 |
+| CLS-ITUL | Limiar de estresse térmico do grupo genético (Girolando/zebuínos toleram mais calor) | `lote.grupo_genetico` in @params.grupos_zebuinos | concluir `perfil.itu_limiar` = @params.itu_limiar_zebuino | 1.0 | B | LUME UFRGS; Embrapa (ITU crítico de mestiços) |
+| CLS-10 | ITU acima do limiar do grupo (72 Holandês; 76 zebuínos) e até 78 — estresse térmico brando | `clima.itu` > $perfil.itu_limiar\|@params.itu_alerta E `clima.itu` <= @params.itu_forte | concluir `perfil.estresse_termico` = brando; alerta **atencao** (calor): Risco de estresse térmico (ITU {clima.itu:.1f}) | 0.7 | B | Embrapa COT42; Negri 2021; LUME UFRGS |
 | CLS-11 | ITU acima de 78 indica estresse térmico acima do brando | `clima.itu` > @params.itu_forte | concluir `perfil.estresse_termico` = forte; alerta **critico** (calor): Estresse térmico forte (ITU {clima.itu:.1f}) | 0.8 | B | Embrapa COT42 |
 | CLS-12 | Mestiças em pasto tropical têm predição de consumo pouco confiável | `lote.sistema` = pasto E `lote.grupo_genetico` in @params.grupos_zebuinos | concluir `perfil.cms_baixa_confianca` = True | 0.6 | B | Embrapa 2012 (NRC com R² 0,029 em pasto tropical) |
 | CLS-13 | Calcular a semana de lactação a partir do DEL | `lote.estado` = lactacao E `lote.del` existe | calcular `perfil.semana_lactacao` = semana_lactacao(…) | 1.0 | B | NRC 2001 |
@@ -40,39 +44,45 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | EXG-03 | Vacas secas e pré-parto consomem cerca de 1,8–2% do PV | `perfil.fase` in ['pre_parto', 'seca'] | calcular `exig.cms` = cms_preparto(…) | 1.0 | B | NASEM 2021 via Drackley 2021 |
 | EXG-02A | Energia de mantença = k × PV^0,75 | `lote.pv` existe E `perfil.fase` existe | calcular `exig.ell_mantenca` = mantenca(…) | 1.0 | B | NRC 2001 (NASEM 2021: 0,10) |
 | EXG-02B | Energia para produção de leite pela composição do leite | `lote.estado` = lactacao | calcular `exig.ell_leite` = ell_leite(…) | 1.0 | B | NRC 2001 |
-| EXG-02C | Energia de gestação (a partir de 190 dias) | `perfil.gestacao_avancada` = True | calcular `exig.ell_gestacao` = ell_gestacao(…); calcular `exig.pm_gestacao` = pm_gestacao(…) | 1.0 | B | NRC 2001 (Bell & Ehrhardt); confere com tabela de Drackley 2021 |
+| EXG-02C | Energia e proteína de gestação (a partir de 190 dias) | `perfil.gestacao_avancada` = True | calcular `exig.ell_gestacao` = ell_gestacao(…); calcular `exig.pm_gestacao` = pm_gestacao(…) | 1.0 | B | NRC 2001 (Bell & Ehrhardt); confere com tabela de Drackley 2021 |
 | EXG-02D | Energia de crescimento das primíparas | `perfil.crescimento` = True E `exig.ell_mantenca` existe | calcular `exig.ell_crescimento` = ell_crescimento(…) | 0.9 | D | NRC 1989 (+20% de mantença na 1ª lactação) |
 | EXG-02E | Energia de atividade de pastejo por peso, distância e relevo | `perfil.atividade_pastejo` = True | calcular `exig.ell_atividade` = ell_atividade(…) | 0.8 | B | NRC 2001 via eOrganic (reproduz valores tabelados) |
-| EXG-06A | ECC abaixo do mínimo no meio da lactação — somar energia para recuperar | `perfil.fase` = meio E `lote.ecc` < @params.ecc_min_meio | calcular `exig.ell_ecc` = ell_ajuste_ecc(…) | 0.8 | B | Penn State (417 Mcal por ponto de ECC) |
-| EXG-06B | ECC abaixo do mínimo no final da lactação — somar energia para recuperar antes da secagem | `perfil.fase` = final E `lote.ecc` < @params.ecc_min_final | calcular `exig.ell_ecc` = ell_ajuste_ecc(…) | 0.8 | B | Penn State |
-| EXG-06C | ECC abaixo do mínimo no início da lactação — somar energia para recuperar | `perfil.fase` in ['recem_parida', 'inicio'] E `lote.ecc` < @params.ecc_min_inicio | calcular `exig.ell_ecc` = ell_ajuste_ecc(…) | 0.8 | B | Penn State |
-| EXG-07 | Início de lactação com ECC adequado pode mobilizar reserva — tolerar oferta de energia um pouco menor | `perfil.fase` in ['recem_parida', 'inicio'] E `lote.ecc` >= @params.ecc_min_inicio | concluir `meta.fator_energia_min` = @params.fator_energia_mobilizacao | 0.8 | B | Penn State; USC |
-| EXG-02Z | Exigência total de ELl = mantença + leite + gestação + crescimento + atividade ± ECC | `exig.ell_mantenca` existe | calcular `exig.ell_total` = soma(…) | 1.0 | B | NRC 2001 |
-| EXG-PB1 | PB alvo por produção — Holandês/Jersey | `perfil.equacao_cms` = nrc2001 | calcular `exig.pb_pct_alvo` = pb_alvo(…); calcular `exig.pm_leite` = pm_leite(…) | 1.0 | B | MSD Vet Manual; NRC 2001 |
-| EXG-PB2 | PB alvo por produção — zebuínos e cruzados | `perfil.equacao_cms` = brleite | calcular `exig.pb_pct_alvo` = pb_alvo(…); calcular `exig.pm_leite` = pm_leite(…) | 1.0 | B | MSD Vet Manual (raças pequenas) |
+| EXG-06A | ECC abaixo do mínimo no meio da lactação — somar energia para recuperar (escala pelo peso) | `perfil.fase` = meio E `lote.ecc` < @params.ecc_min_meio | calcular `exig.ell_ecc` = ell_ajuste_ecc(…) | 0.8 | B | Penn State (417 Mcal por ponto de ECC numa vaca de ~650 kg; escalado pelo PV) |
+| EXG-06B | ECC abaixo do mínimo no final da lactação, antes da secagem — somar energia para recuperar (escala pelo peso) | `perfil.fase` = final E `lote.ecc` < @params.ecc_min_final | calcular `exig.ell_ecc` = ell_ajuste_ecc(…) | 0.8 | B | Penn State (417 Mcal por ponto de ECC numa vaca de ~650 kg; escalado pelo PV) |
+| EXG-06C | ECC abaixo do mínimo no início/pico (não na recém-parida, quando recuperar ECC não é realista) — somar energia para recuperar (escala pelo peso) | `perfil.fase` = inicio E `lote.ecc` < @params.ecc_min_inicio | calcular `exig.ell_ecc` = ell_ajuste_ecc(…) | 0.8 | B | Penn State (417 Mcal por ponto de ECC numa vaca de ~650 kg; escalado pelo PV) |
+| EXG-07 | Pós-parto/início com ECC adequado mobiliza reserva — a dieta precisa cobrir só o que a mobilização aceitável não cobre | `perfil.fase` in ['recem_parida', 'inicio'] E `lote.ecc` >= @params.ecc_min_inicio E `exig.ell_total` existe | calcular `meta.fator_energia_min` = fator_mobilizacao(…) | 0.8 | B | Penn State (417 Mcal/ponto); OMAFRA (perda aceitável 0,5–0,75 ponto); Dossiê ACP-05 (5 semanas) |
+| EXG-02Z | Exigência total de ELl em lactação = mantença + leite + gestação + crescimento + atividade ± ECC (leite é obrigatório) | `lote.estado` = lactacao E `exig.ell_mantenca` existe E `exig.ell_leite` existe | calcular `exig.ell_total` = soma(…) | 1.0 | B | NRC 2001 |
+| EXG-02Y | Exigência total de ELl da vaca seca = mantença + gestação + atividade | `lote.estado` = seca E `exig.ell_mantenca` existe | calcular `exig.ell_total` = soma(…) | 1.0 | B | NRC 2001 |
+| EXG-PB1 | PB alvo por produção — Holandês | `lote.estado` = lactacao E `lote.grupo_genetico` = holandes | calcular `exig.pb_pct_alvo` = pb_alvo(…); calcular `exig.pm_leite` = pm_leite(…) | 1.0 | B | MSD Vet Manual; NRC 2001 |
+| EXG-PB2 | PB alvo por produção — raças menores (Jersey), zebuínos e cruzados | `lote.estado` = lactacao E `lote.grupo_genetico` != holandes | calcular `exig.pb_pct_alvo` = pb_alvo(…); calcular `exig.pm_leite` = pm_leite(…) | 1.0 | B | MSD Vet Manual (raças pequenas) |
 | EXG-PB3 | PB alvo no pré-parto | `perfil.fase` = pre_parto | concluir `exig.pb_pct_alvo` = @params.pb_preparto | 1.0 | C | Dossiê (pré-parto 13–15% PB) |
 | EXG-PB4 | PB alvo para vacas secas | `perfil.fase` = seca | concluir `exig.pb_pct_alvo` = @params.pb_seca | 1.0 | D | Prática de campo |
 | EXG-04 | Metas fixas de fibra de forragem, gordura e ureia da dieta | `perfil.fase` existe | concluir `meta.fdnf_min` = @params.fdnf_min; concluir `meta.ee_max` = @params.ee_max; concluir `meta.ureia_max` = @params.ureia_max | 1.0 | B | NRC 2001; Cultivar; Semadesc-MS |
 | EXG-04B | Sem dieta informada, metas de FDN e CNF ficam no valor base | `perfil.fase` existe E `dieta.fdnf_pct` ausente | concluir `meta.fdn_min` = @params.fdn_min; concluir `meta.cnf_max` = @params.cnf_max | 1.0 | B | NRC 2001 |
 | EXG-05 | Cada ponto de FDNf abaixo de 19% sobe o FDN mínimo em 2 e baixa o CNF máximo em 2 | `dieta.fdnf_pct` existe E `perfil.fase` existe | calcular `meta` = metas_fibra(…) | 1.0 | B | NRC 2001 via CompreRural |
-| EXG-09 | Calcular CMS como % do PV para checagem de plausibilidade | `exig.cms` existe E `lote.estado` = lactacao | calcular `perfil.cms_pct_pv` = cms_pct_pv(…) | 1.0 | C | Dossiê (CMS de lactação entre 2,5 e 4% do PV) |
+| EXG-09 | CMS da equação como % do PV para checar os dados de entrada (fora do pós-parto, quando consumo baixo é normal) | `exig.cms_equacao` existe E `perfil.fase` in ['inicio', 'meio', 'final'] | calcular `perfil.cms_pct_pv` = cms_pct_pv(…) | 1.0 | C | Dossiê (CMS de lactação entre 2,5 e 4% do PV) |
+| EXG-ECC | ECC máximo da fase (vaca gorda tem mais risco metabólico no parto) | `perfil.fase` existe | calcular `meta.ecc_max` = valor_tabela(…) | 1.0 | B | USC; Embrapa/IFRO (metas de ECC por fase) |
 
 ## F — Formulação por programação linear (FOR)
 
 | ID | Descrição | SE | ENTÃO | CF | Força | Fonte |
 |---|---|---|---|---|---|---|
-| FOR-01 | Faixa de matéria seca total do PL (CMS ± 5%) | `formulacao.solicitada` = True E `exig.cms` existe | calcular `pl.folga_ms` = produto(…) | 1.0 | D | Inferências (CMS ± 5%) |
+| FOR-01 | Faixa de matéria seca do PL — mesmos limites de oferta que a verificação usa (VER-06/06B) | `formulacao.solicitada` = True E `exig.cms` existe | calcular `pl.ms_min` = produto(…); calcular `pl.ms_max` = produto(…) | 1.0 | D | Inferências (CMS ± 5%); Dossiê VER-06 |
 | FOR-02 | Energia mínima do PL = exigência × fator de tolerância | `formulacao.solicitada` = True E `exig.ell_total` existe | calcular `pl.ell_min` = produto(…) | 1.0 | D | Dossiê VER-01 |
-| FOR-03 | Faixa de PB do PL = alvo até alvo + folga | `formulacao.solicitada` = True E `exig.pb_pct_alvo` existe | concluir `pl.pb_min` = $exig.pb_pct_alvo; calcular `pl.pb_max` = soma(…) | 1.0 | D | MSD Vet Manual |
+| FOR-02B | Energia máxima do PL — o mesmo teto que a verificação usa para apontar excesso (VER-10) | `formulacao.solicitada` = True E `exig.ell_total` existe | calcular `pl.ell_max` = produto(…) | 1.0 | D | Dossiê VER-10 |
+| FOR-03 | Faixa de PB do PL = alvo até o máximo que a verificação aceita sem apontar excesso (VER-02B) | `formulacao.solicitada` = True E `exig.pb_pct_alvo` existe | concluir `pl.pb_min` = $exig.pb_pct_alvo; calcular `pl.pb_max` = produto(…) | 1.0 | D | MSD Vet Manual |
 | FOR-04 | Teto de consumo de FDN (kg/dia) = 1,25% do PV | `formulacao.solicitada` = True E `lote.pv` existe | calcular `pl.fdn_max_kg` = pct_de(…) | 1.0 | B | Mertens via Epagri |
 | FOR-05 | Lote acima de 15 kg/vaca não pode ter cana como único volumoso — limitar a cana no PL | `formulacao.solicitada` = True E `lote.leite` > @params.leite_max_cana | concluir `pl.cana_max_pct_volumoso` = @params.cana_max_pct_volumoso | 1.0 | C | Semadesc-MS (mesma base da VER-07) |
 | FOR-06 | Lote confinado não pasteja — excluir forragens de pastejo do PL | `formulacao.solicitada` = True E `lote.sistema` = confinado | concluir `pl.excluir_pastejo` = True | 1.0 | A | Definição do sistema de produção |
-| FOR-10 | PL inviável por energia — faltam alimentos energéticos | `pl.status` = inviavel E `pl.restricoes_violadas` contem energia | alerta **critico** (formulacao): Energia não atingível com os alimentos escolhidos | 1.0 | D | Dossiê (diagnóstico de inviabilidade) |
-| FOR-11 | PL inviável por proteína | `pl.status` = inviavel E `pl.restricoes_violadas` contem proteina | alerta **critico** (formulacao): Proteína fora da faixa com os alimentos escolhidos | 1.0 | D | Dossiê (diagnóstico de inviabilidade) |
+| FOR-10 | PL inviável por energia — faltam alimentos energéticos | `pl.status` in ['inviavel', 'parcial'] E `pl.restricoes_violadas` contem energia | alerta **critico** (formulacao): Energia não atingível com os alimentos escolhidos | 1.0 | D | Dossiê (diagnóstico de inviabilidade) |
+| FOR-11 | PL inviável por proteína | `pl.status` in ['inviavel', 'parcial'] E `pl.restricoes_violadas` contem proteina | alerta **critico** (formulacao): Proteína fora da faixa com os alimentos escolhidos | 1.0 | D | Dossiê (diagnóstico de inviabilidade) |
 | FOR-12 | PL inviável por fibra mínima | `pl.status` = inviavel E `pl.restricoes_violadas` contem fibra | alerta **critico** (formulacao): Fibra mínima não atingível | 1.0 | D | NRC 2001 |
 | FOR-13 | PL inviável por enchimento (FDN demais para o consumo) | `pl.status` = inviavel E `pl.restricoes_violadas` contem enchimento | alerta **critico** (formulacao): Volumoso muito fibroso limita o consumo | 1.0 | B | Mertens via Epagri |
 | FOR-14 | PL inviável por CNF ou gordura máximos | `pl.status` = inviavel E (`pl.restricoes_violadas` contem cnf OU `pl.restricoes_violadas` contem gordura) | alerta **critico** (formulacao): Limites de CNF ou gordura impedem a solução | 1.0 | D | NRC 2001 |
 | FOR-15 | PL inviável porque falta volumoso além da cana | `pl.status` = inviavel E `pl.restricoes_violadas` contem cana | alerta **critico** (formulacao): Falta volumoso além da cana para esta produção | 1.0 | C | Semadesc-MS |
+| FOR-16 | Informar alimentos escolhidos que não podem entrar na dieta deste lote | `pl.alimentos_excluidos` != [] | alerta **informativo** (formulacao): Não entraram na formulação: {pl.alimentos_excluidos} | 1.0 | A | Definição do sistema de produção |
+| FOR-17 | PL inviável porque todos os alimentos têm energia demais para a exigência (vaca seca, final de lactação) | `pl.status` in ['inviavel', 'parcial'] E `pl.restricoes_violadas` contem excesso_energia | alerta **critico** (formulacao): Alimentos energéticos demais para este lote | 1.0 | C | Penn State; OMAFRA |
+| FOR-21 | Só energia/proteína são inatingíveis — entregar a melhor dieta possível com o déficit explícito | `pl.status` = parcial | alerta **atencao** (formulacao): Melhor dieta possível com estes alimentos: R$ {pl.custo:.2f}/vaca/dia | 1.0 | D | Programação por metas (folgas penalizadas) |
 | FOR-20 | PL encontrou a dieta de menor custo | `pl.status` = otimo | alerta **informativo** (formulacao): Dieta de custo mínimo: R$ {pl.custo:.2f}/vaca/dia | 1.0 | B | Programação linear (PuLP + HiGHS) |
 
 ## C — Verificação da dieta (VER)
@@ -88,6 +98,7 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | VER-03 | FDN da dieta abaixo da meta — risco de acidose ruminal | `dieta.fdn_pct` < $meta.fdn_min | concluir `ver.risco_acidose` = True | 0.85 | B | NRC 2001 (FDN ≥ 25% MS) |
 | VER-03B | CNF acima do máximo — risco de acidose ruminal | `dieta.cnf_pct` > $meta.cnf_max | concluir `ver.risco_acidose` = True | 0.8 | B | NRC 2001 (CNF ≤ 44% MS) |
 | VER-03C | FDN de forragem abaixo de 19% — pouca fibra efetiva | `dieta.fdnf_pct` < $meta.fdnf_min | concluir `ver.risco_acidose` = True | 0.7 | B | NRC 2001 (FDNf ≥ 19% MS) |
+| VER-03D | FDN de forragem abaixo de 15% da MS — fora da tabela NRC, dieta bloqueada | `dieta.fdnf_pct` < @params.fdnf_min_absoluto | concluir `parecer.bloqueio` = True; alerta **critico** (dieta): Volumoso insuficiente: FDN de forragem {dieta.fdnf_pct:.1f}% da MS | 1.0 | B | NRC 2001 (tabela de FDN mínimo vai até FDNf 15%) |
 | VER-03Z | Emitir alerta de acidose com o CF combinado das evidências | `ver.risco_acidose` = True | alerta **atencao** (dieta): Risco de acidose ruminal | 1.0 | B | NRC 2001 |
 | VER-04 | Ureia acima de 1% da MS — dieta bloqueada | `dieta.ureia_pct` > $meta.ureia_max | concluir `parecer.bloqueio` = True; alerta **critico** (dieta): Ureia acima do limite: {dieta.ureia_pct:.2f}% da MS (máx. {meta.ureia_max}%) | 1.0 | B | Semadesc-MS |
 | VER-05 | Gordura da dieta acima de 6% da MS | `dieta.ee_pct` > $meta.ee_max | concluir `ver.excesso_gordura` = True; alerta **atencao** (dieta): Gordura excessiva: EE {dieta.ee_pct:.1f}% da MS | 0.8 | C | Cultivar |
@@ -95,8 +106,13 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | VER-06B | MS ofertada abaixo do CMS possível — subalimentação | `ver.razao_ms` < @params.fator_oferta_min | concluir `ver.subalimentacao` = True; alerta **atencao** (dieta): Oferta abaixo do consumo possível ({dieta.ms_kg:.1f} kg MS contra {exig.cms:.1f}) | 0.7 | D | Escolha de engenharia |
 | VER-07 | Cana como único volumoso limita lotes de produção mais alta | `dieta.cana_unico_volumoso` = True E `lote.leite` > @params.leite_max_cana | concluir `ver.volumoso_limitante` = True; alerta **atencao** (dieta): Cana como único volumoso para {lote.leite:.0f} kg/vaca | 0.7 | C | Semadesc-MS |
 | VER-09 | CMS fora de 2,5–4% do PV — conferir dados de entrada | (`perfil.cms_pct_pv` < @params.cms_pct_pv_min OU `perfil.cms_pct_pv` > @params.cms_pct_pv_max) | alerta **informativo** (dados): Consumo previsto incomum ({perfil.cms_pct_pv:.1f}% do PV) | 0.8 | C | Dossiê |
+| VER-10 | Energia consumida muito acima da exigência — risco de engorda (ECC alto ao parto) | `ver.razao_energia` > @params.fator_energia_max | concluir `ver.excesso_energetico` = True; alerta **atencao** (dieta): Energia acima do necessário: a dieta cobre {ver.razao_energia:.0%} da exigência | 0.7 | C | Penn State; OMAFRA (ECC alto ao parto) |
+| VER-11 | ECC acima do máximo da fase | `lote.ecc` > $meta.ecc_max | concluir `ver.ecc_alto` = True; alerta **atencao** (condicao_corporal): ECC {lote.ecc} acima da meta da fase (máx. {meta.ecc_max}) | 0.7 | B | USC; Embrapa/IFRO; Dossiê ACP-09 (ajuste conforme direção do desvio) |
+| VER-12 | Alimento acima do limite de inclusão | `dieta.inclusao_excedida` != [] | concluir `ver.inclusao_excedida` = True; alerta **atencao** (dieta): Alimento acima do limite de inclusão: {dieta.inclusao_excedida} | 0.8 | C | Limites de inclusão de foods.yaml |
+| VER-13 | Forragem de pastejo na dieta de lote confinado | `lote.sistema` = confinado E `dieta.tem_pastejo` = True | concluir `ver.pastejo_em_confinado` = True; alerta **atencao** (dieta): Dieta de lote confinado com forragem de pastejo | 1.0 | A | Definição do sistema de produção |
+| VER-14 | Dieta sem núcleo mineral | `dieta.mineral_kg_ms` < @params.mineral_min_kg_ms | alerta **atencao** (dieta): Sem núcleo mineral suficiente na dieta | 0.8 | C | Rótulo do produto; Dossiê (minerais via núcleo) |
 | VER-90 | Parecer — dieta bloqueada | `parecer.bloqueio` = True | concluir `parecer.dieta` = bloqueada | 1.0 | B | Dossiê VER-04 |
-| VER-91 | Parecer — dieta precisa de ajustes | `parecer.bloqueio` ausente E (`ver.deficit_energetico` existe OU `ver.deficit_proteico` existe OU `ver.risco_acidose` existe OU `ver.excesso_gordura` existe OU `ver.oferta_excessiva` existe OU `ver.subalimentacao` existe OU `ver.volumoso_limitante` existe) | concluir `parecer.dieta` = ajustar | 1.0 | C | Dossiê VER-08 |
+| VER-91 | Parecer — dieta precisa de ajustes | `parecer.bloqueio` ausente E (`ver.deficit_energetico` existe OU `ver.deficit_proteico` existe OU `ver.risco_acidose` existe OU `ver.excesso_gordura` existe OU `ver.oferta_excessiva` existe OU `ver.subalimentacao` existe OU `ver.volumoso_limitante` existe OU `ver.excesso_energetico` existe OU `ver.inclusao_excedida` existe OU `ver.pastejo_em_confinado` existe) | concluir `parecer.dieta` = ajustar | 1.0 | C | Dossiê VER-08 |
 | VER-08 | Parecer — dieta adequada (nenhuma regra crítica disparou) | `dieta.ms_kg` > 0 E `ver.razao_energia` existe E `parecer.dieta` ausente | concluir `parecer.dieta` = adequada | 1.0 | C | Dossiê VER-08 |
 
 ## D1 — Acompanhamento diário (ACP)
@@ -104,10 +120,11 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | ID | Descrição | SE | ENTÃO | CF | Força | Fonte |
 |---|---|---|---|---|---|---|
 | ACP-D00 | Dia sem registro gera lembrete, nunca alerta zootécnico | `mon.sem_registro_hoje` = True | alerta **informativo** (registro): Sem registro de hoje | 1.0 | D | de Mol et al. 2012 (dado faltante não é alerta) |
+| ACP-D00B | Curva da fazenda ainda em calibração — sem alertas de produção até ter dias suficientes | `mon.calibrando_dias` existe | alerta **informativo** (registro): Calibrando a curva de lactação do lote ({mon.calibrando_dias} dia(s) de registro) | 1.0 | D | Inferências (ajuste da escala da curva nas primeiras semanas) |
 | ACP-D01 | Queda brusca de um dia (resíduo abaixo de −3σ) sem queda sustentada em curso | `mon.z` < @params.shewhart_z E `hipotese.queda_sustentada` ausente | alerta **atencao** (producao): Queda brusca hoje: {mon.litros_vaca:.1f} L/vaca contra {mon.esperado_vaca:.1f} esperados | 0.7 | D | SPC (Shewhart) sobre resíduo padronizado |
 | ACP-D02 | Corrida de dias abaixo do esperado com ao menos um dia abaixo de −10% | `mon.corrida_dias` >= @params.corrida_dias_min E `mon.corrida_pior` <= @params.corrida_queda_min E `mon.residuo` < @params.residuo_queda_atual | concluir `hipotese.queda_sustentada` = True | 0.8 | B | Frontiers in Genetics 2022 (perturbação de lactação) |
 | ACP-D03 | EWMA do resíduo abaixo do limite inferior (queda sustentada de 3–5%) | `mon.ewma` < $mon.ewma_limite_inf E `mon.residuo` < @params.residuo_queda_atual | concluir `hipotese.queda_sustentada` = True | 0.6 | C | Archiv Tierzucht 2009; SPC |
-| ACP-D03B | Queda de mais de 10% em 7 dias | `mon.queda_7d` <= @params.queda_7d | concluir `hipotese.queda_sustentada` = True | 0.6 | C | Dossiê ACP-08/ACP-10 |
+| ACP-D03B | Queda de mais de 10% em 7 dias | `mon.queda_7d` <= @params.queda_7d E `mon.residuo` < @params.residuo_queda_atual | concluir `hipotese.queda_sustentada` = True | 0.6 | C | Dossiê ACP-08/ACP-10 |
 | ACP-D04 | Alerta de queda sustentada de produção (CF combinado das evidências) | `hipotese.queda_sustentada` = True | alerta **critico** (producao): Queda sustentada de produção: {mon.litros_vaca:.1f} L/vaca ({mon.residuo:.0%} do esperado) | 1.0 | B | Frontiers in Genetics 2022; de Mol 2012 (persistência) |
 | ACP-08 | Queda logo após troca de volumoso — causa provável é o novo volumoso | `hipotese.queda_sustentada` = True E `mon.dias_desde_troca_volumoso` <= @params.janela_troca_volumoso | concluir `hipotese.causa_volumoso` = True; alerta **atencao** (dieta_queda): Causa provável da queda: troca de volumoso há {mon.dias_desde_troca_volumoso} dia(s) | 0.6 | C | Dossiê ACP-08; Inferências (assinatura de troca de silagem) |
 | ACP-10 | Queda de produção com ITU alto nos 2 dias anteriores — causa provável é calor, não a dieta | (`hipotese.queda_sustentada` = True OU `mon.queda_7d` <= @params.queda_7d) E `mon.itu_2d` > $mon.itu_limiar E (`mon.dias_desde_troca_volumoso` ausente OU `mon.dias_desde_troca_volumoso` > @params.janela_troca_volumoso) E `hipotese.mastite` ausente | concluir `hipotese.causa_calor` = True; alerta **atencao** (calor): Calor explica a queda (ITU médio de 2 dias = {mon.itu_2d:.1f}) | 0.6 | B | Dossiê ACP-10; Negri 2021; LUME UFRGS |
@@ -123,24 +140,24 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | ACP-M01 | Calcular a relação gordura:proteína do leite | `laudo.gordura` existe E `laudo.proteina` existe | calcular `laudo.gp` = razao(…) | 1.0 | B | Penn State |
 | ACP-01 | NUL alto — excesso de proteína ou falta de energia fermentável | `laudo.nul` > @params.nul_max | alerta **atencao** (dieta): NUL alto: {laudo.nul:.1f} mg/dL | 0.7 | B | Penn State; Embrapa Pedroso 2011 |
 | ACP-01R | NUL acima de ~19,5 mg/dL reduz a chance de prenhez | `laudo.nul` >= @params.nul_reprodutivo | alerta **critico** (reproducao): NUL {laudo.nul:.1f} mg/dL: risco reprodutivo | 0.9 | A | Raboisson et al. 2017 (meta-análise) |
-| ACP-02 | NUL baixo junto com produção abaixo do esperado — proteína possivelmente insuficiente | `laudo.nul` < @params.nul_min E (`hipotese.queda_sustentada` = True OU `mon.residuo` < -0.05) | alerta **atencao** (dieta_queda): NUL baixo ({laudo.nul:.1f} mg/dL) com produção abaixo do esperado | 0.6 | B | Magalhães UFV 2003; Meyer et al. 2006 (alvo único de NUL não vale) |
+| ACP-02 | NUL baixo junto com produção abaixo do esperado — proteína possivelmente insuficiente | `laudo.nul` < @params.nul_min E (`hipotese.queda_sustentada` = True OU `mon.residuo` < @params.residuo_baixo) | alerta **atencao** (dieta_queda): NUL baixo ({laudo.nul:.1f} mg/dL) com produção abaixo do esperado | 0.6 | B | Magalhães UFV 2003; Meyer et al. 2006 (alvo único de NUL não vale) |
 | ACP-03 | G:P abaixo de 1,0 — suspeita de acidose subaguda | `laudo.gp` < @params.gp_sara_max | concluir `hipotese.acidose` = True | 0.7 | C | Dossiê ACP-03; UNH 2025 |
 | ACP-04 | G:P baixa com fezes fluidas reforça a suspeita de acidose | `laudo.gp` < @params.gp_sara_max E `mon.fezes` <= @params.fezes_acidose_max | concluir `hipotese.acidose` = True | 0.6 | C | Dossiê ACP-04 |
 | ACP-ACID | Alerta de acidose subaguda com o CF combinado das evidências | `hipotese.acidose` = True | alerta **atencao** (dieta): Suspeita de acidose ruminal subaguda | 1.0 | C | Dossiê; MYCIN (combinação de CFs) |
-| ACP-M03 | G:P acima de 1,4 em recém-paridas — balanço energético negativo / cetose subclínica | `perfil.fase` in ['recem_parida', 'inicio'] E `lote.del` <= 40 E `laudo.gp` > @params.gp_ben_min | alerta **atencao** (dieta): G:P {laudo.gp:.2f} em recém-paridas: risco de cetose subclínica | 0.7 | B | Penn State (cetose subclínica) |
+| ACP-M03 | G:P acima de 1,4 em recém-paridas — balanço energético negativo / cetose subclínica | `perfil.fase` in ['recem_parida', 'inicio'] E `lote.del` <= @params.gp_ben_del_max E `laudo.gp` > @params.gp_ben_min | alerta **atencao** (dieta): G:P {laudo.gp:.2f} em recém-paridas: risco de cetose subclínica | 0.7 | B | Penn State (cetose subclínica) |
 | ACP-M04 | Queda de gordura com proteína estável — depressão da gordura do leite | `laudo.gordura_delta` <= @params.gordura_queda_pp E `laudo.proteina_delta_abs` < @params.proteina_estavel_pp | concluir `hipotese.dgl` = True; alerta **atencao** (dieta): Gordura do leite caiu {laudo.gordura_delta:.2f} p.p. com proteína estável | 0.7 | C | eXtension (gordura do leite) |
 | ACP-M05 | Lactose baixa com CCS subindo — mastite primeiro, não dieta | `laudo.lactose` < @params.lactose_min E (`laudo.ccs_tendencia` = subindo OU `laudo.ccs` > @params.ccs_pre_regulatorio) | concluir `hipotese.mastite` = True; alerta **critico** (qualidade): Mastite primeiro: lactose {laudo.lactose:.2f}% com CCS subindo | 0.8 | A | IN 76/2018; Inferências |
 | ACP-M06 | CCS do tanque acima do limite regulatório (média geométrica de 3 meses) | `laudo.ccs_mg3` > @params.ccs_regulatorio | calcular `mon.perda_ccs` = perda_ccs(…); alerta **critico** (qualidade): CCS {laudo.ccs_mg3:.0f} mil acima do limite da IN 76 (500 mil) | 1.0 | A | IN 76/2018; eXtension (perdas por CCS) |
 | ACP-M06B | CCS do tanque em faixa pré-regulatória | `laudo.ccs_mg3` > @params.ccs_pre_regulatorio E `laudo.ccs_mg3` <= @params.ccs_regulatorio | alerta **atencao** (qualidade): CCS {laudo.ccs_mg3:.0f} mil: perto do limite regulatório | 0.8 | A | IN 76/2018 |
 | ACP-M07 | CBT acima do limite — higiene e resfriamento, não dieta | `laudo.cbt_mg3` > @params.cbt_regulatorio | alerta **critico** (qualidade): CBT {laudo.cbt_mg3:.0f} mil UFC/mL acima do limite (300 mil) | 1.0 | A | IN 76/2018 |
-| ACP-M05B | Queda de produção com mastite em curso — causa provável é a mastite | `hipotese.queda_sustentada` = True E `hipotese.mastite` = True | alerta **atencao** (qualidade): Causa provável da queda: mastite | 0.7 | C | Inferências (assinatura de surto de mastite) |
+| ACP-M05B | Queda de produção com mastite em curso — causa provável é a mastite | `hipotese.queda_sustentada` = True E `hipotese.mastite` = True | alerta **atencao** (producao): Causa provável da queda: mastite | 0.7 | C | Inferências (assinatura de surto de mastite) |
 
 ## D2 — Acompanhamento semanal (ACP)
 
 | ID | Descrição | SE | ENTÃO | CF | Força | Fonte |
 |---|---|---|---|---|---|---|
-| ACP-S01 | MS da silagem mudou 2 p.p. ou mais (confirmado) — recalcular kg de matéria natural | `mon.ms_delta_abs` >= @params.ms_delta_recalcular E `mon.ms_leituras_confirmadas` >= 2 | calcular `mon.silagem_kg_mn_novo` = ms_para_mn(…); alerta **atencao** (dieta): MS da silagem mudou: {mon.ms_silagem_formulacao:.1f}% → {mon.ms_silagem_atual:.1f}% | 0.8 | C | Penn State (determinação de MS); heurística de 2 p.p. |
-| ACP-S02 | MS mudou 5 p.p. ou mais, ou silo novo — reformular e pedir bromatologia | (`mon.ms_delta_abs` >= @params.ms_delta_reformular OU `mon.silo_novo` = True) | alerta **atencao** (dieta): Volumoso mudou muito: reformular a dieta | 0.8 | B | OSU Buckeye Dairy News |
+| ACP-S01 | MS da silagem mudou 2 p.p. ou mais (confirmado) — recalcular kg de matéria natural | `mon.ms_delta_abs` >= @params.ms_delta_recalcular E `mon.ms_leituras_confirmadas` >= @params.ms_leituras_confirmacao | calcular `mon.silagem_kg_mn_novo` = ms_para_mn(…); alerta **atencao** (dieta): MS da silagem mudou: {mon.ms_silagem_formulacao:.1f}% → {mon.ms_silagem_atual:.1f}% | 0.8 | C | Penn State (determinação de MS); heurística de 2 p.p. |
+| ACP-S02 | MS mudou 5 p.p. ou mais, ou silo novo — reformular e pedir bromatologia | ((`mon.ms_delta_abs` >= @params.ms_delta_reformular E `mon.ms_leituras_confirmadas` >= @params.ms_leituras_confirmacao) OU `mon.silo_novo` = True) | alerta **atencao** (dieta): Volumoso mudou muito: reformular a dieta | 0.8 | B | OSU Buckeye Dairy News |
 | ACP-S03A | Faixa-alvo de sobras para a fase do lote | `perfil.fase` existe E `mon.sobras_mm3` existe | calcular `meta.sobras` = faixa(…) | 1.0 | B | eXtension (feed bunk management) |
 | ACP-S03 | Sobras (média de 3 dias) abaixo da faixa — aumentar oferta | `mon.sobras_mm3` < $meta.sobras.min | alerta **atencao** (cocho): Sobras baixas: {mon.sobras_mm3:.1f}% (meta {meta.sobras.min:.0f}–{meta.sobras.max:.0f}%) | 0.7 | B | eXtension; SDSU |
 | ACP-S04 | Sobras (média de 3 dias) acima da faixa — reduzir oferta ou investigar seleção | `mon.sobras_mm3` > $meta.sobras.max | alerta **atencao** (cocho): Sobras altas: {mon.sobras_mm3:.1f}% (meta {meta.sobras.min:.0f}–{meta.sobras.max:.0f}%) | 0.7 | B | eXtension; SDSU; Dossiê ACP-07 |
@@ -155,7 +172,7 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | ID | Descrição | SE | ENTÃO | CF | Força | Fonte |
 |---|---|---|---|---|---|---|
 | META-01 | Mastite primeiro — suprime recomendações de dieta | `hipotese.mastite` = True | suprimir alertas de dieta, dieta_queda | 1.0 | C | Inferências (lactose/ESD baixos com CCS = mastite primeiro) |
-| META-02 | Calor explica — rebaixa a informativos os alertas de dieta motivados pela queda | `hipotese.causa_calor` = True | rebaixar alertas de dieta_queda | 1.0 | B | Dossiê ACP-10 |
+| META-02 | Calor explica — rebaixa os alertas de dieta motivados pela queda e a própria queda (a ação é manejo de calor) | `hipotese.causa_calor` = True | rebaixar alertas de dieta_queda; rebaixar alertas de producao | 1.0 | B | Dossiê ACP-10 |
 | META-03 | Reagrupamento recente — suprime alertas de queda de produção por 48 h | `mon.horas_desde_movimentacao` <= @params.janela_supressao_h | suprimir alertas de producao | 1.0 | B | UBC/Farmwest |
 | META-04 | Correção recente da MS — suprime alertas de queda de produção por 48 h | `mon.horas_desde_correcao_ms` <= @params.janela_supressao_h | suprimir alertas de producao | 1.0 | D | Inferências |
 
@@ -163,14 +180,15 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 
 | Parâmetro | Valor | Unidade | Força | Fonte | Descrição |
 |---|---|---|---|---|---|
-| `cf_medido_recente` | 1.0 | CF | D | Convenção do sistema | Medição recente na fazenda |
-| `cf_medido_30d` | 0.8 | CF | D | Convenção do sistema | Medição com menos de 30 dias |
+| `cf_medido_recente` | 1.0 | CF | D | Convenção do sistema | Medição recente na fazenda (registros e laudos) |
+| `cf_limiar` | 0.2 | CF | C | Convenção MYCIN (premissa abaixo de 0,2 é tratada como desconhecida) | CF mínimo de uma premissa para a regra disparar |
 | `cf_tabela` | 0.8 | CF | D | Convenção do sistema | Valor de tabela publicada (Embrapa/CQBAL) |
 | `cf_padrao` | 0.6 | CF | D | Convenção do sistema | Valor padrão quando o usuário não sabe |
 | `del_recem_parida_max` | 21 | dias | C | Dossiê CLS-01 | Fim da fase recém-parida |
 | `del_inicio_max` | 100 | dias | C | Dossiê CLS-02 | Fim do início/pico de lactação |
 | `del_meio_max` | 200 | dias | C | Dossiê CLS-03 | Fim do meio de lactação |
 | `preparto_dias` | 21 | dias | B | Dossiê CLS-05; Santos 2019 | Dias antes do parto que definem o pré-parto |
+| `gestacao_duracao` | 280 | dias | C | Inferências (parto previsto = IA fecundante + 280 d) | Duração da gestação para derivar os dias de gestação da vaca seca |
 | `gestacao_dias_exigencia` | 190 | dias | B | NRC 2001 via AgModel | A partir daqui soma exigência de gestação |
 | `itu_alerta` | 72 | ITU | B | Embrapa COT42 | Início do estresse térmico |
 | `itu_forte` | 78 | ITU | B | Embrapa COT42 | Estresse acima do brando |
@@ -182,6 +200,10 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | `cms_preparto_pct_pv` | 1.9 | % PV | B | NASEM 2021 via Drackley (1,8–2%) | CMS de vacas secas/pré-parto |
 | `cms_pct_pv_min` | 2.5 | % PV | C | Dossiê (checagem de sanidade) | CMS de lactação abaixo disso: conferir dados |
 | `cms_pct_pv_max` | 4.0 | % PV | C | Dossiê (checagem de sanidade) | CMS de lactação acima disso: conferir dados |
+| `pv_ref_ecc` | 650 | kg | B | Penn State (valor de 417 Mcal é para vaca de ~650 kg) | Peso de referência para escalar a energia por ponto de ECC |
+| `ecc_mobilizacao_aceitavel` | 0.5 | pontos | B | OMAFRA (perda de 0,5–0,75 ponto no início é aceitável) | Perda de ECC aceitável no pós-parto (energia que pode vir da reserva) |
+| `dias_mobilizacao` | 35 | dias | B | Dossiê ACP-05 (5 primeiras semanas) | Período em que a mobilização aceitável acontece |
+| `ecc_max_fases` | {'recem_parida': 3.75, 'inicio': 3.25, 'meio': 3.5, 'final': 3.75, 'seca': 3.75, 'pre_parto': 3.75} | 1-5 | B | USC; Embrapa/IFRO (parto 3,25–3,75; pico 2,5–3,0; meio 2,75–3,25; final 3,0–3,75) com 0,25 de tolerância | ECC máximo por fase |
 | `mcal_por_ponto_ecc` | 417 | Mcal | B | Penn State | ELl por ponto de ECC (vaca ~650 kg) |
 | `dias_recuperacao_ecc` | 100 | dias | D | Dossiê T17 | Prazo para levar o ECC à meta |
 | `ecc_min_inicio` | 2.5 | 1-5 | B | USC; Embrapa/IFRO (pico 2,5–3,0) | ECC mínimo no início/pico |
@@ -196,24 +218,30 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | `pb_preparto` | 14.0 | % MS | C | Dossiê (pré-parto 13–15%) | PB alvo pré-parto |
 | `pb_seca` | 12.0 | % MS | D | Prática de campo | PB alvo vacas secas |
 | `fdn_min` | 25 | % MS | B | NRC 2001 | FDN mínimo da dieta |
+| `fdnf_min_absoluto` | 15 | % MS | B | NRC 2001 (tabela vai até FDNf 15%) | FDN de forragem abaixo disso bloqueia a dieta |
 | `fdnf_min` | 19 | % MS | B | NRC 2001 | FDN de forragem mínimo |
 | `cnf_max` | 44 | % MS | B | NRC 2001 | CNF máximo |
 | `passo_fibra` | 2 | p.p. por p.p. | B | NRC 2001 via CompreRural | Ajuste de FDN/CNF por ponto de FDNf abaixo do mínimo |
 | `ee_max` | 6 | % MS | C | Cultivar | Gordura máxima da dieta |
 | `ureia_max` | 1.0 | % MS | B | Semadesc-MS | Ureia máxima da dieta (bloqueante) |
 | `fator_energia_min` | 0.95 | fração | D | Dossiê VER-01 | Oferta mínima de ELl / exigência |
-| `fator_energia_mobilizacao` | 0.9 | fração | D | Dossiê EXG-07; Penn State | Tolerância quando o lote pode mobilizar reserva |
+| `fator_energia_max` | 1.2 | fração | D | Escolha de engenharia (risco de engorda; Penn State/OMAFRA) | Energia consumida / exigência acima disso = excesso |
 | `fator_pb_min` | 0.95 | fração | D | Dossiê VER-02 | PB mínima / alvo |
 | `fator_pb_max` | 1.15 | fração | D | Escolha de engenharia | PB acima disso = desperdício |
 | `fator_oferta_max` | 1.05 | fração | D | Dossiê VER-06 | MS ofertada / CMS previsto acima disso não será consumida |
 | `fator_oferta_min` | 0.9 | fração | D | Escolha de engenharia | MS ofertada / CMS abaixo disso = subalimentação |
 | `cana_max_pct_volumoso` | 50 | % da MS de volumoso | D | Escolha de engenharia derivada de VER-07 (Semadesc-MS) | Teto de cana no volumoso do PL quando o lote produz acima de leite_max_cana |
+| `mineral_min_kg_ms` | 0.1 | kg MS/vaca/dia | D | Rótulos usuais de núcleo (100–200 g/vaca/dia) | Núcleo mineral mínimo na dieta |
 | `leite_max_cana` | 15 | kg | C | Dossiê VER-07 (a validar) | Produção acima disso com cana como único volumoso |
-| `pl_folga_cms` | 0.05 | fração | D | Inferências (CMS ± 5%) | Folga do total de MS no PL |
-| `pl_pb_folga_max` | 3.0 | p.p. | D | Escolha de engenharia | PB máxima = alvo + folga |
+| `pl_fator_ms_min` | 0.95 | fração | D | Inferências (CMS − 5%) | MS mínima do PL / CMS (precisa ficar acima de fator_oferta_min) |
+| `pl_margem` | 0.01 | fração | D | Escolha de engenharia | Margem de segurança do PL em todo limite, para a dieta arredondada continuar aprovada pela verificação |
 | `shewhart_z` | -3.0 | sigma | D | SPC padrão | Queda de um dia |
 | `corrida_dias_min` | 5 | dias | B | Frontiers Genet 2022 (adaptado ao lote) | Dias seguidos abaixo do esperado |
 | `residuo_queda_atual` | -0.03 | fração | D | Escolha de engenharia (evita alerta com o lote já recuperado) | Resíduo de hoje precisa estar abaixo disso para manter a queda sustentada |
+| `corrida_residuo_min` | -0.02 | fração | D | Escolha de engenharia (ruído de medição não conta como dia abaixo) | Resíduo abaixo disso conta como dia abaixo do esperado na corrida |
+| `corrida_janela` | 14 | dias | D | Escolha de engenharia | A corrida olha no máximo estes dias para trás |
+| `calibracao_dias_min` | 7 | dias | D | Inferências (ajustar a escala nas primeiras 2–4 semanas) | Dias válidos mínimos para calibrar a curva antes de emitir alertas de produção |
+| `residuo_baixo` | -0.05 | fração | D | Escolha de engenharia | Produção 5% abaixo do esperado (usado com NUL baixo) |
 | `corrida_queda_min` | -0.1 | fração | B | Frontiers Genet 2022 | Ao menos um dia abaixo de −10% |
 | `ewma_lambda` | 0.25 |  | C | Archiv Tierzucht 2009 (⚠ NV) | Suavização do EWMA |
 | `ewma_L` | 2.75 | sigma | C | Archiv Tierzucht 2009 (⚠ NV) | Largura do limite do EWMA |
@@ -227,6 +255,7 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | `litros_por_kg_conc_min` | 2.0 | L/kg | D | Inferências (C/D) | Eficiência mínima do concentrado |
 | `custo_conc_litro_tolerancia` | 1.1 | fração | D | Inferências (mediana 30 d + 10%) | Custo de concentrado/L acima da mediana |
 | `ms_delta_recalcular` | 2.0 | p.p. | C | Heurística de campo (C) | Mudança de MS que exige recalcular kg MN |
+| `ms_leituras_confirmacao` | 2 | leituras | C | Inferências (confirmar em 2 leituras) | Leituras seguidas fora da referência para confirmar mudança de MS |
 | `ms_delta_reformular` | 5.0 | p.p. | B | OSU Buckeye Dairy News | Mudança de MS que exige reformular |
 | `sobras_faixas` | {'recem_parida': [3, 5], 'inicio': [2, 4], 'meio': [2, 4], 'final': [1, 3], 'pre_parto': [2, 4], 'seca': [1, 3]} | % oferta | B | eXtension; SDSU | Faixa-alvo de sobras por fase |
 | `cocho_vazio_dias` | 2 | dias | C | Dossiê ACP-06 | Leituras seguidas com cocho vazio |
@@ -238,10 +267,14 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | `nul_max` | 16 | mg/dL | B | Embrapa (8–16); Penn State (10–14); conflito | NUL alto: excesso de PB ou falta de energia |
 | `nul_reprodutivo` | 19.5 | mg/dL | A | Raboisson 2017 (meta-análise) | NUL com chance de prenhez −43% |
 | `gp_sara_max` | 1.0 | razão | C | Dossiê ACP-03; UNH 2025 | G:P abaixo disso sugere acidose |
+| `gp_ben_del_max` | 40 | dias | B | Penn State (≤40 DEL) | Janela de DEL em que G:P alta indica BEN/cetose |
 | `gp_ben_min` | 1.4 | razão | B | Penn State (≤40 DEL) | G:P acima disso em recém-paridas sugere BEN/cetose |
 | `gordura_queda_pp` | -0.3 | p.p. | C | eXtension (0,2–0,3) | Queda de gordura vs linha de base |
 | `proteina_estavel_pp` | 0.1 | p.p. | D | Escolha de engenharia | Variação de proteína considerada estável |
 | `lactose_min` | 4.3 | % | A | IN 76/2018 | Lactose mínima |
+| `ccs_tendencia_min` | 200 | mil cél/mL | B | eXtension (200 mil = 0% de perda) | CCS só conta como 'subindo' acima deste valor |
+| `laudo_validade_dias` | 35 | dias | A | Laudo mensal (IN 76/77) | Laudo mais antigo que isso não vale como dado atual |
+| `laudo_base_dias` | 120 | dias | D | Escolha de engenharia | Laudos usados como linha de base para variação de gordura/proteína |
 | `ccs_regulatorio` | 500 | mil cél/mL | A | IN 76/2018 | CCS máxima (média geométrica 3 m) |
 | `ccs_pre_regulatorio` | 400 | mil cél/mL | D | Inferências | Faixa pré-regulatória |
 | `cbt_regulatorio` | 300 | mil UFC/mL | A | IN 76/2018 | CBT/CPP máxima (média geométrica 3 m) |
