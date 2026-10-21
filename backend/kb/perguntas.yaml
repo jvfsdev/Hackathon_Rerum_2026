@@ -11,8 +11,9 @@ lote.leite: {texto: "Produção média por vaca (kg/dia)", tipo: numero, unidade
 lote.gordura: {texto: "Gordura do leite (%)", tipo: numero, unidade: "%", ajuda: "Vem no laudo mensal do laticínio. Corrige o leite para 4% e define a energia do leite.", padrao: 3.5}
 lote.proteina: {texto: "Proteína do leite (%)", tipo: numero, unidade: "%", ajuda: "Vem no laudo do laticínio. Entra na energia e na proteína metabolizável do leite.", padrao: 3.2}
 lote.fracao_primiparas: {texto: "Que fração do lote é de primíparas (0 a 1)?", tipo: numero, unidade: fração, ajuda: "Primíparas ainda crescem e precisam de energia extra.", padrao: 0.3}
-lote.ecc: {texto: "Escore de condição corporal médio (1 a 5)", tipo: numero, unidade: "1-5", ajuda: "Abaixo da meta da fase o sistema soma energia para recuperar; acima, aponta excesso. Sem ECC essas regras não se aplicam.", opcional: true}
+lote.ecc: {texto: "Escore de condição corporal médio (1 a 5)", tipo: numero, escala: ecc, unidade: "1-5", ajuda: "Abaixo da meta da fase o sistema soma energia para recuperar; acima, aponta excesso. Sem ECC essas regras não se aplicam.", opcional: true}
 lote.distancia_km: {texto: "Distância caminhada por dia (km)", tipo: numero, unidade: km, ajuda: "Caminhada até o piquete e a sala de ordenha gasta energia.", padrao: 1.0}
 lote.relevo: {texto: "Relevo do pasto", tipo: opcao, opcoes: [plano, ondulado, acidentado], ajuda: "Terreno acidentado aumenta muito o gasto de energia.", padrao: plano}
 lote.temp: {texto: "Temperatura média do dia (°C)", tipo: numero, unidade: "°C", ajuda: "Com a umidade, calcula o ITU (estresse térmico reduz consumo e leite). Sem ela, o ITU não é avaliado.", opcional: true}
 lote.ur: {texto: "Umidade relativa média (%)", tipo: numero, unidade: "%", ajuda: "Com a temperatura, calcula o ITU. Sem ela, o ITU não é avaliado.", opcional: true}
+lote.forrageira: {texto: "Qual a forrageira do pasto?", tipo: opcao, opcoes: [mombaca, tanzania, decumbens, marandu, outra], ajuda: "Define as alturas de entrada e saída do piquete.", opcional: true}

@@ -9,7 +9,7 @@ from datetime import date, datetime, time, timedelta
 from ..calc import climate, economics, lactation_curve
 from . import series
 
-INDICADORES_LAUDO = ("gordura", "proteina", "lactose", "nul", "ureia", "ccs", "cbt")
+INDICADORES_LAUDO = ("gordura", "proteina", "lactose", "nul", "ureia", "ccs", "cbt", "crioscopia")
 
 
 class HistoricoLote:
@@ -120,6 +120,23 @@ def dias_calibrados(lote, h: HistoricoLote, ate: date) -> int:
     return sum(1 for d in h.por_ind.get("litros", {}) if d <= ate and (del_em(lote, d) or 0) > 0)
 
 
+def leituras_cocho(h: HistoricoLote, d: date, params, dias: int = 10) -> list[dict]:
+    """Leituras de cocho por dia (mais antiga primeiro), em % de sobra equivalente. Escore 1–5 convertido pela tabela
+    @params.escore_cocho_pct; se no mesmo dia houver sobra pesada, ela prevalece (é medida)."""
+    tabela = {int(k): v for k, v in params["escore_cocho_pct"]["valor"].items()}
+    pesadas = dict(h.serie("sobras_pct", d, dias))
+    escores = dict(h.serie("escore_cocho", d, dias))
+    out = []
+    for dia in sorted(set(pesadas) | set(escores)):
+        if dia in pesadas:
+            pct, esc = pesadas[dia], None
+        else:
+            esc = int(round(escores[dia]))
+            pct = tabela.get(esc, tabela[3])
+        out.append({"data": dia, "pct": pct, "escore": esc, "vazio": esc == 1 if esc is not None else pct <= 0.5})
+    return out
+
+
 def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimentos, d: date) -> dict:
     """Fatos mon.* e laudo.* do lote no dia d."""
     f: dict = {}
@@ -131,6 +148,8 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
     # --- diário: produção × esperado
     if lote.estado == "lactacao" and h.valor("litros", d) is None:
         f["mon.sem_registro_hoje"] = True
+    if litros_vaca(h, d) is not None:      # produção do dia vale para economia mesmo com a curva ainda calibrando
+        f["mon.litros_vaca"], f["mon.litros_lote"] = litros_vaca(h, d), h.valor("litros", d)
     pontos = serie_esperado(lote, h, params, d)
     if lote.estado == "lactacao" and not pontos and h.valor("litros", d) is not None:
         f["mon.calibrando_dias"] = dias_calibrados(lote, h, d)
@@ -205,7 +224,8 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
     # --- semanal: MS da silagem
     ms_pts = h.serie("ms_silagem", d, 14)
     if ms_pts and dieta:
-        silagem = next((i for i in dieta.itens if alimentos.get(i["alimento"], {}).get("id", "").startswith("silagem")), None)
+        silagem = next((i for i in dieta.itens if alimentos.get(i["alimento"], {}).get("tipo") == "volumoso"
+                        and "silagem" in alimentos.get(i["alimento"], {}).get("nome", "").lower()), None)
         ref = dieta.ms_silagem_ref or (alimentos[silagem["alimento"]]["ms"] if silagem else None)
         if ref:
             limiar_ms = params["ms_delta_recalcular"]["valor"]
@@ -223,18 +243,30 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
                 f["mon.silagem_kg_mn_atual"] = silagem["kg_mn"]
                 f["mon.silagem_kg_ms"] = silagem["kg_mn"] * ref / 100
 
-    # --- semanal: cocho, ECC, fezes, ruminação
-    sob = h.serie("sobras_pct", d, 3)
-    if sob:
-        f["mon.sobras_mm3"] = sum(v for _, v in sob) / len(sob)
+    # --- diário: leitura de cocho (escore 1–5) ou sobras pesadas (%); no mesmo dia, a pesagem prevalece
+    leituras = leituras_cocho(h, d, params, dias=10)
+    recentes = [l for l in leituras if l["data"] > d - timedelta(days=3)]
+    if recentes:
+        pct = sum(l["pct"] for l in recentes) / len(recentes)
+        f["mon.sobras_mm3"] = pct
+        if len(recentes) >= 3:      # "3 dias fora da meta" (Inferências): menor e maior leitura dos 3 dias
+            f["mon.sobras_min3"] = min(l["pct"] for l in recentes)
+            f["mon.sobras_max3"] = max(l["pct"] for l in recentes)
+        escores = [l["escore"] for l in recentes if l["escore"] is not None]
+        if len(escores) == len(recentes):
+            f["mon.sobras_texto"] = f"escore médio {sum(escores) / len(escores):.1f} (≈ {pct:.1f}% de sobra)"
+        else:
+            f["mon.sobras_texto"] = f"{pct:.1f}% de sobra" + (" (pesada)" if not escores else " (pesagem e escore)")
         vazio = 0
-        for _, v in reversed(h.serie("sobras_pct", d, 10)):
-            if v <= 0.5:
+        for l in reversed(leituras):
+            if l["vazio"] and (d - l["data"]).days == vazio:
                 vazio += 1
             else:
                 break
         if vazio:
             f["mon.dias_cocho_vazio"] = vazio
+
+    # --- semanal: ECC, fezes, ruminação
     ecc = [v for _, v in h.serie("ecc", d, 42)]
     if len(ecc) >= 2:
         # mediana de 3 nos pontos internos: uma leitura isolada fora da curva não vira "perda de ECC",
@@ -246,6 +278,13 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
     fz = h.serie("escore_fezes", d, 7)
     if fz:
         f["mon.fezes"] = fz[-1][1]
+    dist = h.serie("distancia_km", d, 30)
+    if len(dist) >= 2:
+        f["mon.distancia_delta"] = dist[-1][1] - dist[0][1]
+    for ind in ("altura_entrada", "altura_saida", "altura_media"):       # régua no pasto (última leitura da semana)
+        pts = h.serie(ind, d, 7)
+        if pts:
+            f[f"mon.{ind}"] = pts[-1][1]
     rum = h.serie("ruminacao", d, 10)
     if len(rum) >= 6:
         f["mon.ruminacao_queda"] = sum(v for _, v in rum[:-3]) / len(rum[:-3]) - sum(v for _, v in rum[-3:]) / 3

@@ -1,0 +1,130 @@
+"""Ciclo de vida dos alertas: episódio, aceite/recusa, ação registrada, resolução automática e histórico."""
+from datetime import date, datetime, timedelta
+
+import pytest
+from sqlmodel import select
+from test_auditoria import lote_sintetico, sessao_memoria  # noqa: F401 (fixture)
+
+from app import alertas, services
+from app.db.models import AlertaDB, Dieta, Evento, HistoricoAlerta
+
+
+def eps(s, lote_id, regra=None):
+    q = select(AlertaDB).where(AlertaDB.lote_id == lote_id)
+    if regra:
+        q = q.where(AlertaDB.regra == regra)
+    return s.exec(q).all()
+
+
+def tipos(s, ep):
+    """Tipos do histórico na ordem em que foram registrados (o teste simula dias passados para o automático)."""
+    return [h.tipo for h in sorted(alertas.historico_do(s, ep.id), key=lambda h: h.id)]
+
+
+def queda_e_recuperacao(s, eventos=()):
+    """Queda de 12% nos dias 28–33 e recuperação a partir do 34 (40 dias, terminando hoje)."""
+    lote, d0 = lote_sintetico(s, efeitos={i: 0.88 for i in range(28, 34)}, eventos=eventos)
+    return lote, d0
+
+
+def test_um_episodio_por_problema_e_resolucao_automatica_explicada(sessao_memoria):
+    s = sessao_memoria
+    lote, d0 = queda_e_recuperacao(s)
+    services.reprocessar(s, lote, d0, date.today())
+    [ep] = eps(s, lote.id, "ACP-D04")
+    assert ep.ocorrencias > 1 and ep.aberto_em >= d0 + timedelta(days=28)
+    assert ep.estado == "resolvido" and ep.estado_em is not None
+    assert "deixou de valer" in ep.resolucao and "mon.residuo" in ep.resolucao
+    assert tipos(s, ep)[0] == "aberto" and tipos(s, ep)[-1] == "resolvido"
+
+
+def test_aceitar_leva_para_a_tela_e_acao_entra_no_historico_e_na_resolucao(sessao_memoria):
+    s = sessao_memoria
+    lote, d0 = queda_e_recuperacao(s)
+    services.reprocessar(s, lote, d0, d0 + timedelta(days=31))      # problema em andamento
+    [ep] = eps(s, lote.id, "ACP-D04")
+    assert ep.estado == "aberto"
+    destino = alertas.aceitar(s, ep, "vou conferir a ordenha")
+    assert destino == f"/lotes/{lote.id}/registro?evento=conferencia&alerta={ep.id}"
+    ev = Evento(lote_id=lote.id, data_hora=datetime.combine(d0 + timedelta(days=32), datetime.min.time()),
+                tipo="conferencia", descricao="teteiras trocadas")
+    s.add(ev)
+    s.commit()
+    alertas.registrar_acao(s, ep.id, lote.id, "Evento conferência: teteiras trocadas", {"evento_id": ev.id})
+    services.reprocessar(s, lote, d0 + timedelta(days=32), date.today())
+    s.refresh(ep)
+    assert tipos(s, ep)[:3] == ["aberto", "aceito", "acao_registrada"]
+    assert ep.estado == "resolvido" and "teteiras trocadas" in ep.resolucao
+
+
+def test_recusa_exige_motivo_e_nao_insiste(sessao_memoria):
+    s = sessao_memoria
+    lote, d0 = queda_e_recuperacao(s)
+    services.reprocessar(s, lote, d0, d0 + timedelta(days=30))
+    [ep] = eps(s, lote.id, "ACP-D04")
+    with pytest.raises(ValueError):
+        alertas.recusar(s, ep, "  ")
+    alertas.recusar(s, ep, "queda já explicada: vacas vendidas")
+    services.reprocessar(s, lote, d0 + timedelta(days=31), d0 + timedelta(days=32))
+    s.refresh(ep)
+    assert ep.estado == "recusado" and len(eps(s, lote.id, "ACP-D04")) == 1
+
+
+def test_reprocessamento_retroativo_preserva_acoes_do_usuario(sessao_memoria):
+    s = sessao_memoria
+    lote, d0 = queda_e_recuperacao(s)
+    services.reprocessar(s, lote, d0, d0 + timedelta(days=31))
+    [ep] = eps(s, lote.id, "ACP-D04")
+    alertas.aceitar(s, ep)
+    services.reprocessar(s, lote, d0 + timedelta(days=29), date.today())   # ex.: registro retroativo
+    s.refresh(ep)
+    assert "aceito" in tipos(s, ep) and len(eps(s, lote.id, "ACP-D04")) == 1
+
+
+def test_laudo_vencido_expira_em_vez_de_resolver(sessao_memoria):
+    s = sessao_memoria
+    lote, d0 = lote_sintetico(s, dias=60, extra={(5, "laudo_nul"): 22.0})
+    services.reprocessar(s, lote, d0, date.today())
+    [ep] = eps(s, lote.id, "ACP-01R")
+    assert ep.estado == "expirado" and "venceu" in ep.resolucao
+
+
+def test_alertas_da_dieta_ativa_sao_resolvidos_pela_nova_versao(sessao_memoria):
+    s = sessao_memoria
+    lote, _ = lote_sintetico(s, dias=10)
+    ruim = [{"alimento": "silagem_milho", "kg_mn": 35}, {"alimento": "milho_moido", "kg_mn": 3},
+            {"alimento": "nucleo_mineral", "kg_mn": 0.2}]                     # sem fonte proteica
+    for d in s.exec(select(Dieta).where(Dieta.lote_id == lote.id)).all():
+        d.itens = ruim
+        s.add(d)
+    s.commit()
+    services.avaliar_lote(s, lote)
+    [ep] = eps(s, lote.id, "VER-02")
+    assert ep.origem == "verificacao" and ep.estado == "aberto"
+    assert alertas.aceitar(s, ep).startswith(f"/lotes/{lote.id}/dieta")
+    for d in s.exec(select(Dieta).where(Dieta.lote_id == lote.id)).all():
+        d.ativa = False
+        s.add(d)
+    corrigida = [{"alimento": "silagem_milho", "kg_mn": 35}, {"alimento": "milho_moido", "kg_mn": 2.5},
+                 {"alimento": "farelo_soja", "kg_mn": 4.5}, {"alimento": "nucleo_mineral", "kg_mn": 0.2}]
+    nova = Dieta(lote_id=lote.id, versao=2, itens=corrigida, motivo="mais farelo de soja", inicio=date.today())
+    s.add(nova)
+    s.commit()
+    alertas.registrar_acao(s, ep.id, lote.id, "Nova dieta v2: mais farelo de soja", {"dieta_id": nova.id})
+    services.avaliar_lote(s, lote)
+    s.refresh(ep)
+    assert ep.estado == "resolvido" and "dieta ativa v2" in ep.resolucao
+    assert s.exec(select(HistoricoAlerta).where(HistoricoAlerta.alerta_id == ep.id,
+                                                HistoricoAlerta.automatico == False)).all()  # noqa: E712
+
+
+def test_reanalisar_hoje_preserva_abertura_de_alerta_ja_aceito(sessao_memoria):
+    s = sessao_memoria
+    lote, d0 = lote_sintetico(s, efeitos={i: 0.88 for i in range(32, 40)})
+    services.reprocessar(s, lote, d0, date.today())
+    [ep] = eps(s, lote.id, "ACP-D04")
+    alertas.aceitar(s, ep)
+    services.monitorar(s, lote, date.today())          # ex.: novo registro no mesmo dia
+    s.refresh(ep)
+    assert tipos(s, ep)[:2] == ["aberto", "aceito"] and ep.estado == "aceito"
+    assert all(c["fato"].startswith(("mon.", "ver.", "laudo.", "clima.", "dieta.", "exig.", "meta.")) for c in ep.contexto)

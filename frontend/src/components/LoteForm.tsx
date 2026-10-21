@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { api, OPCOES, type Lote } from '../api'
 import { Erro } from './ui'
+import { EscalaEscore } from './Escala'
 
 /** Cadastro/edição de lote. DEL e dias de gestação são os valores de HOJE (avançam sozinhos com o tempo). */
 export interface ValoresLote {
   nome: string; finalidade: string; estado: string; sistema: string; grupo_genetico: string; n_vacas: string; pv: string
   del_ref: string; dias_para_parto_ref: string; dias_gestacao_ref: string; fracao_primiparas: string; ecc: string
-  distancia_km: string; relevo: string; leite: string; gordura: string; proteina: string
+  distancia_km: string; relevo: string; forrageira: string; leite: string; gordura: string; proteina: string
 }
 
 const s = (v: any) => (v === null || v === undefined ? '' : String(Math.round(Number(v) * 100) / 100))
@@ -17,7 +18,7 @@ export function valoresIniciais(lote?: Lote, fatos?: Record<string, any>): Valor
     grupo_genetico: lote?.grupo_genetico ?? 'girolando', n_vacas: s(lote?.n_vacas ?? 20), pv: s(lote?.pv ?? 500),
     del_ref: s(fatos?.['lote.del'] ?? lote?.del_ref ?? 100), dias_para_parto_ref: s(fatos?.['lote.dias_para_parto'] ?? lote?.dias_para_parto_ref),
     dias_gestacao_ref: s(fatos?.['lote.dias_gestacao'] ?? lote?.dias_gestacao_ref ?? 0), fracao_primiparas: s(lote?.fracao_primiparas ?? 0.3),
-    ecc: s(lote?.ecc), distancia_km: s(lote?.distancia_km), relevo: lote?.relevo ?? 'plano', leite: s(fatos?.['lote.leite'] ?? lote?.leite),
+    ecc: s(lote?.ecc), distancia_km: s(lote?.distancia_km), relevo: lote?.relevo ?? 'plano', forrageira: lote?.forrageira ?? '', leite: s(fatos?.['lote.leite'] ?? lote?.leite),
     gordura: s(lote?.gordura ?? 3.5), proteina: s(lote?.proteina ?? 3.2),
   }
 }
@@ -30,7 +31,7 @@ export default function LoteForm({ lote, fatos, onSalvo }: { lote?: Lote; fatos?
   const [salvando, setSalvando] = useState(false)
   const set = (k: keyof ValoresLote) => (e: { target: { value: string } }) => setV({ ...v, [k]: e.target.value })
   const lactacao = v.estado === 'lactacao'
-  const pasto = v.sistema === 'pasto'
+  const pasto = v.sistema === 'pasto' || v.sistema === 'semiconfinado'
 
   const salvar = async () => {
     if (!v.nome.trim()) { setErro('Dê um nome ao lote.'); return }
@@ -42,7 +43,7 @@ export default function LoteForm({ lote, fatos, onSalvo }: { lote?: Lote; fatos?
       grupo_genetico: v.grupo_genetico, n_vacas: num(v.n_vacas), pv: num(v.pv),
       del_ref: lactacao ? num(v.del_ref) : null, dias_para_parto_ref: lactacao ? null : num(v.dias_para_parto_ref),
       dias_gestacao_ref: num(v.dias_gestacao_ref) ?? 0, fracao_primiparas: num(v.fracao_primiparas), ecc: num(v.ecc),
-      distancia_km: pasto ? num(v.distancia_km) : null, relevo: pasto ? v.relevo : null, leite: lactacao ? num(v.leite) : null,
+      distancia_km: pasto ? num(v.distancia_km) : null, relevo: pasto ? v.relevo : null, forrageira: pasto && v.forrageira ? v.forrageira : null, leite: lactacao ? num(v.leite) : null,
       gordura: num(v.gordura), proteina: num(v.proteina),
     }
     setSalvando(true); setErro('')
@@ -79,8 +80,8 @@ export default function LoteForm({ lote, fatos, onSalvo }: { lote?: Lote; fatos?
         {lactacao ? campo('del_ref', 'Dias em lactação hoje', 'dias') : campo('dias_para_parto_ref', 'Dias para o parto', 'dias')}
         {campo('dias_gestacao_ref', 'Dias de gestação hoje', 'dias', '0 se vazias')}
         {campo('fracao_primiparas', 'Fração de primíparas', '0–1')}
-        {campo('ecc', 'ECC médio', '1–5', 'opcional')}
       </div>
+      <EscalaEscore tipo="ecc" valor={v.ecc} onChange={(x) => setV({ ...v, ecc: x })} />
       {lactacao && (
         <div className="grid grid-cols-3 gap-3">
           {campo('leite', 'Leite/vaca', 'kg/d', 'referência; o diário vem dos registros')}
@@ -89,9 +90,14 @@ export default function LoteForm({ lote, fatos, onSalvo }: { lote?: Lote; fatos?
         </div>
       )}
       {pasto && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {campo('distancia_km', 'Distância caminhada', 'km/d')}
           {opcao('relevo', 'Relevo', ['plano', 'ondulado', 'acidentado'])}
+          <label><span className="rotulo">Forrageira</span>
+            <select className="input" value={v.forrageira} onChange={set('forrageira')}>
+              <option value="">não informada</option><option value="mombaca">Mombaça</option><option value="tanzania">Tanzânia</option>
+              <option value="decumbens">Braquiária decumbens</option><option value="marandu">Marandu</option><option value="outra">Outra</option>
+            </select></label>
         </div>
       )}
       <p className="text-xs text-stone-500">DEL e dias de gestação são os valores de hoje; o sistema os avança automaticamente a cada dia.</p>

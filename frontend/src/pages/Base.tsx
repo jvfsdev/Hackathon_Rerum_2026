@@ -37,7 +37,9 @@ export default function BasePagina() {
   const salvarParam = async (nome: string) => {
     setErro(''); setMsg('')
     try {
-      const r: any = await api.put(`/kb/parametros/${nome}`, { valor: Number(edicao[nome].replace(',', '.')), motivo: 'Editado pelo especialista na interface.' })
+      const bruto = edicao[nome]
+      const valor = typeof params[nome].valor === 'string' ? bruto : Number(bruto.replace(',', '.'))
+      const r: any = await api.put(`/kb/parametros/${nome}`, { valor, motivo: 'Editado pelo especialista na interface.' })
       setMsg(`Base agora na versão ${r.versao}: ${nome} ${r.antes} → ${r.depois}. Casos de teste: ${r.testes.passaram}/${r.testes.total}.`)
       setTestes(r.testes); setEdicao({ ...edicao, [nome]: '' }); carregar()
     } catch (e: any) { setErro(e.message) }
@@ -87,12 +89,20 @@ export default function BasePagina() {
             <thead className="text-xs text-stone-500"><tr><th className="py-1 pr-3">Parâmetro</th><th className="pr-3">Valor</th><th className="pr-3">Força</th><th>Fonte</th></tr></thead>
             <tbody>
               {Object.entries(params).map(([nome, p]) => {
+                const opcoes = typeof p.valor === 'string' && String(p.unidade).includes('|') ? String(p.unidade).split('|').map((o: string) => o.trim()) : null
                 const escalar = typeof p.valor === 'number'
                 return (
                   <tr key={nome} className="border-t border-stone-100 align-top">
                     <td className="py-1.5 pr-3"><div className="font-mono text-xs text-stone-800">{nome}</div><div className="text-xs text-stone-500">{p.descricao}</div></td>
                     <td className="num pr-3 whitespace-nowrap">
-                      {especialista && escalar ? (
+                      {especialista && opcoes ? (
+                        <span className="flex items-center gap-1">
+                          <select className="input w-32 py-1" value={edicao[nome] ?? p.valor} onChange={(e) => setEdicao({ ...edicao, [nome]: e.target.value })}>
+                            {opcoes.map((o: string) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                          <button className="btn-secundario px-2 py-1 text-xs" disabled={!edicao[nome] || edicao[nome] === p.valor} onClick={() => salvarParam(nome)}>Salvar</button>
+                        </span>
+                      ) : especialista && escalar ? (
                         <span className="flex items-center gap-1">
                           <input className="input w-20 py-1" placeholder={String(p.valor)} value={edicao[nome] ?? ''} onChange={(e) => setEdicao({ ...edicao, [nome]: e.target.value })} />
                           <button className="btn-secundario px-2 py-1 text-xs" disabled={!edicao[nome]} onClick={() => salvarParam(nome)}>Salvar</button>

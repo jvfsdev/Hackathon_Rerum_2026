@@ -23,6 +23,8 @@ npm install
 npm run dev                                 # http://localhost:5173
 ```
 
+No celular (mesma rede Wi-Fi): `npm run dev:rede` e abra `http://<ip-do-computador>:5173` — a página inicial vira o **modo campo** (registro rápido + avisos, funciona sem conexão e envia depois).
+
 Testes: `cd backend && .venv/bin/pytest -q`, com 62 testes, entre eles 33 casos de resultado conhecido em `backend/tests/cases.yaml`.
 
 ## Onde está cada coisa

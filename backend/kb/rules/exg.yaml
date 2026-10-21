@@ -73,6 +73,35 @@
   fonte: "Mertens via Epagri"
   forca: B
 
+- id: EXG-01N
+  versao: 1
+  modulo: exigencias
+  descricao: CMS pela equação NASEM 2021 baseada no animal (ECC e paridade)
+  prioridade: 80
+  se:
+    - {fato: perfil.equacao_cms, op: "=", valor: nasem2021}
+  entao:
+    - calcular:
+        fato: exig.cms_equacao
+        funcao: cms_nasem2021
+        args: {pv: $lote.pv, leite: $lote.leite, gordura: $lote.gordura, proteina: $lote.proteina, ecc: $lote.ecc, del_: $lote.del, fracao_primiparas: "$lote.fracao_primiparas|0", lactose: "$lote.lactose|null"}
+  fonte: "NASEM 2021 via ICAR Appendix 2"
+  forca: B
+
+- id: EXG-01F
+  versao: 1
+  modulo: exigencias
+  descricao: Digestibilidade da FDN do volumoso acima/abaixo da referência ajusta o consumo esperado
+  prioridade: 80
+  cf: 0.8
+  se:
+    - {fato: dieta.fdnd_forragem, op: existe}
+    - {fato: exig.cms_equacao, op: existe}
+  entao:
+    - calcular: {fato: exig.cms_ajuste_fdnd, funcao: ajuste_fdnd, args: {fdnd: $dieta.fdnd_forragem, ref: "@params.fdnd_ref", kg_por_ponto: "@params.cms_por_ponto_fdnd"}}
+  fonte: "Oba & Allen 1999; Dossiê EXG-09"
+  forca: B
+
 - id: EXG-01E
   versao: 1
   modulo: exigencias
@@ -82,7 +111,7 @@
     - {fato: exig.cms_equacao, op: existe}
     - {fato: perfil.cms_baixa_confianca, op: ausente}
   entao:
-    - calcular: {fato: exig.cms, funcao: minimo, args: {a: $exig.cms_equacao, b: "$exig.cms_teto_fibra|null"}}
+    - calcular: {fato: exig.cms, funcao: cms_final, args: {equacao: $exig.cms_equacao, ajuste: "$exig.cms_ajuste_fdnd|0", teto: "$exig.cms_teto_fibra|null"}}
   fonte: "NRC 2001; Mertens"
   forca: B
 
@@ -96,7 +125,7 @@
     - {fato: exig.cms_equacao, op: existe}
     - {fato: perfil.cms_baixa_confianca, op: "=", valor: true}
   entao:
-    - calcular: {fato: exig.cms, funcao: minimo, args: {a: $exig.cms_equacao, b: "$exig.cms_teto_fibra|null"}}
+    - calcular: {fato: exig.cms, funcao: cms_final, args: {equacao: $exig.cms_equacao, ajuste: "$exig.cms_ajuste_fdnd|0", teto: "$exig.cms_teto_fibra|null"}}
     - alerta:
         nivel: informativo
         categoria: dieta

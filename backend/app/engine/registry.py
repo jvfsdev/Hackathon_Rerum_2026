@@ -15,6 +15,21 @@ def _metas_fibra(fdnf_dieta: float, fdn_min: float, fdnf_min: float, cnf_max: fl
     return {"fdn_min": fdn_min + passo * deficit, "cnf_max": cnf_max - passo * deficit}
 
 
+def _metas_altura(forrageira: str, tabela: dict, tolerancia: float) -> dict | None:
+    """Limites de altura do pasto: rotacionado (entrada máx., saída mín.) ou contínuo (faixa da altura média)."""
+    m = tabela.get(forrageira)
+    if not m:
+        return None
+    out = {}
+    if "entrada" in m:
+        out["entrada_max"] = m["entrada"] * (1 + tolerancia)
+    if "saida_min" in m:
+        out["saida_min"] = m["saida_min"]
+    if "media" in m:
+        out["media_min"], out["media_max"] = m["media"] * (1 - tolerancia), m["media"] * (1 + tolerancia)
+    return out
+
+
 FUNCOES = {
     "semana_lactacao": lambda del_: del_ / 7,
     "cms_nrc2001": lambda pv, leite, gordura, semana: intake.cms_nrc2001(pv, leite, gordura, semana),
@@ -24,6 +39,13 @@ FUNCOES = {
     "teto_fibra": lambda pv, fdn, limite: intake.teto_fibra(pv, fdn, limite),
     "cms_pct_pv": lambda cms, pv: intake.cms_pct_pv(cms, pv),
     "minimo": _minimo,
+    "ajuste_fdnd": lambda fdnd, ref, kg_por_ponto: (fdnd - ref) * kg_por_ponto,
+    "metas_altura": _metas_altura,
+    "cms_nasem2021": lambda pv, leite, gordura, proteina, ecc, del_, fracao_primiparas, lactose=None:
+        intake.cms_nasem2021(pv, leite, gordura, proteina, ecc, del_, 1 - fracao_primiparas, lactose),
+    "cms_final": lambda equacao, ajuste=0.0, teto=None: intake.cms_final(equacao, ajuste, teto),
+    "ecm": lambda leite, gordura, proteina: conversions.ecm(leite, gordura, proteina),
+    "pct": lambda parte, total: 100 * parte / total if total else None,
     "mantenca": lambda pv, k: energy.mantenca(pv, k),
     "ell_leite": lambda leite, gordura, proteina, lactose=None: leite * energy.ell_leite_por_kg(gordura, proteina, lactose),
     "ell_gestacao": lambda dias, peso_bezerro, inicio: energy.gestacao(dias, peso_bezerro, inicio),

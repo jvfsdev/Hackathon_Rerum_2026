@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api, fmt, OPCOES, rotulo } from '../api'
 import { Carregando, Erro, Painel } from '../components/ui'
+import { EscalaEscore } from '../components/Escala'
 import { ResultadoAvaliacao } from './Lote'
 
 /** Consulta guiada: o motor faz encadeamento regressivo e pergunta só o que falta para concluir. */
@@ -44,7 +45,9 @@ export default function ConsultaPagina() {
       <div className="space-y-5">
         {p && (
           <Painel titulo={p.texto} subtitulo={p.ajuda}>
-            {p.tipo === 'opcao' ? (
+            {p.escala ? (
+              <EscalaEscore tipo={p.escala} valor={valor} onChange={setValor} />
+            ) : p.tipo === 'opcao' ? (
               <div className="flex flex-wrap gap-2">
                 {p.opcoes.map((o: string) => (
                   <button key={o} onClick={() => setValor(o)} className={`btn ${valor === o ? 'bg-campo-600 text-white' : 'border border-stone-300 bg-white hover:bg-stone-100'}`}>{OPCOES[o] ?? o}</button>

@@ -1,0 +1,10 @@
+{
+  "name": "Leite por Lote — campo",
+  "short_name": "Leite no campo",
+  "start_url": "/campo",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fafaf9",
+  "theme_color": "#245a26",
+  "lang": "pt-BR"
+}

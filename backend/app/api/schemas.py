@@ -26,6 +26,7 @@ class LoteIn(BaseModel):
     ecc: float | None = None
     distancia_km: float | None = None
     relevo: str | None = None
+    forrageira: str | None = None
     leite: float | None = None
     gordura: float | None = None
     proteina: float | None = None
@@ -50,18 +51,21 @@ class DietaIn(BaseModel):
     itens: list[ItemDieta]
     motivo: str = ""
     origem: str = "usuario"
+    alerta_id: int | None = None      # alerta aceito que levou a esta ação
 
 
 class RegistroIn(BaseModel):
     data: date
     valores: dict[str, float]
     metodo: str | None = None
+    alerta_id: int | None = None
 
 
 class EventoIn(BaseModel):
     data_hora: datetime
     tipo: str
     descricao: str = ""
+    alerta_id: int | None = None
 
 
 class ConsultaIn(BaseModel):
@@ -75,10 +79,55 @@ class RespostaIn(BaseModel):
     nao_sei: bool = False
 
 
-class AlertaUpdate(BaseModel):
-    status_usuario: str
+class AceitarIn(BaseModel):
+    observacao: str = ""
+
+
+class RecusarIn(BaseModel):
+    motivo: str
 
 
 class ParametroUpdate(BaseModel):
-    valor: float
+    valor: float | str
     motivo: str = ""
+
+
+class PrecosIn(BaseModel):
+    precos: dict[str, float]          # id do alimento (R$/kg MN), "leite" (R$/L) ou "concentrado" (R$/kg)
+    fonte: str = ""
+    data: date | None = None
+
+
+class AlimentoIn(BaseModel):
+    nome: str
+    tipo: str                         # volumoso | concentrado | ureia | mineral
+    ms: float                         # % da matéria natural
+    pb: float = 0                     # % da MS
+    fdn: float = 0
+    ndt: float = 0
+    ee: float = 0
+    mm: float = 0
+    fdnd: float | None = None         # digestibilidade da FDN (% da FDN), opcional
+    ca: float | None = None           # minerais em % da MS, opcionais
+    p: float | None = None
+    mg: float | None = None
+    k: float | None = None
+    na: float | None = None
+    cl: float | None = None
+    s: float | None = None
+    pastejo: bool = False
+    max_pct_ms: float | None = None
+    min_kg_ms: float | None = None
+    max_kg_ms: float | None = None
+    origem_dado: str = "tabela"       # laboratorio | tabela | estimado
+    fonte: str = ""
+    preco_kg_mn: float | None = None  # obrigatório no cadastro
+
+
+class BonificacaoIn(BaseModel):
+    tabela: dict[str, list[dict]]      # {"ccs": [{"min": null, "max": 200, "rs_l": 0.03}, ...], "cbt": [...], ...}
+
+
+class ImportacaoIn(BaseModel):
+    conteudo: str                      # texto do CSV (separador ; , ou tab; decimal com vírgula ou ponto)
+    confirmar: bool = False            # False = só prévia

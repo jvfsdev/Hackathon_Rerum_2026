@@ -216,3 +216,161 @@
         acao: "Rever alocação e preços; conferir se a produção caiu."
   fonte: "Penn State (IOFC); Inferências"
   forca: D
+
+- id: ACP-D08
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Custo de toda a alimentação acima de 60% da receita do leite
+  prioridade: 50
+  cf: 0.7
+  se:
+    - {fato: mon.alimento_pct_receita, op: ">", valor: "@params.alimento_pct_receita_max"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: economia
+        titulo: "Alimentação consome {mon.alimento_pct_receita:.0f}% da receita (IOFC R$ {mon.iofc:.2f}/vaca/dia)"
+        causa: "Com a alimentação acima de ~60% da receita, a margem sobre o alimento (IOFC) fica baixa."
+        acao: "Rever preços, sobras e a dieta (a sugestão de custo mínimo pode baixar o custo)."
+  fonte: "Penn State (IOFC)"
+  forca: C
+
+- id: ACP-EA0
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Eficiência alimentar com consumo MEDIDO (oferta − sobras) — leite corrigido para energia / CMS
+  prioridade: 90
+  se:
+    - {fato: mon.cms_medido, op: ">", valor: 0}
+    - {fato: mon.litros_vaca, op: existe}
+  entao:
+    - calcular: {fato: mon.ecm, funcao: ecm, args: {leite: $mon.litros_vaca, gordura: $lote.gordura, proteina: $lote.proteina}}
+    - calcular: {fato: mon.ea, funcao: razao, args: {a: $mon.ecm, b: $mon.cms_medido}}
+  fonte: "Penn State (ECM); eXtension (eficiência alimentar)"
+  forca: B
+
+- id: ACP-EA1
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Eficiência alimentar baixa no meio da lactação
+  prioridade: 55
+  cf: 0.6
+  se:
+    - {fato: lote.del, op: entre, valor: [150, 225]}
+    - {fato: mon.ea, op: "<", valor: "@params.ea_min_meio"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Eficiência alimentar baixa: {mon.ea:.2f} kg de leite corrigido por kg de MS"
+        causa: "Abaixo de 1,3 no meio da lactação a dieta rende pouco leite por kg consumido (referência de Holandesas)."
+        acao: "Conferir digestibilidade do volumoso, sobras e balanceamento; comparar com o histórico do próprio lote."
+  fonte: "eXtension (Holandesas EUA — comparar com o histórico do lote)"
+  forca: C
+
+- id: ACP-EA2
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Eficiência alimentar alta demais no início — vacas tirando energia do corpo
+  prioridade: 55
+  cf: 0.6
+  se:
+    - {fato: perfil.fase, op: in, valor: [recem_parida, inicio]}
+    - {fato: mon.ea, op: ">", valor: "@params.ea_max_inicio"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Eficiência {mon.ea:.2f} no início da lactação: perda de peso excessiva"
+        causa: "EA acima de 2,0 no início indica leite produzido à custa de reserva corporal, não mérito da dieta."
+        acao: "Elevar a densidade energética e acompanhar o ECC."
+  fonte: "eXtension"
+  forca: C
+
+# --- Leitura de cocho (diária, antes do 1º trato): escore 1–5 ou sobras pesadas ---
+- id: ACP-S03A
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Faixa-alvo de sobras para a fase do lote
+  prioridade: 90
+  se:
+    - {fato: perfil.fase, op: existe}
+    - {fato: mon.sobras_min3, op: existe}
+  entao:
+    - calcular: {fato: meta.sobras, funcao: faixa, args: {chave: $perfil.fase, tabela: "@params.sobras_faixas"}}
+  fonte: "eXtension (feed bunk management)"
+  forca: B
+
+- id: ACP-S03
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Cocho abaixo da faixa nos 3 últimos dias (escore ou pesagem) — aumentar oferta
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: mon.sobras_max3, op: "<", valor: $meta.sobras.min}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: cocho
+        titulo: "Sobras baixas: {mon.sobras_texto}; meta {meta.sobras.min:.0f}–{meta.sobras.max:.0f}% (escore 3)"
+        causa: "O lote está comendo tudo; o consumo pode estar limitado pela oferta."
+        acao: "Aumentar a oferta em 2–3% e esperar 3 dias antes de novo ajuste."
+  fonte: "eXtension; SDSU; Inferências (ajustar só após 3 dias fora da meta)"
+  forca: B
+
+- id: ACP-S04
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Cocho acima da faixa nos 3 últimos dias (escore ou pesagem) — reduzir oferta ou investigar seleção
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: mon.sobras_min3, op: ">", valor: $meta.sobras.max}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: cocho
+        titulo: "Sobras altas: {mon.sobras_texto}; meta {meta.sobras.min:.0f}–{meta.sobras.max:.0f}% (escore 3)"
+        causa: "Oferta acima do consumo, rejeição ou seleção da dieta."
+        acao: "Reduzir a oferta em 2–3% e observar se sobra a parte grossa (seleção)."
+  fonte: "eXtension; SDSU; Dossiê ACP-07"
+  forca: B
+
+- id: ACP-06
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Cocho vazio por 2+ leituras em lote de alta ou recém-paridas
+  prioridade: 70
+  cf: 0.8
+  se:
+    - {fato: mon.dias_cocho_vazio, op: ">=", valor: "@params.cocho_vazio_dias"}
+    - {fato: perfil.fase, op: in, valor: [recem_parida, inicio]}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: cocho
+        titulo: "Cocho vazio há {mon.dias_cocho_vazio} leituras"
+        causa: "Consumo possivelmente limitado num lote que precisa comer o máximo."
+        acao: "Aumentar a oferta ~5% e empurrar o trato mais vezes ao dia."
+  fonte: "Dossiê ACP-06; DeVries 2023"
+  forca: C
+
+- id: ACP-06B
+  versao: 1
+  modulo: acompanhamento_diario
+  descricao: Cocho vazio por 2+ leituras nos demais lotes
+  prioridade: 70
+  cf: 0.7
+  se:
+    - {fato: mon.dias_cocho_vazio, op: ">=", valor: "@params.cocho_vazio_dias"}
+    - {fato: perfil.fase, op: nao_in, valor: [recem_parida, inicio]}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: cocho
+        titulo: "Cocho vazio há {mon.dias_cocho_vazio} leituras"
+        causa: "Oferta abaixo do consumo."
+        acao: "Aumentar a oferta ~5%."
+  fonte: "Dossiê ACP-06"
+  forca: C

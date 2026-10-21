@@ -245,6 +245,42 @@
   fonte: "IN 76/2018"
   forca: A
 
+- id: ACP-M09
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: Índice crioscópico fora da faixa da IN 76 — água no leite, manejo ou amostra
+  prioridade: 70
+  cf: 0.9
+  se:
+    - {fato: laudo.crioscopia, op: fora, valor: "@params.crioscopia_faixa"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: qualidade
+        titulo: "Crioscopia {laudo.crioscopia:.3f} °H fora da faixa (−0,555 a −0,530)"
+        causa: "Fora da faixa indica água no leite (equipamento, lavagem), problema de manejo ou de amostra."
+        acao: "Conferir o escoamento da ordenhadeira e do tanque e a coleta da amostra; pedir nova análise."
+  fonte: "IN 76/2018"
+  forca: A
+
+- id: ACP-M08
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: Qualidade do leite deixando de render na bonificação do laticínio
+  prioridade: 50
+  cf: 0.9
+  se:
+    - {fato: mon.bonificacao_perda_rs_mes, op: ">", valor: 0}
+  entao:
+    - alerta:
+        nivel: informativo
+        categoria: economia
+        titulo: "Bonificação: R$ {mon.bonificacao_rs_l:+.3f}/L hoje; deixando de ganhar ~R$ {mon.bonificacao_perda_rs_mes:.0f}/mês"
+        causa: "Pela tabela do laticínio, a qualidade atual não está na melhor faixa: {mon.bonificacao_detalhe}."
+        acao: "Priorizar o parâmetro com maior perda (CCS/CBT: rotina de ordenha e resfriamento; sólidos: dieta)."
+  fonte: "Tabela de bonificação do laticínio da fazenda; Dias et al. (Embrapa)"
+  forca: B
+
 - id: ACP-M05B
   versao: 1
   modulo: acompanhamento_mensal

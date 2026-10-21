@@ -41,93 +41,6 @@
   fonte: "OSU Buckeye Dairy News"
   forca: B
 
-- id: ACP-S03A
-  versao: 1
-  modulo: acompanhamento_semanal
-  descricao: Faixa-alvo de sobras para a fase do lote
-  prioridade: 90
-  se:
-    - {fato: perfil.fase, op: existe}
-    - {fato: mon.sobras_mm3, op: existe}
-  entao:
-    - calcular: {fato: meta.sobras, funcao: faixa, args: {chave: $perfil.fase, tabela: "@params.sobras_faixas"}}
-  fonte: "eXtension (feed bunk management)"
-  forca: B
-
-- id: ACP-S03
-  versao: 1
-  modulo: acompanhamento_semanal
-  descricao: Sobras (média de 3 dias) abaixo da faixa — aumentar oferta
-  prioridade: 60
-  cf: 0.7
-  se:
-    - {fato: mon.sobras_mm3, op: "<", valor: $meta.sobras.min}
-  entao:
-    - alerta:
-        nivel: atencao
-        categoria: cocho
-        titulo: "Sobras baixas: {mon.sobras_mm3:.1f}% (meta {meta.sobras.min:.0f}–{meta.sobras.max:.0f}%)"
-        causa: "O lote está comendo tudo; o consumo pode estar limitado pela oferta."
-        acao: "Aumentar a oferta em 2–3% e esperar 3 dias antes de novo ajuste."
-  fonte: "eXtension; SDSU"
-  forca: B
-
-- id: ACP-S04
-  versao: 1
-  modulo: acompanhamento_semanal
-  descricao: Sobras (média de 3 dias) acima da faixa — reduzir oferta ou investigar seleção
-  prioridade: 60
-  cf: 0.7
-  se:
-    - {fato: mon.sobras_mm3, op: ">", valor: $meta.sobras.max}
-  entao:
-    - alerta:
-        nivel: atencao
-        categoria: cocho
-        titulo: "Sobras altas: {mon.sobras_mm3:.1f}% (meta {meta.sobras.min:.0f}–{meta.sobras.max:.0f}%)"
-        causa: "Oferta acima do consumo, rejeição ou seleção da dieta."
-        acao: "Reduzir a oferta em 2–3% e observar se sobra a parte grossa (seleção)."
-  fonte: "eXtension; SDSU; Dossiê ACP-07"
-  forca: B
-
-- id: ACP-06
-  versao: 1
-  modulo: acompanhamento_semanal
-  descricao: Cocho vazio por 2+ leituras em lote de alta ou recém-paridas
-  prioridade: 70
-  cf: 0.8
-  se:
-    - {fato: mon.dias_cocho_vazio, op: ">=", valor: "@params.cocho_vazio_dias"}
-    - {fato: perfil.fase, op: in, valor: [recem_parida, inicio]}
-  entao:
-    - alerta:
-        nivel: critico
-        categoria: cocho
-        titulo: "Cocho vazio há {mon.dias_cocho_vazio} leituras"
-        causa: "Consumo possivelmente limitado num lote que precisa comer o máximo."
-        acao: "Aumentar a oferta ~5% e empurrar o trato mais vezes ao dia."
-  fonte: "Dossiê ACP-06; DeVries 2023"
-  forca: C
-
-- id: ACP-06B
-  versao: 1
-  modulo: acompanhamento_semanal
-  descricao: Cocho vazio por 2+ leituras nos demais lotes
-  prioridade: 70
-  cf: 0.7
-  se:
-    - {fato: mon.dias_cocho_vazio, op: ">=", valor: "@params.cocho_vazio_dias"}
-    - {fato: perfil.fase, op: nao_in, valor: [recem_parida, inicio]}
-  entao:
-    - alerta:
-        nivel: atencao
-        categoria: cocho
-        titulo: "Cocho vazio há {mon.dias_cocho_vazio} leituras"
-        causa: "Oferta abaixo do consumo."
-        acao: "Aumentar a oferta ~5%."
-  fonte: "Dossiê ACP-06"
-  forca: C
-
 - id: ACP-05
   versao: 1
   modulo: acompanhamento_semanal
@@ -178,4 +91,148 @@
   entao:
     - concluir: {fato: hipotese.acidose, valor: true}
   fonte: "Paudyal 2018 (queda coletiva = causa coletiva)"
+  forca: C
+
+- id: ACP-12
+  versao: 1
+  modulo: acompanhamento_semanal
+  descricao: Lote entrou nos 190 dias de gestação — a exigência de gestação começa a contar
+  prioridade: 60
+  se:
+    - {fato: perfil.dias_gestacao, op: ">=", valor: "@params.gestacao_dias_exigencia"}
+    - {fato: perfil.dias_gestacao, op: "<=", valor: "@params.aviso_gestacao_ate"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Gestação chegou a {perfil.dias_gestacao:.0f} dias: exigências aumentaram"
+        causa: "A partir de 190 dias a gestação soma energia e proteína metabolizável à exigência do lote."
+        acao: "Rever a dieta (verificar ou sugerir custo mínimo) para incluir a exigência de gestação."
+  fonte: "NRC 2001 via AgModel; Dossiê ACP-12"
+  forca: B
+
+- id: ACP-SEC
+  versao: 1
+  modulo: acompanhamento_semanal
+  descricao: Lote em lactação a ~60 dias do parto previsto — programar a secagem
+  prioridade: 60
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: perfil.dias_gestacao, op: ">=", valor: "@params.dias_gestacao_secagem"}
+  entao:
+    - calcular: {fato: mon.dias_para_parto_previsto, funcao: diferenca, args: {a: "@params.gestacao_duracao", b: $perfil.dias_gestacao}}
+    - alerta:
+        nivel: atencao
+        categoria: manejo
+        titulo: "Programar a secagem: parto previsto em ~{mon.dias_para_parto_previsto:.0f} dias"
+        causa: "Período seco recomendado de 50–60 dias antes do parto."
+        acao: "Secar as vacas, mover para o lote de vacas secas e usar dieta de vaca seca."
+  fonte: "Inferências nº 36; Embrapa Doc 286 (período seco 50–60 d)"
+  forca: A
+
+- id: ACP-PRE
+  versao: 1
+  modulo: acompanhamento_semanal
+  descricao: Lote seco a 21 dias do parto — dieta de pré-parto; DCAD negativa só para multíparas
+  prioridade: 60
+  se:
+    - {fato: lote.estado, op: "=", valor: seca}
+    - {fato: perfil.fase, op: "=", valor: pre_parto}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Lote no pré-parto ({lote.dias_para_parto:.0f} dias para o parto)"
+        causa: "Nas 3 semanas antes do parto a dieta de transição reduz febre do leite, retenção de placenta e metrite."
+        acao: "Dieta de pré-parto (PB ~14%, CMS 1,8–2% do PV). DCAD negativa (−100 mEq/kg) só para as multíparas; para novilhas não há evidência."
+  fonte: "Santos et al. 2019 (meta-análise); Inferências nº 36"
+  forca: A
+
+- id: ACP-11
+  versao: 1
+  modulo: acompanhamento_semanal
+  descricao: Lote a pasto perdendo ECC e caminhando mais — gasto de atividade pode estar subestimado
+  prioridade: 55
+  cf: 0.5
+  se:
+    - {fato: lote.sistema, op: in, valor: [pasto, semiconfinado]}
+    - {fato: mon.ecc_perda, op: ">", valor: "@params.ecc_perda_atencao"}
+    - {fato: mon.distancia_delta, op: ">=", valor: "@params.distancia_aumento"}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "Caminhada aumentou {mon.distancia_delta:.1f} km/dia e o lote perde condição"
+        causa: "O gasto de energia com atividade de pastejo cresce com a distância e o relevo."
+        acao: "Atualizar a distância e o relevo no cadastro do lote para recalcular a exigência; rever a energia da dieta."
+  fonte: "Dossiê ACP-11; NRC 2001 via eOrganic"
+  forca: C
+
+- id: ACP-P0
+  versao: 1
+  modulo: acompanhamento_semanal
+  descricao: Metas de altura do pasto para a forrageira do lote
+  prioridade: 90
+  se:
+    - {fato: lote.forrageira, op: existe}
+    - {fato: lote.sistema, op: in, valor: [pasto, semiconfinado]}
+  entao:
+    - calcular: {fato: meta.altura, funcao: metas_altura, args: {forrageira: $lote.forrageira, tabela: "@params.alturas_pasto", tolerancia: "@params.altura_tolerancia"}}
+  fonte: "Embrapa (Lopes; Gomide 2011)"
+  forca: C
+
+- id: ACP-P1
+  versao: 1
+  modulo: acompanhamento_semanal
+  descricao: Entrada no piquete com o pasto alto demais — forragem passada
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: mon.altura_entrada, op: ">", valor: $meta.altura.entrada_max}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: pasto
+        titulo: "Pasto passado na entrada: {mon.altura_entrada:.0f} cm (máx. {meta.altura.entrada_max:.0f})"
+        causa: "Acima da altura de entrada a forragem perde qualidade (mais colmo, menos folha)."
+        acao: "Entrar mais cedo nos piquetes ou aumentar a lotação."
+  fonte: "Embrapa (Lopes) — 95% de interceptação luminosa"
+  forca: C
+
+- id: ACP-P2
+  versao: 1
+  modulo: acompanhamento_semanal
+  descricao: Saída do piquete com o pasto baixo demais — superpastejo
+  prioridade: 60
+  cf: 0.7
+  se:
+    - {fato: mon.altura_saida, op: "<", valor: $meta.altura.saida_min}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: pasto
+        titulo: "Superpastejo: saída a {mon.altura_saida:.0f} cm (mín. {meta.altura.saida_min:.0f})"
+        causa: "Rebaixar demais o pasto reduz o consumo das vacas e a rebrota."
+        acao: "Tirar o lote mais cedo, reduzir a lotação ou suplementar volumoso."
+  fonte: "Embrapa (Lopes)"
+  forca: C
+
+- id: ACP-P3
+  versao: 1
+  modulo: acompanhamento_semanal
+  descricao: Pastejo contínuo com altura média fora da meta
+  prioridade: 60
+  cf: 0.7
+  se:
+    - qualquer:
+        - {fato: mon.altura_media, op: "<", valor: $meta.altura.media_min}
+        - {fato: mon.altura_media, op: ">", valor: $meta.altura.media_max}
+  entao:
+    - alerta:
+        nivel: atencao
+        categoria: pasto
+        titulo: "Altura média do pasto {mon.altura_media:.0f} cm fora da meta ({meta.altura.media_min:.0f}–{meta.altura.media_max:.0f})"
+        causa: "Abaixo da meta: superpastejo; acima: subpastejo e perda de qualidade."
+        acao: "Ajustar a lotação (ou a área) para manter a altura na meta."
+  fonte: "Gomide 2011 (braquiária em lotação contínua: 25 cm)"
   forca: C

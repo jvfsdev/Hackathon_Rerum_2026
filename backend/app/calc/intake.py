@@ -33,3 +33,21 @@ def teto_fibra(pv: float, fdn_dieta_pct: float, limite_pct_pv: float) -> float:
 
 def cms_pct_pv(cms: float, pv: float) -> float:
     return 100 * cms / pv
+
+
+def cms_nasem2021(pv: float, leite: float, gordura_pct: float, proteina_pct: float, ecc: float, del_: float,
+                  fracao_multiparas: float, lactose_pct: float | None = None) -> float:
+    """NASEM 2021, equação baseada no animal (ICAR Appendix 2):
+    DMI = [(3,7 + Par·5,7) + 0,305·MilkE + 0,022·PV + (−0,689 − 1,87·Par)·ECC] × [1 − (0,212 + Par·0,136)·e^(−0,053·DEL)]
+    MilkE = energia do leite (Mcal/d). Par = fração de multíparas no lote (interpolação no lote: escolha de engenharia)."""
+    from .energy import ell_leite_por_kg
+    par = fracao_multiparas
+    milk_e = leite * ell_leite_por_kg(gordura_pct, proteina_pct, lactose_pct)
+    base = (3.7 + par * 5.7) + 0.305 * milk_e + 0.022 * pv + (-0.689 - 1.87 * par) * ecc
+    return base * (1 - (0.212 + par * 0.136) * math.exp(-0.053 * del_))
+
+
+def cms_final(equacao: float, ajuste: float = 0.0, teto: float | None = None) -> float:
+    """CMS esperado = equação + ajustes (ex.: digestibilidade da FDN), limitado pelo teto de enchimento."""
+    valor = equacao + (ajuste or 0.0)
+    return min(valor, teto) if teto is not None else valor

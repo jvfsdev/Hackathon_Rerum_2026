@@ -41,3 +41,40 @@ def perda_producao_ccs_pct(ccs_mil: float) -> float:
 
 def media_geometrica(valores: list[float]) -> float:
     return math.exp(sum(math.log(v) for v in valores) / len(valores))
+
+
+def faixa_bonificacao(valor: float, faixas: list[dict]) -> float:
+    """Ajuste (R$/L) da faixa em que o valor cai. Faixa: {"min": x|None, "max": y|None, "rs_l": z} (limites inclusivos)."""
+    for f in faixas:
+        if (f.get("min") is None or valor >= f["min"]) and (f.get("max") is None or valor <= f["max"]):
+            return float(f["rs_l"])
+    return 0.0
+
+
+def bonificacao(laudo: dict, tabela: dict) -> dict:
+    """Bonificação/penalização do laticínio por qualidade. laudo: {"ccs": 520, "cbt": 90, "gordura": 3.9, ...};
+    tabela: {parametro: [faixas]}. Devolve o total atual, o de cada parâmetro e o máximo possível."""
+    por, melhor = {}, 0.0
+    for parametro, faixas in tabela.items():
+        if not faixas:
+            continue
+        melhor += max(float(f["rs_l"]) for f in faixas)
+        if laudo.get(parametro) is not None:
+            por[parametro] = faixa_bonificacao(laudo[parametro], faixas)
+    total = sum(por.values())
+    return {"total": total, "por_parametro": por, "maximo": melhor, "perda_vs_maximo": melhor - total
+            if len(por) == len([f for f in tabela.values() if f]) else None}
+
+
+def iofc(litros_vaca: float, preco_leite: float, custo_dieta_vaca: float) -> float:
+    """Receita do leite menos o custo de TODA a dieta, por vaca/dia (income over feed cost)."""
+    return litros_vaca * preco_leite - custo_dieta_vaca
+
+
+def quadrado_de_pearson(teor_a: float, teor_b: float, alvo: float) -> dict:
+    """Mistura de 2 ingredientes para atingir um teor (ex.: % PB): partes de A e B e % de cada na mistura."""
+    if not min(teor_a, teor_b) < alvo < max(teor_a, teor_b):
+        raise ValueError("o alvo precisa estar entre os teores dos dois ingredientes")
+    partes_a, partes_b = abs(teor_b - alvo), abs(teor_a - alvo)
+    total = partes_a + partes_b
+    return {"partes_a": partes_a, "partes_b": partes_b, "pct_a": 100 * partes_a / total, "pct_b": 100 * partes_b / total}

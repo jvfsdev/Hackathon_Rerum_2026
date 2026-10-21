@@ -167,9 +167,24 @@
   se:
     - {fato: lote.estado, op: "=", valor: lactacao}
     - {fato: lote.grupo_genetico, op: nao_in, valor: "@params.grupos_zebuinos"}
+    - {fato: lote.ecc, op: ausente}
   entao:
     - concluir: {fato: perfil.equacao_cms, valor: nrc2001}
   fonte: "NRC 2001"
+  forca: B
+
+- id: CLS-08N
+  versao: 1
+  modulo: classificacao
+  descricao: Holandês/Jersey com ECC informado usam a equação configurada (NRC 2001 ou NASEM 2021, que considera ECC e paridade)
+  prioridade: 80
+  se:
+    - {fato: lote.estado, op: "=", valor: lactacao}
+    - {fato: lote.grupo_genetico, op: nao_in, valor: "@params.grupos_zebuinos"}
+    - {fato: lote.ecc, op: existe}
+  entao:
+    - concluir: {fato: perfil.equacao_cms, valor: "@params.equacao_cms_com_ecc"}
+  fonte: "Dossiê EXG-08; NASEM 2021 (de Souza et al. 2019)"
   forca: B
 
 - id: CLS-09

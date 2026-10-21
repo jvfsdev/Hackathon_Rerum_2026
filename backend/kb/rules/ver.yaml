@@ -379,6 +379,66 @@
   fonte: "Rótulo do produto; Dossiê (minerais via núcleo)"
   forca: C
 
+- id: VER-15
+  versao: 1
+  modulo: verificacao
+  descricao: Pré-parto com multíparas e DCAD positiva — acidificar a dieta (DCAD negativa)
+  prioridade: 60
+  cf: 0.9
+  se:
+    - {fato: perfil.fase, op: "=", valor: pre_parto}
+    - {fato: lote.fracao_primiparas, op: "<", valor: 1}
+    - {fato: dieta.dcad_meq_kg, op: ">", valor: "@params.dcad_alerta_preparto"}
+  entao:
+    - concluir: {fato: ver.dcad_alta, valor: true}
+    - alerta:
+        nivel: atencao
+        categoria: dieta
+        titulo: "DCAD do pré-parto em {dieta.dcad_meq_kg:+.0f} mEq/kg (meta ≈ {@params.dcad_meta_preparto} para multíparas)"
+        causa: "DCAD positiva no pré-parto aumenta febre do leite, retenção de placenta e metrite nas multíparas."
+        acao: "Reduzir potássio (volumoso com menos K) e incluir sal aniônico até a DCAD ficar negativa; conferir pH urinário."
+  fonte: "Santos et al. 2019 (meta-análise)"
+  forca: A
+
+- id: VER-15N
+  versao: 1
+  modulo: verificacao
+  descricao: Lote de pré-parto só de novilhas com DCAD negativa — sem evidência de benefício
+  prioridade: 60
+  cf: 0.8
+  se:
+    - {fato: perfil.fase, op: "=", valor: pre_parto}
+    - {fato: lote.fracao_primiparas, op: ">=", valor: 1}
+    - {fato: dieta.dcad_meq_kg, op: "<", valor: 0}
+  entao:
+    - alerta:
+        nivel: informativo
+        categoria: dieta
+        titulo: "DCAD negativa ({dieta.dcad_meq_kg:+.0f} mEq/kg) num lote só de novilhas"
+        causa: "A meta-análise não encontrou benefício da dieta aniônica em novilhas."
+        acao: "Dieta aniônica só para as multíparas; para novilhas, dieta de pré-parto convencional."
+  fonte: "Santos et al. 2019"
+  forca: A
+
+- id: VER-15I
+  versao: 1
+  modulo: verificacao
+  descricao: Pré-parto sem minerais suficientes para calcular a DCAD
+  prioridade: 55
+  se:
+    - {fato: perfil.fase, op: "=", valor: pre_parto}
+    - {fato: dieta.ms_kg, op: ">", valor: 0}
+    - {fato: dieta.dcad_meq_kg, op: ausente}
+  entao:
+    - alerta:
+        nivel: informativo
+        categoria: dieta
+        titulo: "Não dá para verificar a DCAD do pré-parto"
+        causa: "Faltam Na, K, Cl ou S de algum alimento da dieta (tabela ou rótulo)."
+        acao: "Informar os minerais dos insumos (análise ou rótulo do núcleo/sal aniônico) para o sistema verificar a DCAD."
+  fonte: "Santos et al. 2019"
+  forca: A
+
 - id: VER-90
   versao: 1
   modulo: verificacao
@@ -409,6 +469,7 @@
         - {fato: ver.excesso_energetico, op: existe}
         - {fato: ver.inclusao_excedida, op: existe}
         - {fato: ver.pastejo_em_confinado, op: existe}
+        - {fato: ver.dcad_alta, op: existe}
   entao:
     - concluir: {fato: parecer.dieta, valor: ajustar}
   fonte: "Dossiê VER-08"

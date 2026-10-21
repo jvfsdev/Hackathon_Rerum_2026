@@ -55,6 +55,7 @@ OPERADORES = {
     "nao_in": lambda a, b: a not in b,
     "entre": lambda a, b: b[0] <= a <= b[1],
     "contem": lambda a, b: b in a,
+    "fora": lambda a, b: not (b[0] <= a <= b[1]),
 }
 
 

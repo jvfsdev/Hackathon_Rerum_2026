@@ -92,6 +92,20 @@
   fonte: "Definição do sistema de produção"
   forca: A
 
+- id: FOR-07
+  versao: 1
+  modulo: formulacao
+  descricao: Pré-parto com multíparas — DCAD máxima do PL (a mesma da verificação VER-15)
+  prioridade: 80
+  se:
+    - {fato: formulacao.solicitada, op: "=", valor: true}
+    - {fato: perfil.fase, op: "=", valor: pre_parto}
+    - {fato: lote.fracao_primiparas, op: "<", valor: 1}
+  entao:
+    - concluir: {fato: pl.dcad_max, valor: "@params.dcad_alerta_preparto"}
+  fonte: "Santos et al. 2019"
+  forca: A
+
 - id: FOR-10
   versao: 1
   modulo: formulacao
@@ -236,6 +250,24 @@
         acao: "Incluir volumoso menos energético (capim, silagem de sorgo, braquiária) ou reduzir o concentrado."
   fonte: "Penn State; OMAFRA"
   forca: C
+
+- id: FOR-18
+  versao: 1
+  modulo: formulacao
+  descricao: PL inviável porque a DCAD negativa não é atingível com os alimentos escolhidos
+  prioridade: 60
+  se:
+    - {fato: pl.status, op: in, valor: [inviavel, parcial]}
+    - {fato: pl.restricoes_violadas, op: contem, valor: dcad}
+  entao:
+    - alerta:
+        nivel: critico
+        categoria: formulacao
+        titulo: "DCAD do pré-parto não fica negativa com estes alimentos"
+        causa: "Os volumosos e concentrados escolhidos têm potássio demais em relação ao cloro e ao enxofre."
+        acao: "Cadastrar e incluir um sal aniônico (com os teores de Cl e S do rótulo) ou um volumoso com menos potássio."
+  fonte: "Santos et al. 2019"
+  forca: A
 
 - id: FOR-21
   versao: 1

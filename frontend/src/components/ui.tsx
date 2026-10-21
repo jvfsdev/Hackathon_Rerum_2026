@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { api, fmt, rotulo, UNIDADES, type Alerta, type NoComo, type Nivel } from '../api'
+import { useNavigate } from 'react-router-dom'
+import { api, dataBR, fmt, rotulo, UNIDADES, type Alerta, type EstadoAlerta, type ItemHistorico, type NoComo, type Nivel } from '../api'
 
 const COR_NIVEL: Record<Nivel, string> = {
   critico: 'bg-red-50 text-critico ring-red-200',
@@ -136,16 +137,29 @@ export function BotaoComo({ no, titulo }: { no?: NoComo; titulo?: string }) {
 }
 
 /** Explicação completa de um alerta salvo: regra disparada + derivação das premissas. */
-export function ExplicacaoAlerta({ alerta }: { alerta: Alerta }) {
+export function ExplicacaoAlerta({ alerta: inicial }: { alerta: Alerta }) {
+  const [alerta, setAlerta] = useState<Alerta>(inicial)
   const [dados, setDados] = useState<any>(null)
+  const [hist, setHist] = useState<ItemHistorico[] | null>(null)
   const [erro, setErro] = useState('')
+  const carregarHist = () => {
+    if (inicial.id && inicial.estado) api.get<any>(`/alertas/${inicial.id}`).then((a) => { setAlerta(a); setHist(a.historico) })
+  }
   useEffect(() => {
-    if (!alerta.sessao_id) return
-    api.get(`/inferencia/sessoes/${alerta.sessao_id}/regra/${alerta.regra}`).then(setDados).catch((e) => setErro(e.message))
-  }, [alerta])
+    carregarHist()
+    if (!inicial.sessao_id) return
+    api.get(`/inferencia/sessoes/${inicial.sessao_id}/regra/${inicial.regra}`).then(setDados).catch((e) => setErro(e.message))
+  }, [inicial])  // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="space-y-4">
       <AlertaCorpo alerta={alerta} />
+      <AlertaAcoes alerta={alerta} onMudou={carregarHist} />
+      {hist && (
+        <div>
+          <h4 className="mb-2 text-sm font-semibold text-stone-800">Histórico do alerta e ações</h4>
+          <LinhaDoTempo itens={hist} />
+        </div>
+      )}
       {erro && <Erro msg={erro} />}
       {!dados && !erro && alerta.sessao_id && <Carregando />}
       {dados && (
@@ -162,30 +176,131 @@ export function ExplicacaoAlerta({ alerta }: { alerta: Alerta }) {
   )
 }
 
+const ESTADO: Record<EstadoAlerta, [string, string]> = {
+  aberto: ['Aberto', 'bg-white text-stone-700 ring-stone-300'], aceito: ['Aceito — em andamento', 'bg-campo-50 text-campo-700 ring-campo-100'],
+  recusado: ['Recusado', 'bg-stone-100 text-stone-600 ring-stone-200'], resolvido: ['Resolvido', 'bg-campo-600 text-white ring-campo-600'],
+  expirado: ['Expirado', 'bg-stone-200 text-stone-600 ring-stone-300'],
+}
+
+export function EstadoBadge({ estado }: { estado?: EstadoAlerta }) {
+  if (!estado) return null
+  const [nome, cor] = ESTADO[estado]
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${cor}`}>{nome}</span>
+}
+
 export function AlertaCorpo({ alerta }: { alerta: Alerta }) {
+  const encerrado = alerta.estado === 'resolvido' || alerta.estado === 'expirado' || alerta.estado === 'recusado'
   return (
-    <div className={alerta.status === 'suprimido' ? 'opacity-70' : ''}>
+    <div className={alerta.status === 'suprimido' || encerrado ? 'opacity-80' : ''}>
       <div className="flex flex-wrap items-center gap-2">
         <NivelBadge nivel={alerta.nivel} />
+        <EstadoBadge estado={alerta.estado} />
         {alerta.status === 'suprimido' && <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs font-semibold text-stone-600">Suprimido</span>}
         <span className="font-mono text-xs text-stone-500">{alerta.regra}</span>
         <ForcaBadge forca={alerta.forca} />
         <CfBarra cf={alerta.cf} />
-        {alerta.data && <span className="text-xs text-stone-400">{new Date(alerta.data + 'T12:00').toLocaleDateString('pt-BR')}</span>}
+        {alerta.aberto_em ? (
+          <span className="text-xs text-stone-400">
+            desde {dataBR(alerta.aberto_em)}{alerta.ultima_ocorrencia && alerta.ultima_ocorrencia !== alerta.aberto_em && ` · última ${dataBR(alerta.ultima_ocorrencia)}`}
+            {(alerta.ocorrencias ?? 1) > 1 && ` · ${alerta.ocorrencias} ocorrências`}
+          </span>
+        ) : alerta.data && <span className="text-xs text-stone-400">{dataBR(alerta.data)}</span>}
       </div>
       <p className="mt-1.5 font-medium text-stone-900">{alerta.titulo}</p>
       {alerta.causa && <p className="mt-1 text-sm text-stone-600"><span className="font-medium text-stone-700">Causa provável: </span>{alerta.causa}</p>}
       {alerta.acao && <p className="mt-1 text-sm text-stone-600"><span className="font-medium text-campo-700">Ação sugerida: </span>{alerta.acao}</p>}
       {alerta.nota && <p className="mt-1 rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">Meta-regra {alerta.nota}</p>}
+      {alerta.resolucao && (
+        <p className={`mt-1.5 rounded-lg px-2 py-1.5 text-sm ${alerta.estado === 'resolvido' ? 'bg-campo-50 text-campo-900' : 'bg-stone-100 text-stone-700'}`}>
+          <b>{alerta.estado === 'resolvido' ? 'Resolvido' : 'Encerrado'} em {dataBR(alerta.estado_em)}:</b> {alerta.resolucao}
+        </p>
+      )}
     </div>
   )
 }
 
-export function AlertaItem({ alerta, onAbrir }: { alerta: Alerta; onAbrir?: () => void }) {
+/** Aceitar (vai para a tela da ação) ou recusar (com motivo) a recomendação de um alerta persistido. */
+export function AlertaAcoes({ alerta, onMudou }: { alerta: Alerta; onMudou?: (a: Alerta) => void }) {
+  const navegar = useNavigate()
+  const [recusando, setRecusando] = useState(false)
+  const [motivo, setMotivo] = useState('')
+  const [erro, setErro] = useState('')
+  if (!alerta.id || !alerta.estado || alerta.estado === 'resolvido' || alerta.estado === 'expirado') return null
+  const aceitar = async () => {
+    setErro('')
+    try {
+      const r = await api.post<{ destino: string }>(`/alertas/${alerta.id}/aceitar`, {})
+      navegar(r.destino)
+    } catch (e: any) { setErro(e.message) }
+  }
+  const recusar = async () => {
+    setErro('')
+    try { const a = await api.post<Alerta>(`/alertas/${alerta.id}/recusar`, { motivo }); setRecusando(false); onMudou?.(a) }
+    catch (e: any) { setErro(e.message) }
+  }
+  return (
+    <div className="mt-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {alerta.estado === 'aceito' ? (
+          <button className="btn-primario px-3 py-1.5" onClick={() => alerta.destino && navegar(alerta.destino)}>Registrar a ação →</button>
+        ) : (
+          <button className="btn-primario px-3 py-1.5" onClick={aceitar}>{alerta.estado === 'recusado' ? 'Aceitar agora' : 'Aceitar e registrar ação'}</button>
+        )}
+        {alerta.estado !== 'recusado' && !recusando && <button className="btn-secundario px-3 py-1.5" onClick={() => setRecusando(true)}>Recusar</button>}
+      </div>
+      {recusando && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          <input autoFocus className="input max-w-md flex-1" placeholder="Motivo da recusa (obrigatório)" value={motivo}
+            onChange={(e) => setMotivo(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && motivo.trim() && recusar()} />
+          <button className="btn-secundario" disabled={!motivo.trim()} onClick={recusar}>Confirmar recusa</button>
+          <button className="text-sm text-stone-500 hover:underline" onClick={() => setRecusando(false)}>cancelar</button>
+        </div>
+      )}
+      {erro && <div className="mt-2"><Erro msg={erro} /></div>}
+    </div>
+  )
+}
+
+const TIPO_HIST: Record<string, [string, string]> = {
+  aberto: ['Alerta aberto', 'bg-amber-500'], agravado: ['Agravou', 'bg-red-600'], reaberto: ['Reaberto', 'bg-red-600'],
+  aceito: ['Recomendação aceita', 'bg-campo-500'], acao_registrada: ['Ação registrada', 'bg-campo-700'],
+  recusado: ['Recusado', 'bg-stone-500'], resolvido: ['Resolvido', 'bg-campo-600'], expirado: ['Expirado', 'bg-stone-400'],
+}
+
+/** Linha do tempo de um alerta (ou de vários, com `mostrarAlerta`). */
+export function LinhaDoTempo({ itens, mostrarAlerta = false, onAbrirAlerta }: { itens: ItemHistorico[]; mostrarAlerta?: boolean; onAbrirAlerta?: (id: number) => void }) {
+  if (!itens.length) return <p className="text-sm text-stone-500">Sem registros.</p>
+  return (
+    <ol className="relative ml-2 border-l border-stone-200">
+      {itens.map((h) => {
+        const [nome, cor] = TIPO_HIST[h.tipo] ?? [h.tipo, 'bg-stone-400']
+        return (
+          <li key={h.id} className="mb-3 ml-4">
+            <span className={`absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full ${cor}`} />
+            <div className="flex flex-wrap items-baseline gap-x-2 text-xs text-stone-500">
+              <span className="num font-medium text-stone-700">{new Date(h.data_hora).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+              <span className="font-semibold text-stone-800">{nome}</span>
+              <span>{h.automatico ? 'sistema' : 'usuário'}</span>
+              {mostrarAlerta && h.alerta && (
+                <button className="text-campo-600 hover:underline" onClick={() => onAbrirAlerta?.(h.alerta!.id)}>
+                  <span className="font-mono">{h.alerta.regra}</span> {h.alerta.titulo.slice(0, 70)}
+                </button>
+              )}
+            </div>
+            <p className="mt-0.5 text-sm text-stone-700">{h.descricao}</p>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+export function AlertaItem({ alerta, onAbrir, onMudou }: { alerta: Alerta; onAbrir?: () => void; onMudou?: (a: Alerta) => void }) {
   return (
     <div className="border-b border-stone-100 py-3 last:border-0">
       <AlertaCorpo alerta={alerta} />
-      {onAbrir && <button onClick={onAbrir} className="mt-1.5 text-xs font-medium text-campo-600 hover:underline">Por que este alerta?</button>}
+      <AlertaAcoes alerta={alerta} onMudou={onMudou} />
+      {onAbrir && <button onClick={onAbrir} className="mt-1.5 text-xs font-medium text-campo-600 hover:underline">Por que este alerta? · histórico</button>}
     </div>
   )
 }

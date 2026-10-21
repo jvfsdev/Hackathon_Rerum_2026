@@ -1,12 +1,12 @@
 """Cadastro: fazendas, lotes, dietas, registros, eventos e alertas."""
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
 from sqlmodel import select
 
-from .. import services
-from ..db.models import AlertaDB, Dieta, Evento, Fazenda, Lote, Registro, sessao
-from .schemas import AlertaUpdate, DietaIn, EventoIn, LoteIn, RegistroIn
+from .. import alertas, services
+from ..db.models import AlertaDB, AlimentoFazenda, Dieta, Evento, Fazenda, HistoricoAlerta, Lote, Registro, sessao
+from .schemas import AceitarIn, AlimentoIn, BonificacaoIn, DietaIn, EventoIn, ImportacaoIn, LoteIn, PrecosIn, RecusarIn, RegistroIn
 
 router = APIRouter()
 
@@ -40,15 +40,167 @@ def painel(fazenda_id: int):
             comp = None
             if dieta:
                 from ..calc.diet import composicao
-                comp = composicao(services.itens_dieta(dieta.itens))
-            alertas = s.exec(select(AlertaDB).where(AlertaDB.lote_id == lote.id, AlertaDB.status == "ativo",
-                                                    AlertaDB.data >= hoje - timedelta(days=13))
-                             .order_by(AlertaDB.data.desc())).all()
-            contagem = {n: sum(a.nivel == n for a in alertas) for n in ("critico", "atencao", "informativo")}
+                comp = composicao(services.itens_dieta(dieta.itens, services.precos_fazenda(s, fazenda_id),
+                                                       services.catalogo(s, fazenda_id)))
+            pendentes = s.exec(select(AlertaDB).where(AlertaDB.lote_id == lote.id, AlertaDB.suprimido == False,  # noqa: E712
+                                                      AlertaDB.estado.in_(("aberto", "aceito")))
+                               .order_by(AlertaDB.ultima_ocorrencia.desc())).all()
+            contagem = {n: sum(a.nivel == n for a in pendentes) for n in ("critico", "atencao", "informativo")}
             cards.append({"lote": lote, "hoje": ultimo, "serie": serie[-30:], "dieta": dieta,
                           "custo_dieta": comp.get("custo_vaca_dia") if comp else None, "alertas": contagem,
-                          "principal": alertas and sorted(alertas, key=lambda a: ["critico", "atencao", "informativo"].index(a.nivel))[0]})
+                          "principal": pendentes and sorted(pendentes, key=lambda a: -alertas.NIVEL[a.nivel])[0]})
         return {"fazenda": fazenda, "data": hoje, "lotes": cards}
+
+
+@router.get("/fazendas/{fazenda_id}/precos")
+def listar_precos(fazenda_id: int):
+    """Preço vigente de cada alimento (da fazenda ou de referência) com histórico; leite e concentrado."""
+    with sessao() as s:
+        fazenda = s.get(Fazenda, fazenda_id)
+        if not fazenda:
+            raise HTTPException(404, "fazenda não encontrada")
+        hist = services.historico_precos(s, fazenda_id)
+
+        def linha(item, referencia, **extra):
+            regs = hist.get(item, [])
+            return {"id": item, "preco_referencia": referencia, "preco": regs[0].preco if regs else referencia,
+                    "origem": "fazenda" if regs else "referencia", "data": regs[0].data if regs else None,
+                    "fonte": regs[0].fonte if regs else "", **extra,
+                    "historico": [{"data": r.data, "preco": r.preco, "fonte": r.fonte} for r in regs[:12]]}
+
+        alimentos = [linha(a["id"], None if a["da_fazenda"] else a["preco_kg_mn"], nome=a["nome"], tipo=a["tipo"],
+                           ms=a["ms"], da_fazenda=a["da_fazenda"])
+                     for a in services.catalogo(s, fazenda_id, so_ativos=True).values()]
+        return {"leite": linha("leite", None) | {"preco": fazenda.preco_leite},
+                "concentrado": linha("concentrado", None) | {"preco": fazenda.preco_concentrado},
+                "alimentos": alimentos}
+
+
+@router.put("/fazendas/{fazenda_id}/precos")
+def atualizar_precos(fazenda_id: int, dados: PrecosIn):
+    """Registra novos preços (o anterior fica no histórico). Valem para verificação, formulação e acompanhamento."""
+    with sessao() as s:
+        fazenda = s.get(Fazenda, fazenda_id)
+        if not fazenda:
+            raise HTTPException(404, "fazenda não encontrada")
+        services.registrar_precos(s, fazenda, dados.precos, dados.data or date.today(), dados.fonte)
+    return listar_precos(fazenda_id)
+
+
+def _insumo(s, fazenda_id: int, codigo: str) -> AlimentoFazenda:
+    a = s.exec(select(AlimentoFazenda).where(AlimentoFazenda.fazenda_id == fazenda_id,
+                                             AlimentoFazenda.codigo == codigo)).first()
+    if not a:
+        raise HTTPException(404, "insumo da fazenda não encontrado (os da base de conhecimento não são editáveis)")
+    return a
+
+
+@router.get("/fazendas/{fazenda_id}/alimentos")
+def listar_insumos(fazenda_id: int, incluir_inativos: bool = False):
+    """Catálogo da fazenda: alimentos da base de conhecimento + insumos cadastrados (com preço vigente)."""
+    with sessao() as s:
+        precos = services.precos_fazenda(s, fazenda_id)
+        cat = services.catalogo(s, fazenda_id, so_ativos=not incluir_inativos)
+        return [services.alimento_com_preco(aid, precos, cat) for aid in cat]
+
+
+@router.post("/fazendas/{fazenda_id}/alimentos")
+def criar_insumo(fazenda_id: int, dados: AlimentoIn):
+    with sessao() as s:
+        fazenda = s.get(Fazenda, fazenda_id)
+        if not fazenda:
+            raise HTTPException(404, "fazenda não encontrada")
+        a = services.criar_alimento(s, fazenda, dados.model_dump())
+        return services.catalogo(s, fazenda_id)[a.codigo]
+
+
+@router.put("/fazendas/{fazenda_id}/alimentos/{codigo}")
+def editar_insumo(fazenda_id: int, codigo: str, dados: AlimentoIn):
+    with sessao() as s:
+        a = services.atualizar_alimento(s, _insumo(s, fazenda_id, codigo), dados.model_dump())
+        return services.catalogo(s, fazenda_id)[a.codigo]
+
+
+@router.post("/fazendas/{fazenda_id}/alimentos/{codigo}/{acao}")
+def ativar_insumo(fazenda_id: int, codigo: str, acao: str):
+    """acao = desativar | reativar. Desativado sai das listas de escolha; dietas antigas continuam válidas."""
+    if acao not in ("desativar", "reativar"):
+        raise HTTPException(404, "ação inválida")
+    with sessao() as s:
+        a = _insumo(s, fazenda_id, codigo)
+        a.ativo = acao == "reativar"
+        s.add(a)
+        s.commit()
+        return {"codigo": codigo, "ativo": a.ativo}
+
+
+@router.get("/fazendas/{fazenda_id}/bonificacao")
+def obter_bonificacao(fazenda_id: int):
+    with sessao() as s:
+        faz = s.get(Fazenda, fazenda_id)
+        if not faz:
+            raise HTTPException(404, "fazenda não encontrada")
+        return {"tabela": faz.bonificacao or {}}
+
+
+@router.put("/fazendas/{fazenda_id}/bonificacao")
+def salvar_bonificacao(fazenda_id: int, dados: BonificacaoIn):
+    """Tabela de bonificação/penalização por qualidade do laticínio (faixas por parâmetro, em R$/L)."""
+    validos = {"ccs", "cbt", "gordura", "proteina", "lactose", "solidos"}
+    for p, faixas in dados.tabela.items():
+        if p not in validos:
+            raise HTTPException(422, f"parâmetro desconhecido: {p}")
+        for f in faixas:
+            if "rs_l" not in f or not -1 < float(f["rs_l"]) < 1:
+                raise HTTPException(422, f"{p}: cada faixa precisa de 'rs_l' entre −1 e 1 R$/L")
+            if f.get("min") is not None and f.get("max") is not None and f["min"] > f["max"]:
+                raise HTTPException(422, f"{p}: faixa com mínimo maior que o máximo")
+    with sessao() as s:
+        faz = s.get(Fazenda, fazenda_id)
+        if not faz:
+            raise HTTPException(404, "fazenda não encontrada")
+        faz.bonificacao = {p: f for p, f in dados.tabela.items() if f}
+        s.add(faz)
+        s.commit()
+        return {"tabela": faz.bonificacao}
+
+
+@router.get("/modelos/importacao/{tipo}")
+def modelo_importacao(tipo: str):
+    from fastapi.responses import PlainTextResponse
+    from ..importacao import MODELOS
+    if tipo not in MODELOS:
+        raise HTTPException(404, "modelos: diario, laudo")
+    return PlainTextResponse(MODELOS[tipo], media_type="text/csv",
+                             headers={"Content-Disposition": f"attachment; filename=modelo_{tipo}.csv"})
+
+
+@router.post("/lotes/{lote_id}/importar")
+def importar(lote_id: int, dados: ImportacaoIn):
+    """Prévia (confirmar=false) ou gravação (confirmar=true) de uma planilha CSV de registros/laudos."""
+    from ..importacao import ler
+    try:
+        lido = ler(dados.conteudo)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    resumo = {k: lido[k] for k in ("erros", "colunas", "periodo", "linhas")} | {
+        "registros": len(lido["registros"]), "amostra": lido["registros"][:8]}
+    if not dados.confirmar or not lido["registros"]:
+        return resumo | {"gravado": False}
+    with sessao() as s:
+        lote = _lote(s, lote_id)
+        for r in lido["registros"]:
+            existente = s.exec(select(Registro).where(Registro.lote_id == lote_id, Registro.data == r["data"],
+                                                      Registro.indicador == r["indicador"])).first()
+            if existente:
+                existente.valor = r["valor"]
+                s.add(existente)
+            else:
+                s.add(Registro(lote_id=lote_id, metodo="importação CSV", **r))
+        s.commit()
+        services.reprocessar(s, lote, lido["periodo"][0], date.today())
+        pendentes = s.exec(select(AlertaDB).where(AlertaDB.lote_id == lote_id, AlertaDB.estado.in_(("aberto", "aceito")))).all()
+    return resumo | {"gravado": True, "alertas_pendentes": len(pendentes)}
 
 
 @router.get("/lotes")
@@ -108,11 +260,12 @@ def nova_dieta(lote_id: int, dados: DietaIn):
             s.add(d)
         itens = [i.model_dump() for i in dados.itens]
         parecer = services.avaliar_lote(s, lote, itens)
-        silagem = next((i for i in itens if i["alimento"].startswith("silagem")), None)
+        cat = services.catalogo(s, lote.fazenda_id)
+        silagem = next((i for i in itens if services.e_silagem(cat.get(i["alimento"], {}))), None)
         ms_ref = None
         if silagem:
             ms = services.historico(s, lote_id).serie("ms_silagem", date.today(), 14)
-            ms_ref = ms[-1][1] if ms else services.kb().alimentos[silagem["alimento"]]["ms"]
+            ms_ref = ms[-1][1] if ms else cat[silagem["alimento"]]["ms"]
         dieta = Dieta(lote_id=lote_id, versao=max((d.versao for d in anteriores), default=0) + 1, itens=itens,
                       origem=dados.origem, motivo=dados.motivo, inicio=date.today(), ativa=True, ms_silagem_ref=ms_ref,
                       parecer={"parecer": parecer["fatos"].get("parecer.dieta", {}).get("valor"),
@@ -120,7 +273,11 @@ def nova_dieta(lote_id: int, dados: DietaIn):
         s.add(dieta)
         s.commit()
         s.refresh(dieta)
-        return dieta
+        _acao(s, dados.alerta_id, lote_id, f"Nova dieta v{dieta.versao}: {dieta.motivo or 'ajuste'}"
+              + f" (parecer: {dieta.parecer.get('parecer') or '—'})", {"dieta_id": dieta.id})
+        services.avaliar_lote(s, lote)          # alertas da dieta ativa: os que a nova versão corrige são resolvidos
+        s.refresh(dieta)
+        return dieta.model_dump()
 
 
 @router.post("/lotes/{lote_id}/registros")
@@ -137,10 +294,13 @@ def registrar(lote_id: int, dados: RegistroIn):
             else:
                 s.add(Registro(lote_id=lote_id, data=dados.data, indicador=ind, valor=valor, metodo=dados.metodo))
         s.commit()
+        _acao(s, dados.alerta_id, lote_id, f"Registro de {dados.data:%d/%m}: " + ", ".join(
+            f"{k} {v:g}" for k, v in dados.valores.items()), {"registro_data": dados.data.isoformat()})
+        out = services.monitorar(s, lote, dados.data)
         hoje = date.today()
         if dados.data < hoje:   # registro retroativo: os dias seguintes dependem dele (série, corrida, médias)
             services.reprocessar(s, lote, dados.data + timedelta(days=1), hoje)
-        return services.monitorar(s, lote, dados.data)
+        return out
 
 
 @router.get("/lotes/{lote_id}/registros")
@@ -156,11 +316,14 @@ def listar_registros(lote_id: int, desde: date | None = None):
 def registrar_evento(lote_id: int, dados: EventoIn):
     with sessao() as s:
         _lote(s, lote_id)
-        ev = Evento(lote_id=lote_id, **dados.model_dump())
+        ev = Evento(lote_id=lote_id, **dados.model_dump(exclude={"alerta_id"}))
         s.add(ev)
         s.commit()
         s.refresh(ev)
-        return ev
+        _acao(s, dados.alerta_id, lote_id, f"Evento {ev.tipo.replace('_', ' ')} em {ev.data_hora:%d/%m %H:%M}"
+              + (f": {ev.descricao}" if ev.descricao else ""), {"evento_id": ev.id})
+        s.refresh(ev)
+        return ev.model_dump()
 
 
 @router.get("/lotes/{lote_id}/serie")
@@ -169,25 +332,81 @@ def serie(lote_id: int):
         return services.serie_lote(s, _lote(s, lote_id))
 
 
+def _acao(s, alerta_id, lote_id, descricao, ref):
+    try:
+        alertas.registrar_acao(s, alerta_id, lote_id, descricao, ref)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+ESTADOS = {"pendentes": ("aberto", "aceito"), "abertos": ("aberto",), "aceitos": ("aceito",), "recusados": ("recusado",),
+           "resolvidos": ("resolvido",), "expirados": ("expirado",), "encerrados": ("resolvido", "expirado", "recusado")}
+
+
 @router.get("/alertas")
-def listar_alertas(lote_id: int | None = None, dias: int = 60, incluir_suprimidos: bool = True):
+def listar_alertas(lote_id: int | None = None, estado: str = "pendentes", dias: int = 120, incluir_suprimidos: bool = True):
+    """Episódios de alerta. estado: pendentes | abertos | aceitos | recusados | resolvidos | expirados | encerrados | todos."""
     with sessao() as s:
-        q = select(AlertaDB).where(AlertaDB.data >= date.today() - timedelta(days=dias))
+        q = select(AlertaDB).where(AlertaDB.ultima_ocorrencia >= date.today() - timedelta(days=dias))
         if lote_id:
             q = q.where(AlertaDB.lote_id == lote_id)
+        if estado in ESTADOS:
+            q = q.where(AlertaDB.estado.in_(ESTADOS[estado]))
         if not incluir_suprimidos:
-            q = q.where(AlertaDB.status == "ativo")
-        return s.exec(q.order_by(AlertaDB.data.desc(), AlertaDB.id.desc())).all()
+            q = q.where(AlertaDB.suprimido == False)  # noqa: E712
+        eps = s.exec(q.order_by(AlertaDB.ultima_ocorrencia.desc(), AlertaDB.id.desc())).all()
+        return [_ep(a) for a in eps]
 
 
-@router.patch("/alertas/{alerta_id}")
-def atualizar_alerta(alerta_id: int, dados: AlertaUpdate):
+def _ep(a: AlertaDB) -> dict:
+    return a.model_dump() | {"data": a.ultima_ocorrencia, "status": "suprimido" if a.suprimido else "ativo",
+                             "destino": alertas.destino(a)}
+
+
+@router.get("/alertas/{alerta_id}")
+def obter_alerta(alerta_id: int):
     with sessao() as s:
         a = s.get(AlertaDB, alerta_id)
         if not a:
             raise HTTPException(404, "alerta não encontrado")
-        a.status_usuario = dados.status_usuario
-        s.add(a)
-        s.commit()
-        s.refresh(a)
-        return a
+        return _ep(a) | {"historico": alertas.historico_do(s, alerta_id)}
+
+
+@router.post("/alertas/{alerta_id}/aceitar")
+def aceitar_alerta(alerta_id: int, dados: AceitarIn | None = None):
+    """Aceita a recomendação e devolve a tela onde a ação deve ser registrada."""
+    with sessao() as s:
+        a = s.get(AlertaDB, alerta_id)
+        if not a:
+            raise HTTPException(404, "alerta não encontrado")
+        try:
+            destino = alertas.aceitar(s, a, dados.observacao if dados else "")
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        return {"destino": destino, "alerta": _ep(a)}
+
+
+@router.post("/alertas/{alerta_id}/recusar")
+def recusar_alerta(alerta_id: int, dados: RecusarIn):
+    with sessao() as s:
+        a = s.get(AlertaDB, alerta_id)
+        if not a:
+            raise HTTPException(404, "alerta não encontrado")
+        try:
+            alertas.recusar(s, a, dados.motivo)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        return _ep(a)
+
+
+@router.get("/historico")
+def historico_acoes(lote_id: int | None = None, dias: int = 120):
+    """Linha do tempo de alertas e ações (aberto, aceito, ação registrada, recusado, resolvido, expirado)."""
+    with sessao() as s:
+        q = select(HistoricoAlerta, AlertaDB).join(AlertaDB, AlertaDB.id == HistoricoAlerta.alerta_id).where(
+            HistoricoAlerta.data_hora >= datetime.now() - timedelta(days=dias))
+        if lote_id:
+            q = q.where(HistoricoAlerta.lote_id == lote_id)
+        linhas = s.exec(q.order_by(HistoricoAlerta.data_hora.desc(), HistoricoAlerta.id.desc())).all()
+        return [h.model_dump() | {"alerta": {"id": a.id, "regra": a.regra, "titulo": a.titulo, "nivel": a.nivel,
+                                             "estado": a.estado, "categoria": a.categoria}} for h, a in linhas]

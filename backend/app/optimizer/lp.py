@@ -12,9 +12,9 @@ from itertools import combinations
 
 import pulp
 
-from ..calc.diet import cnf_alimento, composicao, ell_alimento
+from ..calc.diet import cnf_alimento, composicao, dcad_meq_kg, ell_alimento
 
-GRUPOS = ["consumo", "energia", "excesso_energia", "proteina", "fibra", "enchimento", "cnf", "gordura", "ureia", "cana"]
+GRUPOS = ["consumo", "energia", "excesso_energia", "proteina", "fibra", "enchimento", "cnf", "gordura", "ureia", "cana", "dcad"]
 
 
 # Penalidade das metas flexíveis (melhor dieta possível): muito acima de qualquer custo de alimento,
@@ -71,6 +71,12 @@ def _modelo(alimentos: list[dict], r: dict, ignorar: tuple[str, ...] = (), metas
     grupo("gordura", [pulp.lpSum((a.get("ee", 0) - r["ee_max"] * menos) * x[a["id"]] for a in alimentos) <= 0])
     grupo("ureia", [pulp.lpSum(100 * x[a["id"]] for a in alimentos if a["tipo"] == "ureia")
                     - r["ureia_max"] * menos * total <= 0])
+    # VER-15: DCAD do pré-parto (linear: média ponderada da DCAD de cada alimento). Só quando todos têm Na/K/Cl/S,
+    # a mesma condição em que a verificação consegue calculá-la.
+    if r.get("dcad_max") is not None and all(all(a.get(m) is not None for m in ("na", "k", "cl", "s")) for a in alimentos):
+        folga = 5.0   # mEq/kg de margem para a dieta arredondada continuar abaixo do limite
+        grupo("dcad", [pulp.lpSum((dcad_meq_kg(a["na"], a["k"], a["cl"], a["s"]) - (r["dcad_max"] - folga)) * x[a["id"]]
+                                  for a in alimentos) <= 0])
     if r.get("cana_max_pct_volumoso") is not None:   # FOR-05: cana não pode ser o único volumoso
         volumoso = pulp.lpSum(x[a["id"]] for a in alimentos if a["tipo"] == "volumoso")
         grupo("cana", [pulp.lpSum(x[a["id"]] for a in alimentos if a["id"] == "cana")

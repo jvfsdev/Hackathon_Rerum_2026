@@ -1,5 +1,15 @@
 # Histórico da base de conhecimento
 
+## 1.4.0 — 21/10/2026
+- Composição dos alimentos atualizada pelo **CQBAL 4.0** (Valadares Filho et al., 2018; www.cqbal.com.br) via
+  scripts/importar_cqbal.py: MS, PB, EE, MM, FDN, CNF (medido), NDT (observado com n ≥ 10, senão BR-CORTE 2016),
+  minerais Ca/P/Mg/K/Na/Cl/S quando disponíveis e n de amostras. Novo alimento: braquiária brizantha Marandu.
+  Digestibilidade da FDN não importada (definição/n não confirmados).
+- DCAD: composição calcula minerais e DCAD quando todos os itens têm Na/K/Cl/S; VER-15 (pré-parto com multíparas e
+  DCAD > 0), VER-15N (novilhas), VER-15I (sem dados); FOR-07/FOR-18 levam a mesma restrição ao PL.
+- Regras de 1.3.x: EXG-08 (NASEM com ECC), EXG-09 (FDND), ACP-11, ACP-12, secagem/pré-parto, altura do pasto,
+  crioscopia, bonificação, IOFC, eficiência alimentar; leitura de cocho diária por escore.
+
 ## 1.3.0 — 21/10/2026 (auditoria: motor, base e acompanhamento)
 - Exigências: gestação da vaca seca derivada dos dias para o parto (CLS-00A/B); total de energia exige o leite em
   lactação (EXG-02Z) e tem regra própria para vaca seca (EXG-02Y); tolerância de energia no pós-parto calculada pela

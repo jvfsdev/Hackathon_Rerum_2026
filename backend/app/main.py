@@ -1,4 +1,6 @@
 """API do sistema especialista de dietas por lote (Hackathon UFJF 2026, T2)."""
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -23,6 +25,11 @@ def entrada_invalida(_: Request, erro: EntradaInvalida):
 @app.on_event("startup")
 def iniciar():
     criar_tabelas()
+    if os.environ.get("LEITE_SEM_COLETA") != "1":     # coleta diária de preços de referência (fontes públicas)
+        from .db.models import sessao
+        from .referencias import fontes  # noqa: F401 — registra as fontes
+        from .referencias.coletor import iniciar_agendador
+        iniciar_agendador(sessao)
 
 
 @app.get("/")

@@ -208,17 +208,17 @@
     nao_disparadas: [ACP-S02]
 
 - id: N2
-  descricao: Sobras de 6% (média de 3 dias) em lote de início — reduzir oferta
+  descricao: Sobras de 5,5–6,5% nos 3 últimos dias em lote de início — reduzir oferta
   testa: ACP-S03A, ACP-S04
-  modulos: [classificacao, acompanhamento_semanal, meta]
-  fatos: {lote.estado: lactacao, lote.del: 60, mon.sobras_mm3: 6}
+  modulos: [classificacao, acompanhamento_diario, meta]
+  fatos: {lote.estado: lactacao, lote.del: 60, mon.sobras_mm3: 6, mon.sobras_min3: 5.5, mon.sobras_max3: 6.5}
   espera:
     alertas: [ACP-S04]
 
 - id: N3
   descricao: Cocho vazio em 2 leituras em lote de início — alerta crítico
   testa: ACP-06
-  modulos: [classificacao, acompanhamento_semanal, meta]
+  modulos: [classificacao, acompanhamento_diario, meta]
   fatos: {lote.estado: lactacao, lote.del: 40, mon.dias_cocho_vazio: 2}
   espera:
     alertas: [ACP-06]

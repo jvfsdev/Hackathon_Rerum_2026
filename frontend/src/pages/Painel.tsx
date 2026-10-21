@@ -12,8 +12,11 @@ export default function PainelPagina() {
 
   useEffect(() => {
     api.get('/fazendas/1/painel').then(setDados).catch((e) => setErro(e.message))
-    api.get<Alerta[]>('/alertas?dias=14&incluir_suprimidos=false').then(setAlertas).catch(() => {})
+    carregarAlertas()
   }, [])
+  function carregarAlertas() {
+    api.get<Alerta[]>('/alertas?estado=pendentes&incluir_suprimidos=false').then(setAlertas).catch(() => {})
+  }
 
   if (erro) return <Erro msg={`Não foi possível falar com a API (${erro}). Ela está rodando em localhost:8000?`} />
   if (!dados) return <Carregando texto="Carregando a fazenda…" />
@@ -75,12 +78,12 @@ export default function PainelPagina() {
         })}
       </div>
 
-      <Painel titulo="Alertas dos últimos 14 dias" subtitulo="Ordenados por data. Alertas suprimidos por meta-regras ficam na página de cada lote.">
-        {alertas.length === 0 && <p className="text-sm text-stone-500">Nenhum alerta ativo.</p>}
-        {alertas.slice(0, 12).map((a) => (
+      <Painel titulo={`Alertas pendentes (${alertas.length})`} subtitulo="Abertos ou aceitos e ainda sem resolução. Aceite para ir à tela da ação ou recuse com o motivo; o histórico de cada lote fica na aba Alertas e ações.">
+        {alertas.length === 0 && <p className="text-sm text-stone-500">Nenhum alerta pendente.</p>}
+        {[...alertas].sort((a, b) => ['critico', 'atencao', 'informativo'].indexOf(a.nivel) - ['critico', 'atencao', 'informativo'].indexOf(b.nivel)).slice(0, 15).map((a) => (
           <div key={a.id}>
             <p className="pt-2 text-xs font-medium text-stone-400">{nomeLote(a.lote_id)}</p>
-            <AlertaItem alerta={a} onAbrir={() => setAberto(a)} />
+            <AlertaItem alerta={a} onAbrir={() => setAberto(a)} onMudou={carregarAlertas} />
           </div>
         ))}
       </Painel>

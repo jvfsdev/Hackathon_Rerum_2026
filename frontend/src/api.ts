@@ -2,10 +2,19 @@
 export type Nivel = 'critico' | 'atencao' | 'informativo'
 
 export interface Fato { nome: string; valor: any; cf: number; origem: string; regra: string | null; nota?: string | null }
+export type EstadoAlerta = 'aberto' | 'aceito' | 'recusado' | 'resolvido' | 'expirado'
 export interface Alerta {
   id?: number; regra: string; nivel: Nivel; titulo: string; causa: string; acao: string; categoria: string
   cf: number; fonte: string; forca: string; status: 'ativo' | 'suprimido'; nota?: string | null
-  data?: string; lote_id?: number; sessao_id?: number; status_usuario?: string; modulo?: string
+  data?: string; lote_id?: number; sessao_id?: number; modulo?: string
+  // episódio (alertas persistidos)
+  estado?: EstadoAlerta; aberto_em?: string; ultima_ocorrencia?: string; ocorrencias?: number
+  estado_em?: string | null; resolucao?: string | null; destino?: string; origem?: string
+}
+export interface ItemHistorico {
+  id: number; alerta_id: number; lote_id: number; data_hora: string; tipo: string; descricao: string
+  automatico: boolean; ref?: Record<string, any> | null
+  alerta?: { id: number; regra: string; titulo: string; nivel: Nivel; estado: EstadoAlerta; categoria: string }
 }
 export interface Premissa { fato: string; op: string; esperado: any; valor: any; cf: number }
 export interface EntradaTraco {
@@ -19,16 +28,38 @@ export interface NoComo {
 export interface Resultado {
   kb_version: string; fatos: Record<string, Fato>; traco: EntradaTraco[]; alertas: Alerta[]
   supressoes: Record<string, any>; explicacoes: Record<string, NoComo>; sessao_id?: number
+  episodios?: Record<string, { id: number; estado: EstadoAlerta }>
 }
+
+/** Junta aos alertas de uma execução o id/estado do episódio persistido (para aceitar/recusar). */
+export function comEpisodios(r: Resultado): Alerta[] {
+  return r.alertas.map((a) => (r.episodios?.[a.regra] ? { ...a, ...r.episodios[a.regra] } : a))
+}
+export const dataBR = (d?: string | null) => (d ? new Date(d.slice(0, 10) + 'T12:00').toLocaleDateString('pt-BR') : '—')
 export interface ItemDieta { alimento: string; kg_mn: number }
-export interface Alimento { id: string; nome: string; tipo: string; ms: number; pb: number; fdn: number; ndt: number; ee: number; preco_kg_mn: number; fonte: string; forca: string; cf: number }
+export interface Alimento { id: string; nome: string; tipo: string; ms: number; pb: number; fdn: number; ndt: number; ee: number; preco_kg_mn: number; fonte: string; forca: string; cf: number; preco_origem?: string
+  da_fazenda?: boolean; ativo?: boolean; origem_dado?: string; mm?: number; pastejo?: boolean; max_pct_ms?: number | null
+  preco_ref?: { fonte: string; data: string | null; praca?: string; url?: string; valor_original?: number; unidade_original?: string } }
 export interface Lote {
   id: number; fazenda_id: number; nome: string; finalidade: string; estado: string; sistema: string; grupo_genetico: string
   n_vacas: number; pv: number; del_ref: number | null; dias_para_parto_ref: number | null; dias_gestacao_ref: number | null
-  fracao_primiparas: number | null; ecc: number | null; distancia_km: number | null; relevo: string | null
+  fracao_primiparas: number | null; ecc: number | null; distancia_km: number | null; relevo: string | null; forrageira?: string | null
   leite: number | null; gordura: number | null; proteina: number | null
 }
 export interface Dieta { id: number; lote_id: number; versao: number; itens: ItemDieta[]; origem: string; motivo: string; inicio: string; ativa: boolean; parecer?: any }
+
+/** Erro de resposta da API, com o status HTTP e o corpo (vazio quando o proxy não alcançou a API). */
+export class ErroApi extends Error {
+  status: number
+  corpo: string
+  constructor(status: number, corpo: string, mensagem: string) {
+    super(mensagem)
+    this.status = status
+    this.corpo = corpo
+  }
+  /** A API não respondeu (fora do ar / sem rede): o proxy devolve 5xx sem corpo, ou 502–504. */
+  get semConexao() { return (this.status >= 500 && !this.corpo.trim()) || [502, 503, 504].includes(this.status) }
+}
 
 async function req<T>(metodo: string, caminho: string, corpo?: unknown): Promise<T> {
   const r = await fetch(`/api${caminho}`, {
@@ -40,7 +71,7 @@ async function req<T>(metodo: string, caminho: string, corpo?: unknown): Promise
     const txt = await r.text()
     let msg = txt
     try { msg = JSON.parse(txt).detail ?? txt } catch { /* texto puro */ }
-    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    throw new ErroApi(r.status, txt, typeof msg === 'string' && msg ? msg : (txt ? JSON.stringify(msg) : `API indisponível (HTTP ${r.status})`))
   }
   return r.json()
 }
@@ -73,6 +104,12 @@ export const ROTULOS: Record<string, string> = {
   'lote.grupo_genetico': 'Grupo genético', 'lote.sistema': 'Sistema', 'lote.pv': 'Peso vivo', 'lote.leite': 'Leite/vaca', 'lote.gordura': 'Gordura do leite',
   'lote.proteina': 'Proteína do leite', 'lote.lactose': 'Lactose', 'lote.fracao_primiparas': 'Fração de primíparas', 'lote.ecc': 'ECC',
   'lote.distancia_km': 'Distância caminhada', 'lote.relevo': 'Relevo', 'lote.temp': 'Temperatura', 'lote.ur': 'Umidade',
+  'exig.cms_ajuste_fdnd': 'Ajuste pela digestibilidade da FDN', 'dieta.dcad_meq_kg': 'DCAD da dieta', 'perfil.dias_gestacao': 'Dias de gestação', 'dieta.fdnd_forragem': 'FDND do volumoso',
+  'mon.iofc': 'Receita − custo da dieta (IOFC)', 'mon.alimento_pct_receita': 'Alimentação / receita', 'mon.ea': 'Eficiência alimentar',
+  'mon.ecm': 'Leite corrigido para energia', 'mon.cms_medido': 'Consumo medido (oferta − sobras)', 'mon.custo_dieta_vaca': 'Custo da dieta/vaca/dia',
+  'mon.bonificacao_rs_l': 'Bonificação do laticínio', 'mon.preco_leite_efetivo': 'Preço efetivo do leite', 'laudo.crioscopia': 'Crioscopia',
+  'mon.altura_entrada': 'Altura na entrada', 'mon.altura_saida': 'Altura na saída', 'mon.altura_media': 'Altura média do pasto',
+  'mon.distancia_delta': 'Aumento da caminhada', 'mon.dias_para_parto_previsto': 'Dias para o parto (previsto)',
   'hipotese.queda_sustentada': 'Queda sustentada', 'hipotese.causa_calor': 'Causa: calor', 'hipotese.causa_volumoso': 'Causa: novo volumoso',
   'hipotese.acidose': 'Acidose subaguda', 'hipotese.mastite': 'Mastite', 'hipotese.ben_severo': 'BEN severo', 'hipotese.dgl': 'Depressão de gordura',
   'mon.litros_vaca': 'Litros/vaca hoje', 'mon.esperado_vaca': 'Esperado pela curva', 'mon.residuo': 'Desvio do esperado', 'mon.z': 'Desvio padronizado',
@@ -90,7 +127,7 @@ export const ROTULOS: Record<string, string> = {
 export const rotulo = (f: string) => ROTULOS[f] ?? f
 
 export const UNIDADES: Record<string, string> = {
-  'exig.cms': 'kg MS/d', 'exig.cms_equacao': 'kg MS/d', 'exig.cms_teto_fibra': 'kg MS/d', 'dieta.ms_kg': 'kg MS/d',
+  'exig.cms': 'kg MS/d', 'exig.cms_equacao': 'kg MS/d', 'exig.cms_ajuste_fdnd': 'kg MS/d', 'exig.cms_teto_fibra': 'kg MS/d', 'dieta.ms_kg': 'kg MS/d',
   'exig.ell_total': 'Mcal/d', 'exig.ell_mantenca': 'Mcal/d', 'exig.ell_leite': 'Mcal/d', 'exig.ell_gestacao': 'Mcal/d', 'exig.ell_crescimento': 'Mcal/d',
   'exig.ell_atividade': 'Mcal/d', 'exig.ell_ecc': 'Mcal/d', 'dieta.ell_mcal': 'Mcal/d', 'ver.ell_consumida': 'Mcal/d', 'exig.pm_leite': 'g/d',
   'exig.pb_pct_alvo': '% MS', 'dieta.pb_pct': '% MS', 'dieta.fdn_pct': '% MS', 'dieta.fdnf_pct': '% MS', 'dieta.cnf_pct': '% MS', 'dieta.ee_pct': '% MS',
@@ -104,7 +141,7 @@ export const FASES: Record<string, string> = {
 export const OPCOES: Record<string, string> = {
   lactacao: 'Lactação', seca: 'Seca', holandes: 'Holandês', jersey: 'Jersey', girolando: 'Girolando', gir: 'Gir', mestica: 'Mestiça',
   confinado: 'Confinado', semiconfinado: 'Semiconfinado', pasto: 'Pasto', plano: 'Plano', ondulado: 'Ondulado', acidentado: 'Acidentado',
-  nrc2001: 'NRC 2001', brleite: 'BR-Leite (Embrapa)', adequada: 'Adequada', ajustar: 'Precisa de ajustes', bloqueada: 'Bloqueada',
+  nrc2001: 'NRC 2001', nasem2021: 'NASEM 2021 (com ECC)', brleite: 'BR-Leite (Embrapa)', adequada: 'Adequada', ajustar: 'Precisa de ajustes', bloqueada: 'Bloqueada',
   brando: 'Brando', forte: 'Forte', subindo: 'Subindo', ...FASES,
 }
 

@@ -51,6 +51,20 @@ Tudo roda em localhost. O motor de inferência é o único componente que decide
 - **Validação estática da base:** o carregamento falha com operador, função, argumento, ação, nível ou fato
   desconhecido, inclusive dentro dos textos de alerta.
 
+## Alertas e ações (`backend/app/alertas.py`)
+
+Cada problema detectado vira um **episódio**: um por regra e por lote, enquanto a condição durar.
+
+- **Aceitar** leva à tela da ação: dieta, registro ou evento de manejo de calor, manejo sanitário ou conferência.
+  O que for salvo nela fica no histórico do alerta.
+- **Recusar** exige motivo. Um alerta recusado só reabre se o problema se agravar.
+- **Resolução automática:** quando a regra para de disparar por alguns dias (parâmetro `resolucao_dias`),
+  o episódio é encerrado com a data, o que mudou nos fatos que o sustentavam e as mudanças do período
+  (ações registradas, novas dietas, eventos, laudos). Isso vale mesmo quando a solução não passou pelo aceite.
+- **Expirado:** se o laudo que sustentava o alerta vence sem um novo, o episódio é encerrado como "expirado",
+  e não como resolvido.
+- Os alertas da verificação da **dieta ativa** também são episódios, resolvidos quando uma nova versão passa na regra.
+
 ## Motor de inferência (`backend/app/engine/`)
 
 - **Fatos** (`facts.py`): valor, CF, origem (usuário, medido, tabela, padrão, regra) e ciclo (recência).
@@ -64,7 +78,7 @@ Tudo roda em localhost. O motor de inferência é o único componente que decide
 
 - `rules/*.yaml`: uma lista de regras por módulo (`id, versao, modulo, descricao, prioridade, se, entao, cf, fonte, forca`).
 - `params.yaml`: cada limiar com `valor, unidade, fonte, forca (A–D), editavel`. Valores conflitantes na literatura (NUL, G:P, ITU por raça, mantença 0,08 vs 0,10) ficam aqui como escolha explícita.
-- `foods.yaml`: alimentos com composição da Embrapa (Valadares Filho 2006; Doc 167), preço e limites de inclusão.
+- `foods.yaml`: alimentos com composição do CQBAL 4.0 (Valadares Filho et al., 2018), incluindo minerais para a DCAD,, preço e limites de inclusão.
 - `perguntas.yaml`: fatos que o sistema pode perguntar, com texto, ajuda e valor padrão.
 - `kb.yaml` + `CHANGELOG.md`: versão. Editar um parâmetro pela interface sobe a versão, registra o motivo e roda os casos de teste.
 
