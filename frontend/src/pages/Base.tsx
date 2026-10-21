@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
-import { Carregando, Erro, ForcaBadge, Painel, RegraCartao } from '../components/ui'
+import { CabecalhoPagina, Carregando, Erro, ForcaBadge, Painel, RegraCartao } from '../components/ui'
 
 const NOME_MODULO: Record<string, string> = {
   classificacao: 'A · Classificação', exigencias: 'B · Exigências', verificacao: 'C · Verificação', formulacao: 'F · Formulação (PL)',
@@ -20,7 +20,7 @@ function RevisaoUso() {
       {r.sugestoes.length === 0 && <p className="text-sm text-stone-500">Nenhuma regra com sinal de revisão.</p>}
       <div className="space-y-2">
         {r.sugestoes.map((s: any) => (
-          <div key={s.tipo + s.regra} className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+          <div key={s.tipo + s.regra} className="rounded-md border border-brinco/60 border-l-4 border-l-brinco bg-brinco-claro p-3 text-sm">
             <p className="font-medium text-stone-900"><span className="font-mono text-xs text-campo-700">{s.regra}</span> {s.titulo}</p>
             <p className="text-stone-700">{s.texto}</p>
             {s.parametros.length > 0 && <p className="mt-1 text-xs text-stone-600">Parâmetros citados pela regra: {s.parametros.map((p: string) => <code key={p} className="mr-1 rounded bg-white px-1">{p}</code>)}</p>}
@@ -89,16 +89,12 @@ export default function BasePagina() {
   if (!resumo) return <Carregando />
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-stone-900">Base de conhecimento <span className="font-mono text-base text-campo-700">v{resumo.versao}</span></h1>
-          <p className="text-sm text-stone-500">{resumo.regras} regras de produção · {resumo.parametros} parâmetros com fonte e força de evidência · {resumo.alimentos} alimentos. Versionada no git (backend/kb/).</p>
-        </div>
-        <button className="btn-primario" onClick={rodarTestes} disabled={rodando}>{rodando ? 'Rodando…' : 'Rodar casos de teste'}</button>
-      </div>
+      <CabecalhoPagina titulo={<>Base de conhecimento <span className="ml-1 rounded bg-campo-700 px-2 py-0.5 align-middle font-mono text-sm font-semibold text-white">v{resumo.versao}</span></>}
+        contexto={<><b className="num font-semibold text-stone-700">{resumo.regras}</b> regras de produção, <b className="num font-semibold text-stone-700">{resumo.parametros}</b> parâmetros com fonte e força de evidência e <b className="num font-semibold text-stone-700">{resumo.alimentos}</b> alimentos. Versionada no git (backend/kb/).</>}
+        acoes={<button className="btn-primario" onClick={rodarTestes} disabled={rodando}>{rodando ? 'Rodando…' : 'Rodar casos de teste'}</button>} />
 
       {testes && (
-        <Painel titulo={`Casos de teste — ${testes.passaram}/${testes.total} passaram`} subtitulo={`Validação da versão ${testes.kb_version} contra resultados conhecidos do domínio (tests/cases.yaml).`}>
+        <Painel titulo={`Casos de teste: ${testes.passaram} de ${testes.total} passaram`} subtitulo={`Validação da versão ${testes.kb_version} contra resultados conhecidos do domínio (tests/cases.yaml).`}>
           <div className="grid gap-1 sm:grid-cols-2">
             {testes.resultados.map((t: any) => (
               <div key={t.id} className={`rounded px-2 py-1 text-sm ${t.passou ? 'bg-campo-50' : 'bg-red-50'}`}>
@@ -114,9 +110,9 @@ export default function BasePagina() {
       <RevisaoUso />
 
       <div className="flex flex-wrap gap-2">
-        <button onClick={() => setModulo('todos')} className={`btn ${modulo === 'todos' ? 'bg-campo-600 text-white' : 'border border-stone-300 bg-white'}`}>Todos ({regras.length})</button>
+        <button onClick={() => setModulo('todos')} className={`btn ${modulo === 'todos' ? 'bg-campo-700 text-white' : 'border border-stone-300 bg-white text-stone-700 hover:bg-stone-50'}`}>Todos ({regras.length})</button>
         {Object.keys(NOME_MODULO).filter((m) => resumo.modulos[m]).map((m) => [m, resumo.modulos[m]] as const).map(([m, n]) => (
-          <button key={m} onClick={() => setModulo(m)} className={`btn ${modulo === m ? 'bg-campo-600 text-white' : 'border border-stone-300 bg-white'}`}>{NOME_MODULO[m] ?? m} ({n as number})</button>
+          <button key={m} onClick={() => setModulo(m)} className={`btn ${modulo === m ? 'bg-campo-700 text-white' : 'border border-stone-300 bg-white text-stone-700 hover:bg-stone-50'}`}>{NOME_MODULO[m] ?? m} ({n as number})</button>
         ))}
       </div>
       <input className="input max-w-md" placeholder="Buscar regra por ID, descrição ou fonte" value={busca} onChange={(e) => setBusca(e.target.value)} />

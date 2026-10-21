@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, dataBR, ErroApi, numero, peso, textoAlerta, type Alerta, type Lote } from '../api'
 import { EscalaEscore } from '../components/Escala'
-import { AlertaCorpo, NivelBadge } from '../components/ui'
+import { AlertaCorpo, BORDA_NIVEL, Brinco, Icone, NivelBadge } from '../components/ui'
 
 // ------------------------------------------------------------------ fila offline (localStorage)
 interface Pendente { id: string; caminho: string; corpo: any; descricao: string; criado: string }
@@ -69,15 +69,21 @@ export default function CampoPagina() {
   useEffect(carregar, [carregar])
   const importantes = pendentes.filter((a) => a.nivel !== 'informativo').length
   const aba = ({ isActive }: { isActive: boolean }) =>
-    `flex flex-1 flex-col items-center gap-0.5 py-2 text-xs font-medium ${isActive ? 'text-campo-700' : 'text-stone-500'}`
+    `relative flex flex-1 flex-col items-center gap-1 pt-2.5 pb-2 text-xs font-semibold ${isActive ? 'text-campo-700 before:absolute before:inset-x-6 before:top-0 before:h-[3px] before:rounded-b before:bg-brinco' : 'text-stone-500'}`
   return (
-    <div className="min-h-screen bg-stone-50 pb-20">
-      <header className="sticky top-0 z-20 flex items-center justify-between bg-campo-700 px-4 py-3 text-white">
-        <span className="font-semibold">🐄 CochoCerto · campo</span>
-        <Link to="/?completo=1" className="text-xs text-campo-100 underline">versão completa</Link>
+    <div className="min-h-screen pb-[calc(5rem+env(safe-area-inset-bottom,0px))]">
+      <header className="sticky top-0 z-20 bg-campo-900 pt-[env(safe-area-inset-top,0px)] text-white">
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="flex items-center gap-2">
+            <svg viewBox="0 0 40 50" className="h-7 w-[22px]" aria-hidden="true"><path d="M20 1.5c-4.6 0-8 3-8.6 7.2L6.2 41.4C5.6 45.3 8.6 48.5 12.6 48.5h14.8c4 0 7-3.2 6.4-7.1L28.6 8.7C28 4.5 24.6 1.5 20 1.5z" fill="var(--color-brinco)" /><circle cx="20" cy="10" r="3.2" fill="var(--color-campo-900)" /></svg>
+            <span className="titulo text-xl font-bold tracking-wide">CochoCerto</span>
+            <span className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] font-semibold text-campo-100">campo</span>
+          </span>
+          <Link to="/?completo=1" className="text-[13px] text-campo-100/80 underline underline-offset-2">versão completa</Link>
+        </div>
       </header>
       {fila.fila.length > 0 && (
-        <div className="flex items-center justify-between gap-2 bg-amber-100 px-4 py-2 text-sm text-amber-900">
+        <div className="flex items-center justify-between gap-2 border-b border-brinco/60 bg-brinco-claro px-4 py-2.5 text-sm text-stone-800">
           <span>{fila.fila.length} registro(s) guardado(s) no aparelho, aguardando conexão.</span>
           <button className="font-semibold underline" onClick={fila.sincronizar} disabled={fila.enviando}>{fila.enviando ? 'enviando…' : 'enviar agora'}</button>
         </div>
@@ -89,14 +95,26 @@ export default function CampoPagina() {
           <Route path="trato" element={<Trato lotes={lotes} onEnviado={fila.recarregar} />} />
         </Routes>
       </main>
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-stone-200 bg-white">
-        <NavLink end to="/campo" className={aba}><span className="text-xl">✍️</span>Registrar</NavLink>
-        <NavLink to="/campo/trato" className={aba}><span className="text-xl">🚜</span>Trato</NavLink>
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-stone-200 bg-white pb-[env(safe-area-inset-bottom,0px)]">
+        <NavLink end to="/campo" className={aba}><Icone nome="lapis" className="h-6 w-6" />Registrar</NavLink>
+        <NavLink to="/campo/trato" className={aba}><Icone nome="trato" className="h-6 w-6" />Trato</NavLink>
         <NavLink to="/campo/avisos" className={aba}>
-          <span className="relative text-xl">🔔{importantes > 0 && <span className="absolute -right-3 -top-1 rounded-full bg-critico px-1.5 text-[10px] font-bold text-white">{importantes}</span>}</span>Avisos
+          <span className="relative"><Icone nome="sino" className="h-6 w-6" />{importantes > 0 && <span className="absolute -right-2.5 -top-1 min-w-[18px] rounded-full bg-critico px-1 text-center text-[10px] font-bold leading-[18px] text-white">{importantes}</span>}</span>Avisos
         </NavLink>
       </nav>
     </div>
+  )
+}
+
+/** Botão de escolha do lote: o brinco com o número e o nome curto. */
+function BotaoLote({ lote, ativo, onClick }: { lote: Lote; ativo: boolean; onClick: () => void }) {
+  const [, desc] = lote.nome.split(' — ')
+  return (
+    <button onClick={onClick} aria-pressed={ativo}
+      className={`flex min-w-0 items-center gap-2.5 rounded-[10px] border px-2.5 py-2 text-left transition-colors ${ativo ? 'border-campo-600 bg-campo-600 text-white' : 'border-stone-300 bg-white text-stone-800'}`}>
+      <Brinco nome={lote.nome} id={lote.id} tamanho="sm" />
+      <span className="min-w-0 truncate text-sm font-semibold leading-tight">{desc ?? lote.nome}</span>
+    </button>
   )
 }
 
@@ -111,7 +129,7 @@ function Numero({ rotulo, un, valor, onChange, dica }: { rotulo: string; un: str
   return (
     <label className="block">
       <span className="mb-1 block text-sm font-medium text-stone-700">{rotulo} <span className="font-normal text-stone-400">({un})</span></span>
-      <input className="input num py-3 text-lg" inputMode="decimal" value={valor} onChange={(e) => onChange(e.target.value)} placeholder={dica} />
+      <input className="input num titulo py-2.5 text-2xl font-semibold" inputMode="decimal" value={valor} onChange={(e) => onChange(e.target.value)} placeholder={dica} />
     </label>
   )
 }
@@ -224,25 +242,22 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
 
   return (
     <div className="space-y-4">
-      {alertaId && <div className="rounded-xl border-2 border-campo-500 bg-campo-50 p-3 text-sm text-campo-900">Registrando a ação de um aviso aceito: descreva o que foi feito no evento abaixo.</div>}
+      {alertaId && <div className="rounded-[10px] border border-campo-500 border-l-[6px] border-l-campo-600 bg-campo-50 p-3 text-sm text-campo-900">Registrando a ação de um aviso aceito: descreva o que foi feito no evento abaixo.</div>}
 
       <div>
-        <p className="mb-1.5 text-sm font-medium text-stone-700">Lote</p>
-        <div className="flex flex-wrap gap-2">
+        <p className="titulo mb-2 text-lg font-semibold text-stone-900">Qual lote?</p>
+        <div className="grid grid-cols-2 gap-2">
           {lotes.map((l) => (
-            <button key={l.id} onClick={() => setLoteId(l.id)}
-              className={`rounded-full border px-3 py-2 text-sm ${l.id === loteId ? 'border-campo-600 bg-campo-600 text-white' : 'border-stone-300 bg-white text-stone-700'}`}>
-              {l.nome.replace(/ — .*/, '')}
-            </button>
+            <BotaoLote key={l.id} lote={l} ativo={l.id === loteId} onClick={() => setLoteId(l.id)} />
           ))}
           {!lotes.length && <p className="text-sm text-stone-500">Sem lotes (conecte uma vez para carregar a lista).</p>}
         </div>
-        {lote && <p className="mt-1 text-xs text-stone-500">{lote.nome}</p>}
+        
       </div>
 
       <div className="flex gap-2">
         {([[hoje, 'Hoje'], [ontem, 'Ontem']] as const).map(([d, r]) => (
-          <button key={d} onClick={() => setData(d)} className={`flex-1 rounded-lg border py-2 text-sm ${data === d ? 'border-campo-600 bg-campo-50 font-semibold text-campo-700' : 'border-stone-300 bg-white'}`}>{r}</button>
+          <button key={d} onClick={() => setData(d)} className={`flex-1 rounded-md border py-2.5 text-sm font-semibold ${data === d ? 'border-campo-600 bg-campo-600 text-white' : 'border-stone-300 bg-white text-stone-700'}`}>{r}</button>
         ))}
         <input type="date" className="input flex-1" value={data} max={hoje} onChange={(e) => setData(e.target.value)} />
       </div>
@@ -270,7 +285,7 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
 
       <div className="grid grid-cols-3 gap-2">
         {([['semanal', 'Semanal'], ['laudo', 'Laudo'], ['evento', 'Evento']] as const).map(([k, r]) => (
-          <button key={k} onClick={() => setMais(mais === k ? '' : k)} className={`rounded-lg border py-2 text-sm ${mais === k ? 'border-campo-600 bg-campo-50 font-semibold text-campo-700' : 'border-stone-300 bg-white text-stone-700'}`}>{r}</button>
+          <button key={k} onClick={() => setMais(mais === k ? '' : k)} aria-pressed={mais === k} className={`rounded-md border py-2.5 text-sm font-semibold ${mais === k ? 'border-campo-600 bg-campo-50 text-campo-700' : 'border-stone-300 bg-white text-stone-600'}`}>{mais === k ? '−' : '+'} {r}</button>
         ))}
       </div>
       {mais === 'semanal' && (
@@ -313,9 +328,9 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
       )}
 
       {confirmar.length > 0 && (
-        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm">
-          <p className="font-semibold text-amber-900">Conferir antes de enviar:</p>
-          <ul className="ml-4 list-disc text-amber-900">{confirmar.map((c) => <li key={c}>{c}</li>)}</ul>
+        <div className="rounded-[10px] border border-brinco border-l-[6px] bg-brinco-claro p-3 text-sm">
+          <p className="font-semibold text-stone-900">Conferir antes de enviar:</p>
+          <ul className="ml-4 list-disc text-stone-800">{confirmar.map((c) => <li key={c}>{c}</li>)}</ul>
           <div className="mt-2 flex gap-2">
             <button className="btn-primario flex-1" onClick={() => enviar(true)}>Está certo, enviar</button>
             <button className="btn-secundario flex-1" onClick={() => setConfirmar([])}>Corrigir</button>
@@ -334,7 +349,7 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
           )}
         </div>
       )}
-      <button className="btn-primario w-full py-3.5 text-base" onClick={() => enviar()}>Enviar registro</button>
+      <button className="btn-primario titulo w-full py-4 text-xl" onClick={() => enviar()}>Enviar registro</button>
     </div>
   )
 }
@@ -370,17 +385,17 @@ function Avisos({ alertas, lotes, onMudou }: { alertas: Alerta[]; lotes: Lote[];
   return (
     <div className="space-y-3">
       <div className="flex items-baseline justify-between">
-        <h1 className="text-lg font-semibold text-stone-900">Avisos pendentes</h1>
+        <h1 className="titulo text-2xl font-semibold text-stone-900">Avisos pendentes</h1>
         <button className="text-xs text-campo-600 underline" onClick={() => setVerInformativos(!verInformativos)}>{verInformativos ? 'ocultar informativos' : 'mostrar informativos'}</button>
       </div>
       {erro && <p className="rounded-lg bg-red-50 p-3 text-sm text-critico">{erro}</p>}
-      {lista.length === 0 && <p className="rounded-xl bg-campo-50 p-4 text-sm text-campo-800">Nenhum aviso pendente. 👍</p>}
+      {lista.length === 0 && <p className="rounded-[10px] border border-campo-100 bg-campo-50 p-4 text-sm text-campo-800">Nenhum aviso pendente. Os lotes estão dentro do esperado.</p>}
       {lista.map((a) => (
-        <article key={a.id} className={`card p-3 ${a.nivel === 'critico' ? 'border-l-4 border-l-critico' : a.nivel === 'atencao' ? 'border-l-4 border-l-atencao' : ''}`}>
-          <p className="text-xs font-medium text-stone-400">{nomeLote(a.lote_id)}{a.estado === 'aceito' && ' · aceito, aguardando ação'}</p>
+        <article key={a.id} className={`card border-l-4 p-3.5 ${BORDA_NIVEL[a.nivel]}`}>
+          <p className="flex items-center gap-1.5 text-[13px] font-medium text-stone-500"><Brinco nome={nomeLote(a.lote_id)} id={a.lote_id} tamanho="sm" />{nomeLote(a.lote_id)}{a.estado === 'aceito' && ' · aceito, aguardando ação'}</p>
           <button className="mt-0.5 w-full text-left" onClick={() => setAberto(aberto === a.id ? null : a.id!)}>
-            <p className="font-medium text-stone-900">{textoAlerta(a).titulo}</p>
-            <p className="mt-0.5 text-sm text-campo-700">{textoAlerta(a).acao}</p>
+            <p className="font-semibold leading-snug text-stone-900">{textoAlerta(a).titulo}</p>
+            <p className="mt-1 text-sm text-campo-700">{textoAlerta(a).acao}</p>
           </button>
           {aberto === a.id && <div className="mt-2 border-t border-stone-100 pt-2"><AlertaCorpo alerta={a} /></div>}
           {recusando === a.id ? (
@@ -439,24 +454,23 @@ function Trato({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void }) {
   }
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {lotes.map((l) => (
-          <button key={l.id} onClick={() => setLoteId(l.id)}
-            className={`rounded-full border px-3 py-2 text-sm ${l.id === loteId ? 'border-campo-600 bg-campo-600 text-white' : 'border-stone-300 bg-white text-stone-700'}`}>{l.nome.replace(/ — .*/, '')}</button>
+          <BotaoLote key={l.id} lote={l} ativo={l.id === loteId} onClick={() => setLoteId(l.id)} />
         ))}
       </div>
-      {aviso && <p className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900">{aviso}</p>}
+      {aviso && <p className="rounded-md border-l-4 border-l-brinco bg-brinco-claro p-2.5 text-sm text-stone-800">{aviso}</p>}
       {!loteId && <p className="text-sm text-stone-500">Escolha o lote.</p>}
       {p && (
         <>
           <p className="text-sm text-stone-600">{p.lote.nome} · {numero(p.vacas, 0)} vacas · carregue nesta ordem:</p>
-          {p.observacoes.map((o: string) => <p key={o} className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">{o}</p>)}
+          {p.observacoes.map((o: string) => <p key={o} className="rounded-md border-l-4 border-l-brinco bg-brinco-claro p-2.5 text-[13px] text-stone-800">{o}</p>)}
           {p.total_por_trato.map((total: number, k: number) => (
             <section key={k} className={`card p-3 ${feitos.includes(k) ? 'opacity-60' : ''}`}>
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="font-semibold text-stone-900">Trato {k + 1} · {peso(total)}</h2>
+                <h2 className="titulo text-xl font-semibold text-stone-900">Trato {k + 1} <span className="num ml-1 text-stone-500">{peso(total)}</span></h2>
                 <button className={`rounded-lg px-3 py-1.5 text-sm font-medium ${feitos.includes(k) ? 'bg-campo-600 text-white' : 'border border-stone-300 bg-white'}`} onClick={() => marcar(k)}>
-                  {feitos.includes(k) ? '✓ feito' : 'marcar feito'}
+                  {feitos.includes(k) ? 'Feito ✓' : 'Marcar feito'}
                 </button>
               </div>
               <ol className="space-y-1">

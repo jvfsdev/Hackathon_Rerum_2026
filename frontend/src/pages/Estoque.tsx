@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react'
 import { api, dataBR, numero, peso, tecnico, type Alerta, type Alimento } from '../api'
-import { AlertaCorpo, Carregando, Erro, Painel } from '../components/ui'
+import { AlertaCorpo, CabecalhoPagina, Carregando, Erro, Painel } from '../components/ui'
 
 interface Item {
   item: string; nome: string; saldo_kg: number; consumo_kg_dia: number; dias_restantes: number | null
@@ -38,10 +38,8 @@ export default function EstoquePagina() {
   const cor = (d: number | null) => d === null ? 'text-stone-500' : d <= 7 ? 'text-critico' : d <= 15 ? 'text-atencao' : 'text-campo-700'
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold text-stone-900">Estoque de insumos</h1>
-        <p className="text-sm text-stone-500">O saldo é a última contagem mais as compras, menos o que as dietas dos lotes consomem a cada dia (inclusive durante as trocas de dieta). Conte o estoque de vez em quando para corrigir.</p>
-      </div>
+      <CabecalhoPagina titulo="Estoque de insumos"
+        contexto="O saldo é a última contagem mais as compras, menos o que as dietas dos lotes consomem a cada dia (inclusive durante as trocas de dieta). Conte o estoque de vez em quando para corrigir." />
       {dados.alertas.length > 0 && (
         <Painel titulo="Avisos de estoque">
           {dados.alertas.map((a, i) => <div key={i} className="border-b border-stone-100 py-2 last:border-0"><AlertaCorpo alerta={a} /></div>)}
@@ -50,7 +48,7 @@ export default function EstoquePagina() {
       <Painel titulo="Situação hoje" subtitulo="Dias até acabar seguem o consumo previsto dia a dia.">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="text-xs text-stone-500">
+            <thead className="border-b border-stone-200 text-[13px] text-stone-500">
               <tr><th className="py-1 pr-3">Insumo</th><th className="pr-3 text-right">Tem (estimado)</th><th className="pr-3 text-right">Gasto por dia</th><th className="pr-3 text-right">Dá para</th><th className="pr-3">Última contagem</th><th /></tr>
             </thead>
             <tbody>
@@ -60,7 +58,7 @@ export default function EstoquePagina() {
                     <td className="py-2 pr-3 font-medium text-stone-800">{i.nome}</td>
                     <td className="num pr-3 text-right">{i.saldo_kg < 0 ? <span className="text-amber-700">recontar</span> : peso(i.saldo_kg)}</td>
                     <td className="num pr-3 text-right">{i.consumo_kg_dia ? peso(i.consumo_kg_dia) : 'não usado hoje'}</td>
-                    <td className={`num pr-3 text-right font-semibold ${cor(i.dias_restantes)}`}>{i.dias_restantes === null ? (i.consumo_kg_dia ? 'mais de 4 meses' : 'deixa de ser usado') : `${numero(i.dias_restantes, 0)} dias`}</td>
+                    <td className={`titulo num pr-3 text-right text-lg font-semibold ${cor(i.dias_restantes)}`}>{i.dias_restantes === null ? (i.consumo_kg_dia ? 'mais de 4 meses' : 'deixa de ser usado') : `${numero(i.dias_restantes, 0)} dias`}</td>
                     <td className="pr-3 text-xs text-stone-500">{i.ultima_contagem ? `${dataBR(i.ultima_contagem)}: ${peso(i.contagem_kg)}` : 'sem contagem'}{i.entradas_kg ? ` · +${peso(i.entradas_kg)} comprados` : ''}{tecnico() && ` · consumo desde então ${peso(i.consumo_periodo_kg)}`}</td>
                     <td><button className="text-xs text-campo-600 hover:underline" onClick={() => verHistorico(i.item)}>{historico[i.item] ? 'fechar' : 'histórico'}</button></td>
                   </tr>

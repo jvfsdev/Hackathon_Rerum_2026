@@ -4,11 +4,11 @@ import { CartesianGrid, ComposedChart, Legend, Line, LineChart, ReferenceLine, R
 import { api, certeza, comEpisodios, dataBR, fmt, numero, OPCOES, reais, rotulo, tecnico, textoAlerta, UNIDADES, type Alerta, type Alimento, type Dieta, type ItemDieta, type ItemHistorico, type Lote, type Resultado } from '../api'
 import LoteForm from '../components/LoteForm'
 import { EscalaEscore } from '../components/Escala'
-import { AjusteMinimo, AlertaItem, BotaoComo, Carregando, CfBarra, Erro, ExplicacaoAlerta, Gaveta, LinhaDoTempo, NivelBadge, Painel } from '../components/ui'
+import { AjusteMinimo, AlertaItem, BotaoComo, Brinco, CabecalhoPagina, Carregando, CfBarra, Erro, ExplicacaoAlerta, Gaveta, Icone, LinhaDoTempo, NivelBadge, Painel } from '../components/ui'
 import { AbaPrevisao, AbaSimular, AbaTrato, PlanoTransicao, Sensibilidade } from './LoteExtras'
 
 const aba = ({ isActive }: { isActive: boolean }) =>
-  `whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${isActive ? 'border-campo-600 text-campo-700' : 'border-transparent text-stone-500 hover:text-stone-800'}`
+  `-mb-px whitespace-nowrap border-b-[3px] px-3 py-2.5 text-[15px] font-semibold transition-colors ${isActive ? 'border-campo-600 text-stone-900' : 'border-transparent text-stone-500 hover:border-stone-300 hover:text-stone-800'}`
 
 export default function LotePagina() {
   const { id } = useParams()
@@ -21,23 +21,20 @@ export default function LotePagina() {
   if (!info) return <Carregando texto="Carregando o lote…" />
   const { lote, fatos } = info
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-       <div>
-        <h1 className="text-xl font-semibold text-stone-900">{lote.nome}</h1>
-        <p className="text-sm text-stone-500">
-          {lote.n_vacas} vacas · {OPCOES[lote.grupo_genetico]} · {OPCOES[lote.sistema]} · {OPCOES[lote.estado]}
-          {fatos['lote.del'] !== undefined && (tecnico() ? ` · DEL ${Math.round(fatos['lote.del'])}` : ` · ${Math.round(fatos['lote.del'])} dias de lactação`)}
-          {tecnico() ? ` · PV ${lote.pv} kg` : ` · peso médio ${lote.pv} kg`}
-          {fatos['lote.leite'] !== undefined && ` · ${fmt(fatos['lote.leite'])} L/vaca (média 7 d)`}
-        </p>
-       </div>
-       <button className="btn-secundario" onClick={() => setEditando(true)}>Editar lote</button>
-      </div>
+    <div className="space-y-5">
+      <CabecalhoPagina antes={<Brinco nome={lote.nome} id={lote.id} tamanho="lg" />}
+        titulo={lote.nome.split(' — ')[1] ?? lote.nome}
+        contexto={<>
+          {lote.nome.split(' — ')[1] ? `${lote.nome.split(' — ')[0]}, ` : ''}{lote.n_vacas} vacas, {OPCOES[lote.grupo_genetico]?.toLowerCase()}, {OPCOES[lote.sistema]?.toLowerCase()}, {OPCOES[lote.estado]?.toLowerCase()}
+          {fatos['lote.del'] !== undefined && (tecnico() ? `, DEL ${Math.round(fatos['lote.del'])}` : `, ${Math.round(fatos['lote.del'])} dias de lactação`)}
+          {tecnico() ? `, PV ${lote.pv} kg` : `, peso médio ${lote.pv} kg`}
+          {fatos['lote.leite'] !== undefined && <>, <b className="num font-semibold text-stone-700">{fmt(fatos['lote.leite'])} L/vaca</b> (média de 7 dias)</>}
+        </>}
+        acoes={<button className="btn-secundario" onClick={() => setEditando(true)}><Icone nome="lapis" />Editar lote</button>} />
       <Gaveta aberta={editando} onFechar={() => setEditando(false)} titulo={`Editar ${lote.nome}`}>
         <LoteForm lote={lote} fatos={fatos} onSalvo={() => { setEditando(false); recarregar() }} />
       </Gaveta>
-      <nav className="-mx-4 flex overflow-x-auto border-b border-stone-200 px-4">
+      <nav className="-mx-4 -mt-1 flex overflow-x-auto border-b border-stone-300/70 px-4 sm:mx-0 sm:px-0" aria-label="Seções do lote">
         <NavLink end to="" className={aba}>{tecnico() ? 'Perfil e exigências' : 'Resumo'}</NavLink>
         <NavLink to="dieta" className={aba}>Dieta</NavLink>
         <NavLink to="simular" className={aba}>Simular (e se?)</NavLink>
@@ -104,13 +101,13 @@ function ResumoProdutor({ r, linkDieta, loteId }: { r: Resultado; linkDieta?: st
   return (
     <div className="space-y-4">
       {parecer && (
-        <div className={`card p-4 ${parecer.valor === 'adequada' ? 'border-campo-500 bg-campo-50' : parecer.valor === 'bloqueada' ? 'border-red-300 bg-red-50' : 'border-amber-300 bg-amber-50'}`}>
-          <p className="text-lg font-semibold text-stone-900">{PARECER_PRODUTOR[parecer.valor]?.[0] ?? fmt(parecer.valor)}</p>
+        <div className={`card border-l-[6px] p-4 sm:p-5 ${parecer.valor === 'adequada' ? 'border-campo-500 border-l-campo-600 bg-campo-50' : parecer.valor === 'bloqueada' ? 'border-red-300 border-l-critico bg-red-50' : 'border-brinco/70 border-l-brinco bg-brinco-claro'}`}>
+          <p className="titulo text-2xl font-semibold leading-tight text-stone-900">{PARECER_PRODUTOR[parecer.valor]?.[0] ?? fmt(parecer.valor)}</p>
           <p className="text-sm text-stone-600">{PARECER_PRODUTOR[parecer.valor]?.[1]} <span className="text-stone-400">({certeza(parecer.cf)})</span></p>
           {motivos.length > 0 && <ul className="mt-2 ml-4 list-disc space-y-0.5 text-sm text-stone-800">{motivos.map((a) => <li key={a.regra}>{textoAlerta(a).titulo}</li>)}</ul>}
           {parecer.valor !== 'adequada' && (
             <div className="mt-3 flex flex-wrap gap-2">
-              {linkDieta && <Link to={linkDieta} className="btn-primario">Pedir a dieta mais barata que resolve →</Link>}
+              {linkDieta && <Link to={linkDieta} className="btn-primario">Pedir a dieta mais barata que resolve</Link>}
               {loteId && <span className="w-full"><AjusteMinimo loteId={loteId} /></span>}
             </div>
           )}
@@ -172,10 +169,10 @@ function ResultadoTecnico({ r, linkDieta }: { r: Resultado; linkDieta?: string }
   return (
     <div className="space-y-4">
       {parecer && (
-        <div className={`card flex flex-wrap items-center justify-between gap-3 p-4 ${parecer.valor === 'adequada' ? 'border-campo-500 bg-campo-50' : parecer.valor === 'bloqueada' ? 'border-red-300 bg-red-50' : 'border-amber-300 bg-amber-50'}`}>
+        <div className={`card flex flex-wrap items-center justify-between gap-3 border-l-[6px] p-4 sm:p-5 ${parecer.valor === 'adequada' ? 'border-campo-500 border-l-campo-600 bg-campo-50' : parecer.valor === 'bloqueada' ? 'border-red-300 border-l-critico bg-red-50' : 'border-brinco/70 border-l-brinco bg-brinco-claro'}`}>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Parecer da dieta</p>
-            <p className="text-lg font-semibold text-stone-900">{fmt(parecer.valor)}</p>
+            <p className="text-[13px] font-medium text-stone-500">Parecer da dieta</p>
+            <p className="titulo text-2xl font-semibold leading-tight text-stone-900">{fmt(parecer.valor)}</p>
             {motivos.length > 0 && (
               <ul className="mt-1 space-y-0.5 text-sm text-stone-700">
                 {motivos.map((a) => <li key={a.regra}><span className="font-mono text-xs text-stone-500">{a.regra}</span> {a.titulo}</li>)}
@@ -184,7 +181,7 @@ function ResultadoTecnico({ r, linkDieta }: { r: Resultado; linkDieta?: string }
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <CfBarra cf={parecer.cf} /><BotaoComo no={r.explicacoes?.['parecer.dieta']} />
-            {linkDieta && parecer.valor !== 'adequada' && <Link to={linkDieta} className="btn-primario">Sugerir dieta de custo mínimo →</Link>}
+            {linkDieta && parecer.valor !== 'adequada' && <Link to={linkDieta} className="btn-primario">Sugerir dieta de custo mínimo</Link>}
           </div>
         </div>
       )}
@@ -206,7 +203,7 @@ function ResultadoTecnico({ r, linkDieta }: { r: Resultado; linkDieta?: string }
             {COMPONENTES_ELL.filter((c) => r.fatos[c]).map((c) => (
               <div key={c} className="flex items-center gap-2 text-xs">
                 <span className="w-32 text-stone-500">{rotulo(c)}</span>
-                <span className="h-2 flex-1 overflow-hidden rounded bg-stone-100"><span className="block h-full bg-campo-500" style={{ width: `${Math.max(0, (r.fatos[c].valor / total) * 100)}%` }} /></span>
+                <span className="h-2 flex-1 overflow-hidden rounded-sm bg-stone-100"><span className="block h-full bg-campo-500" style={{ width: `${Math.max(0, (r.fatos[c].valor / total) * 100)}%` }} /></span>
                 <span className="num w-12 text-right text-stone-700">{fmt(r.fatos[c].valor)}</span>
               </div>
             ))}
@@ -252,7 +249,7 @@ function Comparacao({ r }: { r: Resultado }) {
   ].filter((l) => l.oferta !== undefined && l.alvo !== undefined)
   return (
     <Painel titulo={t ? 'Oferta × exigência' : 'A dieta item por item'} subtitulo={t ? `Dieta: ${fmt(v('dieta.ms_kg'))} kg MS · R$ ${fmt(v('dieta.custo_vaca_dia'))}/vaca/dia · ${fmt(v('dieta.forragem_pct'))}% de volumoso na MS`
-      : `Barra verde: dentro do certo. Laranja: falta ou passou. A linha preta é o necessário. ${fmt(v('dieta.forragem_pct'))}% da comida é volumoso.`}>
+      : `Barra verde: dentro do certo. Amarela: falta ou passou. O traço escuro é o necessário. ${fmt(v('dieta.forragem_pct'))}% da comida é volumoso.`}>
       <div className="space-y-2">
         {linhas.map((l) => {
           const razao = l.tipo === 'dcad' ? (l.oferta + 300) / 300 : l.oferta / l.alvo
@@ -261,9 +258,9 @@ function Comparacao({ r }: { r: Resultado }) {
           return (
             <div key={l.nome} className="grid grid-cols-[110px_1fr_auto] items-center gap-3 text-sm sm:grid-cols-[150px_1fr_200px]">
               <span className="text-stone-600">{l.nome}</span>
-              <span className="relative h-3 rounded bg-stone-100">
-                <span className={`absolute inset-y-0 left-0 rounded ${ok ? 'bg-campo-500' : 'bg-amber-500'}`} style={{ width: `${largura}%` }} />
-                <span className="absolute inset-y-[-3px] w-0.5 bg-stone-800" style={{ left: `${(1 / 1.5) * 100}%` }} title="alvo" />
+              <span className="relative h-3.5 rounded-sm bg-stone-100 ring-1 ring-inset ring-stone-200">
+                <span className={`absolute inset-y-0 left-0 rounded-sm ${ok ? 'bg-campo-500' : 'bg-brinco'}`} style={{ width: `${largura}%` }} />
+                <span className="absolute inset-y-[-4px] w-[3px] rounded-full bg-stone-900" style={{ left: `calc(${(1 / 1.5) * 100}% - 1px)` }} title="alvo" />
               </span>
               <span className="num text-right text-xs text-stone-700">
                 {t ? <>{fmt(l.oferta)} {l.tipo === 'max' || l.tipo === 'dcad' ? '≤' : l.tipo === 'min' ? '≥' : '≈'} {fmt(l.alvo)} {l.un} {ok ? '✓' : '⚠'}</>
@@ -320,10 +317,10 @@ function useAlertaDaAcao() {
 function BannerAcao({ alerta, onCancelar }: { alerta: Alerta | null; onCancelar: () => void }) {
   if (!alerta) return null
   return (
-    <div className="rounded-xl border-2 border-campo-500 bg-campo-50 p-4">
+    <div className="rounded-[10px] border border-campo-500 border-l-[6px] border-l-campo-600 bg-campo-50 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-campo-700">Registrando a ação do alerta aceito</p>
+          <p className="text-[13px] font-semibold text-campo-700">Registrando a ação do alerta aceito</p>
           <p className="mt-0.5 font-medium text-stone-900">{tecnico() && <span className="font-mono text-xs text-stone-500">{alerta.regra} </span>}{textoAlerta(alerta).titulo}</p>
           <p className="mt-1 text-sm text-stone-700"><b>{tecnico() ? 'Recomendação' : 'O que fazer'}:</b> {textoAlerta(alerta).acao}</p>
           <p className="mt-1 text-xs text-stone-500">O que você salvar nesta tela entra no histórico do alerta. A resolução é confirmada pelo sistema quando a condição deixar de valer.</p>
@@ -462,7 +459,7 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
           </label>
           <div className="mt-2">
             {!ajustando
-              ? <button className="text-sm font-medium text-campo-600 hover:underline" onClick={() => setAjustando(true)} disabled={!itens.length}>Corrigir esta dieta com a menor mudança possível →</button>
+              ? <button className="text-sm font-medium text-campo-600 hover:underline" onClick={() => setAjustando(true)} disabled={!itens.length}>Corrigir esta dieta com a menor mudança possível</button>
               : <AjusteMinimo key={JSON.stringify(itens)} loteId={lote.id} itens={itens}
                   onUsar={(lista, custo) => { setAjustando(false); carregarNoEditor(lista, `Menor mudança (${reais(custo)}/vaca/dia)`, 'ajuste', 'Menor mudança para corrigir a dieta') }} />}
           </div>
@@ -470,19 +467,19 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
         </div>
         <div id="sugerir" className="scroll-mt-4">
         <Painel className={hash === '#sugerir' ? 'ring-2 ring-campo-500' : ''} titulo={tecnico() ? 'Sugerir dieta de custo mínimo' : 'Sugerir a dieta mais barata'} subtitulo={tecnico() ? 'As regras definem metas e restrições; a programação linear acha as quantidades; as regras verificam o resultado.' : 'Marque o que tem na fazenda. O sistema monta a dieta mais barata que atende o lote e confere o resultado.'}>
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+          <div className="grid gap-x-5 gap-y-0.5 sm:grid-cols-2">
             {alimentos.map((a) => (
-              <label key={a.id} className="flex items-center gap-1.5 text-sm text-stone-700">
+              <label key={a.id} className="flex items-center gap-2 border-b border-stone-100 py-1.5 text-sm text-stone-700">
                 <input type="checkbox" className="accent-campo-600" checked={escolhidos.includes(a.id)}
                   onChange={(e) => setEscolhidos(e.target.checked ? [...escolhidos, a.id] : escolhidos.filter((x) => x !== a.id))} />
                 <span>{a.nome.replace(/ \(.*\)/, '')}{a.da_fazenda && <span className="ml-1 rounded bg-campo-100 px-1 text-[10px] font-semibold text-campo-700">fazenda</span>}</span>
-                <span className={`num text-xs ${a.preco_origem === 'fazenda' ? 'text-campo-700' : 'text-stone-400'}`} title={a.preco_origem === 'fazenda' ? 'preço da fazenda' : 'preço de referência (demonstração)'}>R${a.preco_kg_mn.toFixed(2)}</span>
+                <span className={`num ml-auto shrink-0 text-xs ${a.preco_origem === 'fazenda' ? 'font-semibold text-campo-700' : 'text-stone-400'}`} title={a.preco_origem === 'fazenda' ? 'preço da fazenda' : 'preço de referência (demonstração)'}>R${a.preco_kg_mn.toFixed(2)}</span>
               </label>
             ))}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <button className="btn-primario" onClick={sugerir} disabled={!!ocupado || !escolhidos.length}>{ocupado === 'pl' ? 'Otimizando…' : 'Sugerir dieta'}</button>
-            <Link to="/insumos" className="text-xs font-medium text-campo-600 hover:underline">Insumos e preços →</Link>
+            <Link to="/insumos" className="text-xs font-medium text-campo-600 hover:underline">Insumos e preços</Link>
           </div>
           {pl?.pl?.status === 'otimo' && <Sensibilidade loteId={lote.id} alimentos={escolhidos} />}
           {pl && <ResultadoPL pl={pl} nome={nome}
@@ -642,7 +639,7 @@ function MarcadorEvento({ viewBox, n, ativo }: { viewBox?: { x: number; y: numbe
   if (!viewBox) return null
   return (
     <g transform={`translate(${viewBox.x},${viewBox.y + 10})`}>
-      <circle r={9} fill={ativo ? '#245a26' : '#57534e'} />
+      <circle r={9} fill={ativo ? '#24552f' : '#4b5548'} />
       <text textAnchor="middle" dy={4} fontSize={11} fontWeight={700} fill="#fff">{n}</text>
     </g>
   )
@@ -658,7 +655,7 @@ function BalaoProducao({ active, payload, label, grupos }: any) {
       <p className="mb-1 font-semibold text-stone-800">{label} · DEL {Math.round(p.del)}</p>
       <p className="num text-campo-700">Observado: <b>{p.observado?.toFixed(1)} L/vaca</b></p>
       <p className="num text-stone-500">Esperado: {p.esperado?.toFixed(1)} L/vaca ({p.residuo > 0 ? '+' : ''}{(p.residuo * 100).toFixed(0)}%)</p>
-      {p.itu != null && <p className="num text-orange-600">ITU: {p.itu.toFixed(1)}</p>}
+      {p.itu != null && <p className="num text-atencao">ITU: {p.itu.toFixed(1)}</p>}
       {p.transicao && <p className="text-stone-500">Dia de transição (fora dos detectores de queda)</p>}
       {g && (
         <div className="mt-1.5 border-t border-stone-100 pt-1.5">
@@ -696,12 +693,12 @@ function AbaAcompanhamento({ loteId }: { loteId: number }) {
         <div className="h-36">
           <ResponsiveContainer>
             <LineChart data={d} margin={{ left: -20, right: 8 }}>
-              <CartesianGrid stroke="#f0eeec" />
+              <CartesianGrid stroke="#e8ece5" vertical={false} />
               <XAxis dataKey="dia" tick={{ fontSize: 10 }} minTickGap={20} />
               <YAxis tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
               <Tooltip />
-              {refs.map((r) => <ReferenceLine key={r.rotulo} y={r.y} stroke="#b54708" strokeDasharray="4 3" label={{ value: r.rotulo, fontSize: 10, fill: '#b54708', position: 'insideTopRight' }} />)}
-              <Line dataKey="valor" stroke="#2f7230" strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false} />
+              {refs.map((r) => <ReferenceLine key={r.rotulo} y={r.y} stroke="#9a5800" strokeDasharray="4 3" label={{ value: r.rotulo, fontSize: 10, fill: '#9a5800', position: 'insideTopRight' }} />)}
+              <Line dataKey="valor" stroke="#2f6b3b" strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -715,7 +712,7 @@ function AbaAcompanhamento({ loteId }: { loteId: number }) {
         <div className="h-72">
           <ResponsiveContainer>
             <ComposedChart data={dados} margin={{ left: -10, right: 10 }}>
-              <CartesianGrid stroke="#f0eeec" />
+              <CartesianGrid stroke="#e8ece5" vertical={false} />
               <XAxis dataKey="dia" tick={{ fontSize: 11 }} minTickGap={24} />
               <YAxis yAxisId="l" tick={{ fontSize: 11 }} domain={['auto', 'auto']} unit=" L" />
               <YAxis yAxisId="itu" orientation="right" tick={{ fontSize: 11 }} domain={[60, 90]} />
@@ -723,13 +720,13 @@ function AbaAcompanhamento({ loteId }: { loteId: number }) {
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <ReferenceLine yAxisId="itu" y={72} stroke="#fca5a5" strokeDasharray="2 4" />
               {grupos.map((g) => (
-                <ReferenceLine key={g.dia} yAxisId="l" x={g.dia} stroke={destaque === g.n ? '#245a26' : '#78716c'}
+                <ReferenceLine key={g.dia} yAxisId="l" x={g.dia} stroke={destaque === g.n ? '#24552f' : '#646f60'}
                   strokeWidth={destaque === g.n ? 2.5 : 1} strokeDasharray={destaque === g.n ? undefined : '3 3'}
                   label={<MarcadorEvento n={g.n} ativo={destaque === g.n} />} />
               ))}
-              <Line yAxisId="itu" dataKey="itu" name="ITU" stroke="#f97316" strokeWidth={1} dot={false} isAnimationActive={false} />
-              <Line yAxisId="l" dataKey="esperado" name="Esperado (L/vaca)" stroke="#a8a29e" strokeDasharray="5 4" strokeWidth={2} dot={false} isAnimationActive={false} />
-              <Line yAxisId="l" dataKey="observado" name="Observado (L/vaca)" stroke="#2f7230" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+              <Line yAxisId="itu" dataKey="itu" name="ITU" stroke="#c98a12" strokeWidth={1} dot={false} isAnimationActive={false} />
+              <Line yAxisId="l" dataKey="esperado" name="Esperado (L/vaca)" stroke="#8b9687" strokeDasharray="5 4" strokeWidth={2} dot={false} isAnimationActive={false} />
+              <Line yAxisId="l" dataKey="observado" name="Observado (L/vaca)" stroke="#2f6b3b" strokeWidth={2.5} dot={false} isAnimationActive={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>

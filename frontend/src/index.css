@@ -1,23 +1,62 @@
 @import "tailwindcss";
 
+/* Identidade: verde de pasto para agir, amarelo de brinco para identificar o lote, cinzas de concreto de cocho
+   (levemente esverdeados) para todo o resto. Barlow / Barlow Condensed: letra de placa de estrada e de campo. */
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --color-campo-50: #f2f8f1;
-  --color-campo-100: #e0efdc;
-  --color-campo-500: #3f8a3a;
-  --color-campo-600: #2f7230;
-  --color-campo-700: #245a26;
-  --color-campo-900: #16351a;
-  --color-critico: #b42318;
-  --color-atencao: #b54708;
-  --color-info: #175cd3;
+  --font-sans: "Barlow", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-titulo: "Barlow Condensed", "Barlow", ui-sans-serif, system-ui, sans-serif;
+
+  --color-campo-50: #eef5ee;
+  --color-campo-100: #d8e9d8;
+  --color-campo-500: #3f8a4c;
+  --color-campo-600: #2f6b3b;
+  --color-campo-700: #24552f;
+  --color-campo-800: #1c4325;
+  --color-campo-900: #142a1a;
+
+  --color-brinco: #f2c230;
+  --color-brinco-escuro: #b8890a;
+  --color-brinco-claro: #fdf3cf;
+
+  /* neutros redefinidos: todo stone-* do app passa a ser o cinza do cocho */
+  --color-stone-50: #f4f6f2;
+  --color-stone-100: #e8ece5;
+  --color-stone-200: #d8ded4;
+  --color-stone-300: #bcc5b8;
+  --color-stone-400: #8b9687;
+  --color-stone-500: #646f60;
+  --color-stone-600: #4b5548;
+  --color-stone-700: #374035;
+  --color-stone-800: #252c24;
+  --color-stone-900: #162019;
+
+  --color-critico: #b3261e;
+  --color-atencao: #9a5800;
+  --color-info: #2f5d8a;
 }
 
-body { @apply bg-stone-50 text-stone-800 antialiased; }
-@utility card { @apply rounded-xl border border-stone-200 bg-white shadow-sm; }
-@utility btn { @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:opacity-50; }
-@utility btn-primario { @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:opacity-50 bg-campo-600 text-white hover:bg-campo-700; }
-@utility btn-secundario { @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:opacity-50 border border-stone-300 bg-white text-stone-700 hover:bg-stone-100; }
-@utility input { @apply w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-campo-500 focus:ring-2 focus:ring-campo-100 focus:outline-none; }
-@utility rotulo { @apply mb-1 block text-xs font-medium text-stone-500; }
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-[#edf0ea] text-stone-800 antialiased; font-size: 15px; }
+  h1, h2, h3 { text-wrap: balance; }
+  :focus-visible { outline: 2px solid var(--color-campo-500); outline-offset: 2px; border-radius: 4px; }
+  ::selection { background: var(--color-brinco-claro); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+  }
+}
+
+@utility titulo { font-family: var(--font-titulo); letter-spacing: 0.005em; }
+@utility card { @apply rounded-[10px] border border-stone-200 bg-white; }
+@utility btn { @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50; }
+@utility btn-primario { @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-campo-600 text-white hover:bg-campo-700 active:bg-campo-800; }
+@utility btn-secundario { @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 border border-stone-300 bg-white text-stone-700 hover:border-stone-400 hover:bg-stone-50; }
+@utility input { @apply w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-campo-500 focus:ring-2 focus:ring-campo-100 focus:outline-none; }
+@utility rotulo { @apply mb-1 block text-[13px] font-medium text-stone-600; }
 @utility num { font-variant-numeric: tabular-nums; }
+
+/* gaveta lateral: entra da direita quando a pessoa abre uma explicação */
+@keyframes gaveta-entra { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fundo-entra { from { opacity: 0; } to { opacity: 1; } }
+.gaveta { animation: gaveta-entra 180ms cubic-bezier(.2,.7,.2,1); }
+.gaveta-fundo { animation: fundo-entra 180ms ease-out; }

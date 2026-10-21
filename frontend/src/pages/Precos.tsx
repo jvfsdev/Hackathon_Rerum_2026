@@ -254,17 +254,17 @@ export default function PrecosPagina({ fazendaId = 1 }: { fazendaId?: number }) 
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-stone-300/70 pb-4">
         <div className="max-w-3xl">
-          <h1 className="text-xl font-semibold text-stone-900">Insumos e preços</h1>
-          <p className="text-sm text-stone-500">
-            Os alimentos da <b>base de conhecimento</b> têm composição de tabelas da Embrapa. O preço de <b>referência</b> vem
+          <h1 className="titulo text-[2rem] font-semibold leading-[1.05] text-stone-900">Insumos e preços</h1>
+          <p className="mt-1 text-sm text-stone-500">
+            Os alimentos da <b>base de conhecimento</b> têm composição do CQBAL 4.0. O preço de <b>referência</b> vem
             de cotação pública atualizada diariamente quando existe (Cepea/Esalq-USP, Deral-PR); nos demais itens é um valor
             de demonstração. Cadastre os insumos da fazenda e informe os preços dela: eles têm prioridade sobre a referência
             na verificação da dieta, na sugestão de custo mínimo e no acompanhamento.
           </p>
         </div>
-        {!formulario && <button className="btn-primario" onClick={() => setFormulario({ inicial: { ...VAZIO } })}>+ Cadastrar insumo</button>}
+        {!formulario && <button className="btn-primario" onClick={() => setFormulario({ inicial: { ...VAZIO } })}>Cadastrar insumo</button>}
       </div>
       {formulario && (
         <Painel titulo={formulario.codigo ? 'Editar insumo da fazenda' : 'Cadastrar insumo da fazenda'}
@@ -279,7 +279,7 @@ export default function PrecosPagina({ fazendaId = 1 }: { fazendaId?: number }) 
         {([['leite', 'Leite', 'R$/L', dados.leite], ['concentrado', 'Concentrado (mistura do cocho)', 'R$/kg', dados.concentrado]] as const).map(([id, nome, un, l]) => (
           <Painel key={id} titulo={nome} subtitulo={l.data ? `Atualizado em ${dataBR(l.data)}${l.fonte ? ` · ${l.fonte}` : ''}` : 'Valor inicial da fazenda'}>
             <div className="flex items-center justify-between gap-3">
-              <span className="num text-2xl font-semibold text-stone-900">R$ {brl(l.preco)}<span className="ml-1 text-sm font-normal text-stone-500">{un.replace('R$', '')}</span></span>
+              <span className="titulo num text-[2.2rem] font-semibold leading-none text-stone-900">R$ {brl(l.preco)}<span className="ml-1 text-sm font-normal text-stone-500">{un.replace('R$', '')}</span></span>
               {entrada(id)}
             </div>
             {id === 'leite' && refLeite && (
@@ -310,7 +310,7 @@ export default function PrecosPagina({ fazendaId = 1 }: { fazendaId?: number }) 
                         {l.da_fazenda && <span className="ml-1.5 rounded bg-campo-100 px-1.5 py-0.5 text-[10px] font-semibold text-campo-700">insumo da fazenda</span>}
                       </div>
                       <div className="text-xs text-stone-400">{TIPO[l.tipo ?? ''] ?? l.tipo} · MS {l.ms}%
-                        {catalogo[l.id] && ` · ${l.da_fazenda ? ORIGEM_DADO[catalogo[l.id].origem_dado ?? ''] ?? '' : 'tabela Embrapa'}`}</div>
+                        {catalogo[l.id] && ` · ${l.da_fazenda ? ORIGEM_DADO[catalogo[l.id].origem_dado ?? ''] ?? '' : 'tabela CQBAL'}`}</div>
                       {l.da_fazenda && catalogo[l.id] && (
                         <div className="mt-0.5 flex gap-3 text-xs">
                           <button className="text-campo-600 hover:underline" onClick={() => editar(catalogo[l.id])}>editar</button>
@@ -358,7 +358,7 @@ export default function PrecosPagina({ fazendaId = 1 }: { fazendaId?: number }) 
         </Painel>
       )}
 
-      <div className="card sticky bottom-3 flex flex-wrap items-end gap-3 p-4">
+      <div className="card sticky bottom-3 flex flex-wrap items-end gap-3 border-campo-500/40 p-4 shadow-[0_8px_24px_-12px_rgba(20,42,26,0.35)]">
         <label><span className="rotulo">Data dos preços</span><input type="date" className="input" value={data} onChange={(e) => setData(e.target.value)} /></label>
         <label className="min-w-56 flex-1"><span className="rotulo">Fonte</span><input className="input" placeholder="Ex.: nota fiscal, cotação da cooperativa, Cepea" value={fonte} onChange={(e) => setFonte(e.target.value)} /></label>
         <button className="btn-primario" onClick={salvar} disabled={!alterados.length}>Salvar {alterados.length || ''} preço(s)</button>

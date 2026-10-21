@@ -3,14 +3,61 @@ import { useNavigate } from 'react-router-dom'
 import { api, certeza, dataBR, fmt, numero, reais, rotulo, tecnico, textoAlerta, UNIDADES, type Alerta, type EstadoAlerta, type ItemDieta, type ItemHistorico, type NoComo, type Nivel } from '../api'
 
 const COR_NIVEL: Record<Nivel, string> = {
-  critico: 'bg-red-50 text-critico ring-red-200',
-  atencao: 'bg-amber-50 text-atencao ring-amber-200',
-  informativo: 'bg-blue-50 text-info ring-blue-200',
+  critico: 'bg-critico text-white ring-critico',
+  atencao: 'bg-brinco-claro text-atencao ring-brinco/70',
+  informativo: 'bg-white text-info ring-stone-300',
 }
 const NOME_NIVEL: Record<Nivel, string> = { critico: 'Crítico', atencao: 'Atenção', informativo: 'Informativo' }
+/** Cor da borda lateral de um item, pelo pior nível de alerta. */
+export const BORDA_NIVEL: Record<Nivel | 'ok', string> = {
+  critico: 'border-l-critico', atencao: 'border-l-brinco', informativo: 'border-l-stone-300', ok: 'border-l-campo-500',
+}
 
 export function NivelBadge({ nivel }: { nivel: Nivel }) {
-  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${COR_NIVEL[nivel]}`}>{NOME_NIVEL[nivel]}</span>
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${COR_NIVEL[nivel]}`}>
+      {nivel === 'critico' && <span className="h-1.5 w-1.5 rounded-full bg-white" />}{NOME_NIVEL[nivel]}
+    </span>
+  )
+}
+
+/** Número do lote tirado do nome ("Lote 3 — Pós-parto" → "3"); sem número, as iniciais. */
+export function numeroDoLote(nome: string, id?: number) {
+  const m = nome.match(/\d+/)
+  if (m) return m[0]
+  const ini = nome.replace(/ — .*/, '').split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase()
+  return ini || String(id ?? '?')
+}
+
+/** Brinco de identificação (amarelo, como o da orelha da vaca) com o número do lote. */
+export function Brinco({ nome, id, tamanho = 'md' }: { nome: string; id?: number; tamanho?: 'sm' | 'md' | 'lg' }) {
+  const n = numeroDoLote(nome, id)
+  const dim = { sm: 'h-8 w-7 text-sm', md: 'h-11 w-9 text-lg', lg: 'h-16 w-[3.25rem] text-[1.7rem]' }[tamanho]
+  return (
+    <span className={`titulo relative inline-flex shrink-0 items-end justify-center font-bold leading-none text-stone-900 ${dim}`} aria-hidden="true">
+      <svg viewBox="0 0 40 50" className="absolute inset-0 h-full w-full drop-shadow-[0_1px_0_rgba(110,80,0,0.35)]">
+        <path d="M20 1.5c-4.6 0-8 3-8.6 7.2L6.2 41.4C5.6 45.3 8.6 48.5 12.6 48.5h14.8c4 0 7-3.2 6.4-7.1L28.6 8.7C28 4.5 24.6 1.5 20 1.5z" fill="var(--color-brinco)" stroke="var(--color-brinco-escuro)" strokeWidth="1.2" />
+        <circle cx="20" cy="10" r="3.2" fill="#edf0ea" stroke="var(--color-brinco-escuro)" strokeWidth="1" />
+      </svg>
+      <span className="relative pb-[18%]">{n}</span>
+    </span>
+  )
+}
+
+/** Cabeçalho de página: título forte, uma linha de contexto e as ações à direita. */
+export function CabecalhoPagina({ titulo, contexto, acoes, antes }: { titulo: ReactNode; contexto?: ReactNode; acoes?: ReactNode; antes?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-stone-300/70 pb-4">
+      <div className="flex min-w-0 items-center gap-3.5">
+        {antes}
+        <div className="min-w-0">
+          <h1 className="titulo text-[2rem] font-semibold leading-[1.05] text-stone-900">{titulo}</h1>
+          {contexto && <div className="mt-1 max-w-3xl text-sm text-stone-500">{contexto}</div>}
+        </div>
+      </div>
+      {acoes && <div className="flex flex-wrap gap-2">{acoes}</div>}
+    </div>
+  )
 }
 
 export function ForcaBadge({ forca }: { forca?: string }) {
@@ -19,37 +66,37 @@ export function ForcaBadge({ forca }: { forca?: string }) {
     A: 'Norma legal, meta-análise ou estudo grande', B: 'Estudo revisado ou extensão com dados',
     C: 'Extensão sem dados próprios ou população diferente', D: 'Escolha de engenharia, sem validação',
   }
-  return <span title={titulo[forca]} className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-stone-100 px-1 text-[11px] font-bold text-stone-600 ring-1 ring-stone-200">Evid. {forca}</span>
+  return <span title={titulo[forca]} className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-stone-100 px-1.5 text-[11px] font-semibold text-stone-600 ring-1 ring-stone-200">Evidência {forca}</span>
 }
 
 export function CfBarra({ cf, rotulo: r = 'CF' }: { cf: number; rotulo?: string }) {
   const pct = Math.round(Math.max(0, Math.min(1, cf)) * 100)
-  const cor = cf >= 0.8 ? 'bg-campo-500' : cf >= 0.6 ? 'bg-amber-500' : 'bg-stone-400'
+  const cor = cf >= 0.8 ? 'bg-campo-500' : cf >= 0.6 ? 'bg-brinco' : 'bg-stone-400'
   return (
     <span className="inline-flex items-center gap-1.5" title="Fator de certeza (0 a 1)">
       <span className="text-[11px] font-medium text-stone-500">{r}</span>
-      <span className="h-1.5 w-14 overflow-hidden rounded-full bg-stone-200"><span className={`block h-full ${cor}`} style={{ width: `${pct}%` }} /></span>
+      <span className="h-1.5 w-14 overflow-hidden rounded-full bg-stone-100 ring-1 ring-stone-200"><span className={`block h-full ${cor}`} style={{ width: `${pct}%` }} /></span>
       <span className="num text-xs font-semibold text-stone-700">{cf.toFixed(2)}</span>
     </span>
   )
 }
 
 export function Carregando({ texto = 'Consultando a base de conhecimento…' }: { texto?: string }) {
-  return <div className="flex items-center gap-2 p-6 text-sm text-stone-500"><span className="h-4 w-4 animate-spin rounded-full border-2 border-campo-500 border-t-transparent" />{texto}</div>
+  return <div role="status" className="flex items-center gap-2.5 p-6 text-sm text-stone-500"><span className="h-4 w-4 animate-spin rounded-full border-2 border-campo-500 border-t-transparent" />{texto}</div>
 }
 
 export function Erro({ msg }: { msg: string }) {
-  return <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-critico">{msg}</div>
+  return <div role="alert" className="rounded-md border border-red-200 border-l-4 border-l-critico bg-red-50 px-3 py-2.5 text-sm text-critico">{msg}</div>
 }
 
 export function Painel({ titulo, subtitulo, acoes, children, className = '' }: { titulo?: ReactNode; subtitulo?: ReactNode; acoes?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <section className={`card p-4 sm:p-5 ${className}`}>
       {(titulo || acoes) && (
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-          <div>
-            {titulo && <h2 className="text-base font-semibold text-stone-900">{titulo}</h2>}
-            {subtitulo && <p className="mt-0.5 text-sm text-stone-500">{subtitulo}</p>}
+        <div className="mb-3.5 flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            {titulo && <h2 className="titulo text-xl font-semibold leading-tight text-stone-900">{titulo}</h2>}
+            {subtitulo && <p className="mt-1 max-w-[72ch] text-sm leading-snug text-stone-500">{subtitulo}</p>}
           </div>
           {acoes}
         </div>
@@ -68,16 +115,36 @@ export function Gaveta({ aberta, onFechar, titulo, children }: { aberta: boolean
   if (!aberta) return null
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-stone-900/30" onClick={onFechar} />
-      <aside className="relative flex h-full w-full max-w-2xl flex-col bg-white shadow-xl">
-        <header className="flex items-center justify-between border-b border-stone-200 px-5 py-3">
-          <h3 className="font-semibold text-stone-900">{titulo}</h3>
-          <button className="btn-secundario px-2 py-1" onClick={onFechar} aria-label="Fechar">✕</button>
+      <div className="gaveta-fundo absolute inset-0 bg-campo-900/40" onClick={onFechar} />
+      <aside role="dialog" aria-modal="true" className="gaveta relative flex h-full w-full max-w-2xl flex-col bg-white shadow-[-12px_0_32px_-12px_rgba(20,42,26,0.35)]">
+        <header className="flex items-center justify-between gap-3 border-b border-stone-200 bg-stone-50 px-5 py-3.5">
+          <h3 className="titulo text-xl font-semibold leading-tight text-stone-900">{titulo}</h3>
+          <button className="btn-secundario h-8 w-8 p-0" onClick={onFechar} aria-label="Fechar"><Icone nome="fechar" /></button>
         </header>
         <div className="flex-1 overflow-y-auto p-5">{children}</div>
       </aside>
     </div>
   )
+}
+
+const ICONES: Record<string, ReactNode> = {
+  fechar: <path d="M6 6l12 12M18 6L6 18" />,
+  painel: <><rect x="3.5" y="3.5" width="7" height="8" rx="1" /><rect x="13.5" y="3.5" width="7" height="5" rx="1" /><rect x="13.5" y="11.5" width="7" height="9" rx="1" /><rect x="3.5" y="14.5" width="7" height="6" rx="1" /></>,
+  consulta: <><path d="M5 4.5h14v11H10l-4 4v-4H5z" /><path d="M10 8.5c0-1.2 1-2 2.1-2s2 .8 2 1.9c0 1.6-2.1 1.6-2.1 3" /><circle cx="12" cy="13" r=".4" fill="currentColor" /></>,
+  insumos: <><path d="M5 20.5V9l7-5 7 5v11.5" /><path d="M9.5 20.5v-6h5v6" /><path d="M3 20.5h18" /></>,
+  estoque: <><path d="M4 8l8-4.5L20 8v10l-8 4.5L4 18z" /><path d="M4 8l8 4.5L20 8M12 12.5v10" /></>,
+  relatorio: <><path d="M7 3.5h7.5L19 8v12.5H7z" /><path d="M14 3.5V8.5h5M10 12.5h6M10 16h6" /></>,
+  base: <><ellipse cx="12" cy="6" rx="7" ry="2.5" /><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5" /></>,
+  celular: <><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18.5h2" /></>,
+  lapis: <><path d="M4 20l1-4.5L15.5 5l3.5 3.5L8.5 19z" /><path d="M13.5 7l3.5 3.5" /></>,
+  trato: <><path d="M3 15.5h12.5V9H9L6.5 12H3z" /><path d="M15.5 11h3.5l2 2.5v2h-5.5" /><circle cx="7" cy="17.5" r="2" /><circle cx="17.5" cy="17.5" r="2" /></>,
+  sino: <><path d="M6 16.5V11a6 6 0 0112 0v5.5l1.5 2H4.5z" /><path d="M10 20.5a2 2 0 004 0" /></>,
+  mais: <path d="M12 5v14M5 12h14" />,
+}
+
+/** Ícones de traço (24×24), herdando a cor do texto. */
+export function Icone({ nome, className = 'h-4 w-4' }: { nome: keyof typeof ICONES | string; className?: string }) {
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONES[nome]}</svg>
 }
 
 const ORIGEM: Record<string, string> = { usuario: 'informado', medido: 'medido', tabela: 'tabela', padrao: 'valor padrão', sistema: 'sistema', regra: 'concluído' }
@@ -265,7 +332,7 @@ export function AlertaCorpo({ alerta }: { alerta: Alerta }) {
           </span>
         ) : alerta.data && <span className="text-xs text-stone-400">{dataBR(alerta.data)}</span>}
       </div>
-      <p className="mt-1.5 font-medium text-stone-900">{t.titulo}</p>
+      <p className="mt-2 font-semibold leading-snug text-stone-900">{t.titulo}</p>
       {t.causa && <p className="mt-1 text-sm text-stone-600"><span className="font-medium text-stone-700">{tec ? 'Causa provável: ' : 'Por quê: '}</span>{t.causa}</p>}
       {t.acao && <p className="mt-1 text-sm text-stone-600"><span className="font-medium text-campo-700">{tec ? 'Ação sugerida: ' : 'O que fazer: '}</span>{t.acao}</p>}
       {alerta.nota && <p className="mt-1 rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">{tec ? `Meta-regra ${alerta.nota}` : `Observação: ${alerta.nota.replace(/^[A-Z]+-[\w]+: /, '')}`}</p>}
@@ -301,7 +368,7 @@ export function AlertaAcoes({ alerta, onMudou }: { alerta: Alerta; onMudou?: (a:
     <div className="mt-2">
       <div className="flex flex-wrap items-center gap-2">
         {alerta.estado === 'aceito' ? (
-          <button className="btn-primario px-3 py-1.5" onClick={() => alerta.destino && navegar(alerta.destino)}>Registrar a ação →</button>
+          <button className="btn-primario px-3 py-1.5" onClick={() => alerta.destino && navegar(alerta.destino)}>Registrar a ação</button>
         ) : (
           <button className="btn-primario px-3 py-1.5" onClick={aceitar}>{alerta.estado === 'recusado' ? 'Aceitar agora' : 'Aceitar e registrar ação'}</button>
         )}
@@ -356,10 +423,10 @@ export function LinhaDoTempo({ itens, mostrarAlerta = false, onAbrirAlerta }: { 
 
 export function AlertaItem({ alerta, onAbrir, onMudou }: { alerta: Alerta; onAbrir?: () => void; onMudou?: (a: Alerta) => void }) {
   return (
-    <div className="border-b border-stone-100 py-3 last:border-0">
+    <div className="border-b border-stone-200/80 py-3.5 first:pt-1 last:border-0 last:pb-1">
       <AlertaCorpo alerta={alerta} />
       <AlertaAcoes alerta={alerta} onMudou={onMudou} />
-      {onAbrir && <button onClick={onAbrir} className="mt-1.5 text-xs font-medium text-campo-600 hover:underline">{tecnico() ? 'Por que este alerta? · histórico' : 'Entender este aviso · o que precisaria mudar'}</button>}
+      {onAbrir && <button onClick={onAbrir} className="mt-2 text-[13px] font-semibold text-campo-600 underline-offset-2 hover:underline">{tecnico() ? 'Por que este alerta? · histórico' : 'Entender este aviso · o que precisaria mudar'}</button>}
     </div>
   )
 }
@@ -383,14 +450,14 @@ function acaoTexto(a: any): string {
 export function RegraCartao({ regra }: { regra: any }) {
   if (!regra) return null
   return (
-    <div className="rounded-lg border border-stone-200 bg-stone-50 p-3 font-mono text-xs leading-relaxed text-stone-700">
+    <div className="rounded-md border border-stone-200 border-l-[3px] border-l-campo-600 bg-white p-3 font-mono text-xs leading-relaxed text-stone-700">
       <div className="mb-1 flex flex-wrap items-center gap-2 font-sans">
-        <span className="font-mono font-bold text-campo-700">{regra.id}</span>
+        <span className="rounded bg-campo-700 px-1.5 py-0.5 font-mono text-[11px] font-bold text-white">{regra.id}</span>
         <span className="text-sm text-stone-800">{regra.descricao}</span>
         <ForcaBadge forca={regra.forca} />
       </div>
-      <div><span className="font-bold text-stone-900">SE</span> {regra.se?.map(condicaoTexto).join('  E  ') || '—'}</div>
-      <div><span className="font-bold text-stone-900">ENTÃO</span> {regra.entao?.map(acaoTexto).join('; ')}</div>
+      <div><span className="font-bold text-campo-700">SE</span> {regra.se?.map(condicaoTexto).join('  E  ') || '—'}</div>
+      <div><span className="font-bold text-campo-700">ENTÃO</span> {regra.entao?.map(acaoTexto).join('; ')}</div>
       <div className="mt-1 font-sans text-stone-500">CF da regra {regra.cf} · prioridade {regra.prioridade} · módulo {regra.modulo} · v{regra.versao} · fonte: {regra.fonte}</div>
     </div>
   )
@@ -432,8 +499,8 @@ export function Contrafactual({ sessaoId, regra }: { sessaoId: number; regra: st
   if (erro) return null
   if (!d) return <Carregando texto="Calculando o que precisaria mudar…" />
   return (
-    <div className="rounded-lg border border-campo-100 bg-white p-3">
-      <h4 className="mb-1 text-sm font-semibold text-stone-800">O que precisaria mudar para este aviso sumir?</h4>
+    <div className="rounded-md border border-stone-200 bg-stone-50 p-3.5">
+      <h4 className="titulo mb-1 text-lg font-semibold text-stone-900">O que precisaria mudar para este aviso sumir?</h4>
       {d.opcoes.length === 0 ? (
         <p className="text-sm text-stone-600">Este aviso depende só da situação do lote (fase, sistema, raça): não há um número a corrigir.</p>
       ) : (

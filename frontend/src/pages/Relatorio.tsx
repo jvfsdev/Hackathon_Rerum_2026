@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, dataBR, numero, reais } from '../api'
-import { Carregando, Erro } from '../components/ui'
+import { Brinco, Carregando, Erro } from '../components/ui'
 
 const ROTULO_EVENTO: Record<string, string> = {
   troca_volumoso: 'troca de volumoso', silo_novo: 'silo novo', movimentacao: 'mudança de vacas', correcao_ms: 'correção da silagem',
@@ -29,22 +29,22 @@ export default function RelatorioPagina() {
         <button className="btn-primario" onClick={() => window.print()}>Imprimir / salvar em PDF</button>
       </div>
 
-      <header className="border-b-2 border-campo-700 pb-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-campo-700">CochoCerto · relatório {dias === 7 ? 'semanal' : `de ${dias} dias`}</p>
-        <h1 className="text-2xl font-semibold text-stone-900">{r.fazenda.nome}</h1>
-        <p className="text-sm text-stone-500">{r.fazenda.municipio} · {dataBR(r.inicio)} a {dataBR(r.fim)} · leite a {reais(r.preco_leite)}/L</p>
+      <header className="border-b-[3px] border-campo-700 pb-3">
+        <p className="text-sm font-semibold text-campo-700">Relatório {dias === 7 ? 'semanal' : `de ${dias} dias`} do CochoCerto</p>
+        <h1 className="titulo text-[2.2rem] font-semibold leading-tight text-stone-900">{r.fazenda.nome}</h1>
+        <p className="text-sm text-stone-500">{r.fazenda.municipio}, de {dataBR(r.inicio)} a {dataBR(r.fim)}, leite a {reais(r.preco_leite)}/L</p>
       </header>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[['Vacas', numero(r.totais.vacas, 0)], ['Leite por dia (média)', `${numero(r.totais.leite_dia, 0)} L`],
           ['Sobra por dia depois da comida', reais(r.totais.margem_dia, 0)], ['Avisos pendentes / resolvidos', `${r.totais.pendentes} / ${r.totais.resolvidos}`]].map(([t, v]) => (
-          <div key={t} className="card p-3 print:shadow-none"><p className="text-xs text-stone-500">{t}</p><p className="num text-xl font-semibold text-stone-900">{v}</p></div>
+          <div key={t} className="card px-4 py-3 print:shadow-none"><p className="text-[13px] text-stone-500">{t}</p><p className="titulo num text-[1.7rem] font-semibold leading-tight text-stone-900">{v}</p></div>
         ))}
       </section>
 
       {r.previsao && (
         <section className="card p-4 print:shadow-none">
-          <h2 className="mb-1 font-semibold text-stone-900">Próximo mês (previsão)</h2>
+          <h2 className="titulo mb-1 text-xl font-semibold text-stone-900">Próximo mês (previsão)</h2>
           <p className="num text-sm text-stone-700">~{numero(r.previsao.totais.leite, 0)} L · {reais(r.previsao.totais.receita, 0)} do leite · {reais(r.previsao.totais.custo, 0)} de comida · sobra de {reais(r.previsao.totais.margem, 0)}</p>
           {r.previsao.marcos.length > 0 && <p className="mt-1 text-sm text-stone-700">Datas: {r.previsao.marcos.map((m: any) => `${m.texto.toLowerCase()} — ${m.lote} (${dataBR(m.data)})`).join('; ')}.</p>}
           {r.previsao.avisos.length > 0 && <ul className="mt-1 ml-4 list-disc text-sm text-stone-700">{r.previsao.avisos.map((a: any, i: number) => <li key={i}>{a.titulo}</li>)}</ul>}
@@ -53,7 +53,7 @@ export default function RelatorioPagina() {
 
       {r.estoque.length > 0 && (
         <section className="card p-4 print:shadow-none">
-          <h2 className="mb-1 font-semibold text-stone-900">Estoque</h2>
+          <h2 className="titulo mb-1 text-xl font-semibold text-stone-900">Estoque</h2>
           <ul className="space-y-0.5 text-sm">{r.estoque.map((e: any, i: number) => <li key={i}><b>{e.titulo}</b> — {e.acao}</li>)}</ul>
         </section>
       )}
@@ -61,7 +61,7 @@ export default function RelatorioPagina() {
       {r.lotes.map((l: any) => (
         <section key={l.lote.id} className="card break-inside-avoid p-4 print:shadow-none">
           <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-stone-100 pb-2">
-            <h2 className="text-lg font-semibold text-stone-900">{l.lote.nome}</h2>
+            <h2 className="titulo flex items-center gap-2.5 text-xl font-semibold text-stone-900"><Brinco nome={l.lote.nome} id={l.lote.id} tamanho="sm" />{l.lote.nome}</h2>
             <span className="text-sm text-stone-500">{numero(l.vacas, 0)} vacas</span>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">

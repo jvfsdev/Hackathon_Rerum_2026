@@ -136,7 +136,7 @@ export function AbaSimular({ lote, dieta }: { lote: Lote; dieta: Dieta | null })
               </tbody>
             </table>
             {b.leite_permitido !== null && b.leite_meta && b.leite_permitido < b.leite_meta - 0.3 && (
-              <p className="mt-3 rounded-lg bg-amber-50 p-2 text-sm text-atencao">A comida não sustenta {numero(b.leite_meta)} L: o lote tende a cair para uns {numero(b.leite_permitido)} L por vaca.</p>
+              <p className="mt-3 rounded-md border-l-4 border-l-brinco bg-brinco-claro p-2.5 text-sm text-stone-800">A comida não sustenta {numero(b.leite_meta)} L: o lote tende a cair para uns {numero(b.leite_permitido)} L por vaca.</p>
             )}
             {b.leite_permitido !== null && b.leite_meta && b.leite_permitido > b.leite_meta + 1 && (
               <p className="mt-3 rounded-lg bg-stone-50 p-2 text-sm text-stone-600">Sobra energia para uns {numero(b.leite_permitido - b.leite_meta)} L a mais por vaca. Se as vacas não tiverem potencial para produzir mais, essa energia vira gordura (e custo).</p>
@@ -187,7 +187,7 @@ export function AbaTrato({ lote }: { lote: Lote }) {
       {p && (
         <section className="card p-4 print:border-0 print:shadow-none">
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-lg font-semibold text-stone-900">Trato · {p.lote.nome}</h2>
+            <h2 className="titulo text-2xl font-semibold text-stone-900">Trato: {p.lote.nome}</h2>
             <span className="text-sm text-stone-500">{dataBR(p.data)} · {numero(p.vacas, 0)} vacas · dieta v{p.dieta_versao}{p.sobra_pct ? ` · folga ${numero(p.sobra_pct)}%` : ''}</span>
           </div>
           {p.observacoes.length > 0 && (
@@ -323,7 +323,7 @@ export function AbaPrevisao({ lote }: { lote: Lote }) {
       </div>
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[['Leite no período', `${numero(t.leite, 0)} L`], ['Dinheiro do leite', reais(t.receita, 0)], ['Comida', reais(t.custo, 0)], ['Sobra depois da comida', reais(t.margem, 0)]].map(([n, v]) => (
-          <div key={n} className="card p-3"><p className="text-xs text-stone-500">{n}</p><p className="num text-xl font-semibold text-stone-900">{v}</p></div>
+          <div key={n} className="card px-4 py-3"><p className="text-[13px] text-stone-500">{n}</p><p className="titulo num text-2xl font-semibold text-stone-900">{v}</p></div>
         ))}
       </section>
       {p.alertas.length > 0 && <Painel titulo="O que a previsão aponta">{p.alertas.map((a: Alerta, i: number) => <div key={i} className="border-b border-stone-100 py-2 last:border-0"><AlertaCorpo alerta={a} /></div>)}</Painel>}
@@ -333,17 +333,17 @@ export function AbaPrevisao({ lote }: { lote: Lote }) {
         <div className="h-80">
           <ResponsiveContainer>
             <ComposedChart data={dados} margin={{ left: -10, right: 10 }}>
-              <CartesianGrid stroke="#f0eeec" />
+              <CartesianGrid stroke="#e8ece5" vertical={false} />
               <XAxis dataKey="dia" tick={{ fontSize: 11 }} minTickGap={24} />
               <YAxis tick={{ fontSize: 11 }} domain={['auto', 'auto']} unit=" L" />
               <Tooltip formatter={(v: any) => (Array.isArray(v) ? `${numero(v[0])} a ${numero(v[1])} L` : `${numero(v)} L`)} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Area dataKey="faixa" name="Faixa provável" stroke="none" fill="#bbe0b6" fillOpacity={0.5} isAnimationActive={false} />
-              <Line dataKey="esperado" name="Esperado" stroke="#a8a29e" strokeDasharray="5 4" dot={false} isAnimationActive={false} />
-              <Line dataKey="real" name="Real" stroke="#2f7230" strokeWidth={2.5} dot={false} isAnimationActive={false} />
-              <Line dataKey="previsto" name="Previsto" stroke="#245a26" strokeWidth={2} strokeDasharray="2 3" dot={false} isAnimationActive={false} />
-              <ReferenceLine x={diaCurto(p.hoje)} stroke="#57534e" label={{ value: 'hoje', fontSize: 10, position: 'insideTopLeft' }} />
-              {p.marcos.map((m: any) => <ReferenceLine key={m.data + m.tipo} x={diaCurto(m.data)} stroke="#b54708" strokeDasharray="4 3" label={{ value: m.texto, fontSize: 10, fill: '#b54708', position: 'insideTopRight' }} />)}
+              <Area dataKey="faixa" name="Faixa provável" stroke="none" fill="#cfe5cf" fillOpacity={0.5} isAnimationActive={false} />
+              <Line dataKey="esperado" name="Esperado" stroke="#8b9687" strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+              <Line dataKey="real" name="Real" stroke="#2f6b3b" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+              <Line dataKey="previsto" name="Previsto" stroke="#24552f" strokeWidth={2} strokeDasharray="2 3" dot={false} isAnimationActive={false} />
+              <ReferenceLine x={diaCurto(p.hoje)} stroke="#374035" label={{ value: 'hoje', fontSize: 10, position: 'insideTopLeft' }} />
+              {p.marcos.map((m: any) => <ReferenceLine key={m.data + m.tipo} x={diaCurto(m.data)} stroke="#9a5800" strokeDasharray="4 3" label={{ value: m.texto, fontSize: 10, fill: '#9a5800', position: 'insideTopRight' }} />)}
             </ComposedChart>
           </ResponsiveContainer>
         </div>

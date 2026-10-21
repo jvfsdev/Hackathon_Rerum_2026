@@ -52,7 +52,7 @@ export default function ConsultaPagina() {
             ) : p.tipo === 'opcao' ? (
               <div className="flex flex-wrap gap-2">
                 {p.opcoes.map((o: string) => (
-                  <button key={o} onClick={() => setValor(o)} className={`btn ${valor === o ? 'bg-campo-600 text-white' : 'border border-stone-300 bg-white hover:bg-stone-100'}`}>{OPCOES[o] ?? o}</button>
+                  <button key={o} onClick={() => setValor(o)} aria-pressed={valor === o} className={`btn border ${valor === o ? 'border-campo-600 bg-campo-600 text-white' : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-50'}`}>{OPCOES[o] ?? o}</button>
                 ))}
               </div>
             ) : (
@@ -97,7 +97,7 @@ export default function ConsultaPagina() {
         {carregando && <Carregando />}
         {estado.resultado && (
           <>
-            <div className="rounded-xl bg-campo-50 p-4 text-sm text-campo-900">Pronto: o motor tem todos os fatos para concluir. {estado.padroes.length > 0 && `Valores padrão usados (CF menor): ${estado.padroes.map(rotulo).join(', ')}.`}</div>
+            <div className="rounded-[10px] border border-campo-500 border-l-[6px] border-l-campo-600 bg-campo-50 p-4 text-sm text-campo-900">Pronto: o motor tem todos os fatos para concluir. {estado.padroes.length > 0 && `Valores padrão usados (CF menor): ${estado.padroes.map(rotulo).join(', ')}.`}</div>
             <ResultadoAvaliacao r={estado.resultado} />
             <div className="flex flex-wrap gap-2">
               <button className="btn-primario" onClick={() => navegar('/lotes/novo', { state: { fatos: estado.fatos, padroes: estado.padroes } })}>
@@ -108,14 +108,15 @@ export default function ConsultaPagina() {
           </>
         )}
       </div>
-      <aside className="card h-fit p-4">
-        <h3 className="mb-2 text-sm font-semibold text-stone-800">Memória de trabalho</h3>
+      <aside className="card h-fit border-t-4 border-t-campo-700 p-4 lg:sticky lg:top-6">
+        <h3 className="titulo mb-0.5 text-lg font-semibold text-stone-900">Memória de trabalho</h3>
+        <p className="mb-3 text-xs text-stone-500">O que o motor já sabe. Em amarelo, valores padrão.</p>
         {respondidas.length === 0 && <p className="text-xs text-stone-400">Vazia.</p>}
         <dl className="space-y-1 text-sm">
           {respondidas.map(([f, v]) => (
             <div key={f} className="flex justify-between gap-2">
               <dt className="text-stone-500">{rotulo(f)}</dt>
-              <dd className={`num font-medium ${estado.padroes.includes(f) ? 'text-amber-700' : 'text-stone-800'}`}>{fmt(v)}</dd>
+              <dd className={`num font-semibold ${estado.padroes.includes(f) ? 'rounded bg-brinco-claro px-1 text-atencao' : 'text-stone-800'}`}>{fmt(v)}</dd>
             </div>
           ))}
         </dl>

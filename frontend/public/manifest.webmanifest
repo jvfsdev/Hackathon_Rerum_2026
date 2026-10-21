@@ -4,7 +4,7 @@
   "start_url": "/campo",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#fafaf9",
-  "theme_color": "#245a26",
+  "background_color": "#edf0ea",
+  "theme_color": "#142a1a",
   "lang": "pt-BR"
 }
