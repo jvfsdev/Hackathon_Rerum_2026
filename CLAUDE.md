@@ -25,6 +25,10 @@ backend/app/calc/       funções PURAS (CMS, energia, proteína, ITU, curva, ec
 backend/app/optimizer/  PL de custo mínimo (metas/restrições vêm do motor)
 backend/app/monitor/    séries: esperado, resíduo, EWMA/CUSUM, médias móveis
 backend/app/api/        rotas FastAPI
+backend/app/services.py monta a memória de trabalho de cada fluxo (catálogo, preços, avaliação, formulação, monitor)
+backend/app/alertas.py  ciclo de vida dos alertas (episódios + histórico)
+backend/app/importacao.py  importação CSV;  backend/app/referencias/  preços de referência diários
+backend/scripts/        gerar_regras_md.py (docs/regras.md), importar_cqbal.py (foods.yaml)
 backend/app/db/         modelos + seed (fazenda demo com 60 dias)
 backend/kb/             BASE DE CONHECIMENTO: rules/*.yaml, params.yaml, foods.yaml, CHANGELOG.md
 backend/tests/          cases.yaml (casos conhecidos) + testes unitários
@@ -39,7 +43,9 @@ cd backend && pytest -q                     # TODOS os testes devem passar antes
 cd backend && python -m app.db.seed         # recria a fazenda demo
 cd backend && uvicorn app.main:app --reload # API em :8000 (docs em /docs)
 cd backend && python -m scripts.gerar_regras_md   # regenera docs/regras.md a partir dos YAML
-cd frontend && npm install && npm run dev   # UI em :5173
+cd backend && python -m scripts.importar_cqbal    # reimporta a composição do CQBAL para kb/foods.yaml
+LEITE_SEM_COLETA=1 pytest -q                # desliga a coleta diária de preços (testes, sem internet)
+cd frontend && npm install && npm run dev   # UI em :5173  (npm run dev:rede para abrir no celular)
 ```
 
 ## Convenções da base de conhecimento
@@ -73,7 +79,8 @@ cd frontend && npm install && npm run dev   # UI em :5173
 - **Manutenção de verdade:** continuar sessão (`executar(wm, resultado)`) descarta conclusões e recalcula do zero.
 - **Validador da base** (`rules_loader.validar`) falha ao carregar com operador, função/argumento, ação, nível,
   fato desconhecido (que nenhuma regra conclui e não é pergunta/entrada) ou `@params` inexistente — inclusive em textos.
-- **Alertas são episódios** (`app/alertas.py`): aberto → aceito (ação registrada) | recusado (motivo obrigatório) →
+- **Alertas são episódios** (`app/alertas.py`), um por `problema` e lote (regras do mesmo problema em graus diferentes
+  declaram `problema:` no alerta e viram um episódio que agrava/atenua): aberto → aceito (ação registrada) | recusado (motivo obrigatório) →
   resolvido (a condição deixou de valer, com o que mudou e as mudanças do período) | expirado (laudo venceu).
   Telas que registram ações (dieta, evento, registro) recebem `alerta_id` e chamam `alertas.registrar_acao`.
   Reprocessar dias desfaz só o automático; ações do usuário nunca são apagadas. Testes em `tests/test_alertas.py`.
@@ -105,7 +112,7 @@ cd frontend && npm install && npm run dev   # UI em :5173
 - O Vite escuta em `localhost` (IPv6); o frontend chama a API por `/api` (proxy para :8000).
 
 ## Fora do escopo
-KPIs reprodutivos, sensores individuais, aminoácidos/minerais detalhados, NASEM completo, ML.
+KPIs reprodutivos, sensores individuais, aminoácidos, balanço mineral completo (só DCAD), NASEM completo, ML, destinação econômica do lote como objetivo do PL.
 
 ## Plano completo
 Fluxo, modelo de dados, módulos de regras, telas, testes e cronograma: `docs/plano.md`.

@@ -1,6 +1,13 @@
 # Plano — CochoCerto, sistema especialista de dietas por lote (Hackathon UFJF 2026, Tema T2)
 
-## Context
+> **Documento de planejamento (21/10), mantido como registro do processo.** O estado atual do sistema está em
+> [arquitetura.md](arquitetura.md) e no [README](../README.md). Diferenças em relação ao plano: o solver é o HiGHS
+> (o PuLP 4 não traz o CBC); a composição dos alimentos vem do CQBAL 4.0, não das tabelas da Embrapa de 2006;
+> foram acrescentados preços por fazenda e de referência, insumos próprios, alertas como episódios com histórico,
+> modo campo no celular e DCAD. Ficou de fora a destinação econômica como objetivo do lote.
+
+
+## Contexto
 
 O repositório está vazio (só `README.md` e 4 documentos de referência). Precisamos construir, até **quinta 22/10 às 20h**, uma aplicação em localhost que oriente e acompanhe lotes de vacas leiteiras em **dieta e comportamento alimentar**, seguindo as exigências do edital ([requisitos-hackathon-ufjf-2026.md](requisitos-hackathon-ufjf-2026.md)):
 - **base de conhecimento explícita** (regras + CF, versionada) + **motor de inferência** determinístico. A LLM **não decide**.
