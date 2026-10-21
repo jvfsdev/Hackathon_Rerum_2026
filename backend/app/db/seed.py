@@ -110,7 +110,9 @@ def gerar():
         regs = []
 
         def reg(lote, i, ind, valor, metodo=None):
-            regs.append(Registro(lote_id=lote.id, data=dia(i), indicador=ind, valor=round(valor, 3), metodo=metodo))
+            hora = time(10, 0) if ind.startswith("laudo_") else time(7, 30) if ind in ("escore_cocho", "sobras_pct") else time(18, 0)
+            regs.append(Registro(lote_id=lote.id, data=dia(i), indicador=ind, valor=round(valor, 3), metodo=metodo,
+                                 atualizado_em=datetime.combine(dia(i), hora)))
 
         for i in range(DIAS):
             calor = 46 <= i <= 51

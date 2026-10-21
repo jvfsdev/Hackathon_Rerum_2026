@@ -87,6 +87,7 @@ export const api = {
   post: <T,>(c: string, b?: unknown) => req<T>('POST', c, b ?? {}),
   put: <T,>(c: string, b: unknown) => req<T>('PUT', c, b),
   patch: <T,>(c: string, b: unknown) => req<T>('PATCH', c, b),
+  del: <T,>(c: string) => req<T>('DELETE', c),
 }
 
 // ---------- rótulos legíveis ----------
@@ -233,3 +234,32 @@ export function fmt(v: any, fato?: string): string {
   if (Array.isArray(v)) return v.map((x) => (typeof x === 'object' ? `${x.alimento} ${x.kg_mn} kg` : String(x))).join(', ')
   return JSON.stringify(v)
 }
+
+// ---------- registros do lote ----------
+export interface Registro { id: number; lote_id: number; data: string; indicador: string; valor: number; metodo?: string | null; atualizado_em?: string
+  texto?: string | null }
+export const NOME_INDICADOR: Record<string, string> = {
+  vacas: 'Vacas', litros: 'Litros', concentrado_kg_vaca: 'Concentrado/vaca', escore_cocho: 'Cocho', sobras_pct: 'Sobras pesadas',
+  temp: 'Temperatura', ur: 'Umidade', ms_silagem: 'MS da silagem', ecc: 'Escore corporal', escore_fezes: 'Fezes',
+  ruminacao: 'Ruminação', distancia_km: 'Caminhada', altura_entrada: 'Pasto (entrada)', altura_saida: 'Pasto (saída)',
+  altura_media: 'Pasto (média)', trato_kg: 'Trato fornecido', laudo_gordura: 'Gordura', laudo_proteina: 'Proteína',
+  laudo_lactose: 'Lactose', laudo_ureia: 'Ureia', laudo_nul: 'NUL', laudo_ccs: 'CCS', laudo_cbt: 'CBT', laudo_crioscopia: 'Crioscopia',
+}
+const UN_INDICADOR: Record<string, string> = {
+  litros: ' L', concentrado_kg_vaca: ' kg', sobras_pct: '%', temp: ' °C', ur: '%', ms_silagem: '%', distancia_km: ' km',
+  altura_entrada: ' cm', altura_saida: ' cm', altura_media: ' cm', trato_kg: ' kg', laudo_gordura: '%', laudo_proteina: '%',
+  laudo_lactose: '%', laudo_ureia: ' mg/dL', laudo_nul: ' mg/dL', laudo_ccs: ' mil', laudo_cbt: ' mil', ruminacao: ' min',
+}
+export const valorIndicador = (ind: string, v: number, partes?: string | null) =>
+  `${v.toLocaleString('pt-BR', { maximumFractionDigits: ind === 'laudo_crioscopia' ? 3 : 2 })}${UN_INDICADOR[ind] ?? ''}${partes ? ` (${partes.replace(/\./g, ',')})` : ''}`
+/** Registros agrupados por data (mais recente primeiro): {data: {indicador: registro}}. */
+export function porDia(regs: Registro[]): [string, Record<string, Registro>][] {
+  const m = new Map<string, Record<string, Registro>>()
+  for (const r of regs) m.set(r.data, { ...(m.get(r.data) ?? {}), [r.indicador]: r })
+  return [...m.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1))
+}
+/** Valor gravado como texto de formulário (até 2 casas) e "mudou?" com tolerância desse arredondamento. */
+export const paraCampo = (v: number) => String(Math.round(v * 100) / 100)
+export const mudou = (gravado: number | undefined, novo: number) => gravado === undefined || Math.abs(gravado - novo) > 0.006
+export const hora = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '')
+

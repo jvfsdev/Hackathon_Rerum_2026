@@ -1,9 +1,10 @@
 /** Modo campo (celular): registro rápido do dia e avisos pendentes. Funciona sem conexão: o registro fica numa
  * fila no aparelho e é enviado quando a API volta a responder. */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, dataBR, ErroApi, numero, peso, textoAlerta, type Alerta, type Lote } from '../api'
+import { api, dataBR, ErroApi, hora, mudou, paraCampo, NOME_INDICADOR, numero, peso, porDia, textoAlerta, valorIndicador, type Alerta, type Lote, type Registro } from '../api'
 import { EscalaEscore } from '../components/Escala'
+import { CampoLitros, type ModoLitros } from '../components/Litros'
 import { AlertaCorpo, BORDA_NIVEL, Brinco, Icone, NivelBadge } from '../components/ui'
 
 // ------------------------------------------------------------------ fila offline (localStorage)
@@ -142,6 +143,12 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
   const [data, setData] = useState(hoje)
   const [v, setV] = useState<Record<string, string>>({})
   const [anterior, setAnterior] = useState<Record<string, number>>({})
+  const [regs, setRegs] = useState<Registro[]>([])
+  const [recarga, setRecarga] = useState(0)
+  const [modoLitros, setModoLitros] = useState<ModoLitros>('somar')
+  const doDiaRef = useRef<Record<string, Registro>>({})
+  const doDia = useMemo(() => Object.fromEntries(regs.filter((r) => r.data === data).map((r) => [r.indicador, r])) as Record<string, Registro>, [regs, data])
+  doDiaRef.current = doDia
   const [mais, setMais] = useState<'' | 'semanal' | 'laudo' | 'evento'>(params.get('evento') ? 'evento' : '')
   const [evento, setEvento] = useState({ tipo: params.get('evento') ?? 'outro', descricao: '' })
   const alertaId = params.get('alerta')
@@ -165,24 +172,29 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
       .then((c) => {
         if (cancelado) return
         setClima(c)
-        if (c.disponivel && !climaManual) setV((atual) => ({ ...atual, temp: String(c.temp), ur: String(c.ur) }))
+        // não sobrescreve o que já foi anotado neste dia
+        if (c.disponivel && !climaManual && !doDiaRef.current.temp) setV((atual) => ({ ...atual, temp: String(c.temp), ur: String(c.ur) }))
       })
       .catch(() => { if (!cancelado) setClima({ disponivel: false, motivo: 'sem conexão com a meteorologia' }) })
     return () => { cancelado = true }
   }, [lote?.fazenda_id, data])  // eslint-disable-line react-hooks/exhaustive-deps
   const usarMeteorologia = () => { if (clima?.disponivel) { setClimaManual(false); setV({ ...v, temp: String(clima.temp), ur: String(clima.ur) }) } }
 
-  useEffect(() => {   // último valor de cada indicador do lote: base para pré-preencher e conferir digitação
+  useEffect(() => {   // o que já foi anotado no dia (pré-preenche) e o último valor de antes (confere digitação)
     if (!loteId) return
     gravarJSON('campo_lote', loteId)
-    api.get<{ data: string; indicador: string; valor: number }[]>(`/lotes/${loteId}/registros?desde=${new Date(Date.now() - 10 * 864e5).toISOString().slice(0, 10)}`)
-      .then((regs) => {
+    api.get<Registro[]>(`/lotes/${loteId}/registros?desde=${new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10)}`)
+      .then((lista) => {
+        setRegs(lista)
         const ult: Record<string, number> = {}
-        regs.forEach((r) => { if (r.data < data) ult[r.indicador] = r.valor })
+        lista.forEach((r) => { if (r.data < data) ult[r.indicador] = r.valor })
         setAnterior(ult)
-        setV((atual) => ({ vacas: atual.vacas || (ult.vacas ? String(ult.vacas) : ''), ...atual }))
-      }).catch(() => setAnterior({}))
-  }, [loteId, data])
+        const dia = Object.fromEntries(lista.filter((r) => r.data === data).map((r) => [r.indicador, paraCampo(r.valor)]))
+        delete dia.litros          // litros do dia aparecem abaixo do campo; o campo fica para a próxima ordenha
+        setV((atual) => ({ temp: atual.temp ?? '', ur: atual.ur ?? '', ...dia,
+          vacas: dia.vacas ?? (ult.vacas ? String(ult.vacas) : '') }))
+      }).catch(() => { setAnterior({}); setRegs([]) })
+  }, [loteId, data, recarga])
 
   const num = (x?: string) => (x && x.trim() !== '' ? Number(x.replace(',', '.')) : null)
   const valores = useMemo(() => Object.fromEntries(Object.entries(v).map(([k, x]) => [k, num(x)]).filter(([, x]) => x !== null && !Number.isNaN(x))), [v])
@@ -190,7 +202,8 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
   /** Valores muito diferentes do último registro: provável erro de digitação, pedir confirmação. */
   const suspeitos = () => {
     const out: string[] = []
-    const lv = valores.litros, va = valores.vacas ?? anterior.vacas
+    const lv = valores.litros !== undefined && somarLitros ? valores.litros + doDia.litros.valor : valores.litros
+    const va = valores.vacas ?? anterior.vacas
     if (lv && va && anterior.litros && anterior.vacas) {
       const hojeV = lv / va, antes = anterior.litros / anterior.vacas
       if (Math.abs(hojeV / antes - 1) > 0.3) out.push(`Litros/vaca ${hojeV.toFixed(1)} contra ${antes.toFixed(1)} no último registro`)
@@ -201,12 +214,16 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
     return out
   }
 
+  // só vai o que é novo ou foi mudado: o que já está anotado no dia não é reenviado
+  const somarLitros = !!doDia.litros && modoLitros === 'somar'
+  const novos = useMemo(() => Object.fromEntries(Object.entries(valores).filter(([k, x]) =>
+    (k === 'litros' && somarLitros) || mudou(doDia[k]?.valor, x as number))), [valores, doDia, somarLitros])
   const enviar = async (confirmado = false) => {
     setErro(''); setResultado(null)
     if (!lote) { setErro('Escolha o lote.'); return }
-    const temValores = Object.keys(valores).length > 0
+    const temValores = Object.keys(novos).length > 0
     const temEvento = mais === 'evento' && evento.descricao.trim()
-    if (!temValores && !temEvento) { setErro('Preencha ao menos um valor ou descreva o evento.'); return }
+    if (!temValores && !temEvento) { setErro(Object.keys(doDia).length ? 'Nada novo: esses valores já estão anotados neste dia.' : 'Preencha ao menos um valor ou descreva o evento.'); return }
     if (!confirmado) {
       const s = suspeitos()
       if (s.length) { setConfirmar(s); return }
@@ -217,11 +234,11 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
       let alertas: Alerta[] | undefined
       let offline = false
       if (temValores) {
-        const r = await enviarOuEnfileirar(`/lotes/${lote.id}/registros`, { data, valores, alerta_id: alertaId && !temEvento ? Number(alertaId) : null },
+        const r = await enviarOuEnfileirar(`/lotes/${lote.id}/registros`, { data, valores: novos, somar: somarLitros && novos.litros !== undefined ? ['litros'] : [], alerta_id: alertaId && !temEvento ? Number(alertaId) : null },
           `${lote.nome} · ${dataBR(data)}`)
         offline ||= !r.enviado
         if (r.enviado) alertas = r.resposta?.alertas?.filter((a: Alerta) => a.status === 'ativo' && a.nivel !== 'informativo')
-        partes.push(`${Object.keys(valores).length} valor(es)`)
+        partes.push(`${Object.keys(novos).length} valor(es)`)
       }
       if (temEvento) {
         const hora = data === hoje ? new Date().toTimeString().slice(0, 5) : '08:00'
@@ -233,8 +250,8 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
       setResultado({ ok: true, alertas, texto: offline
         ? `Sem conexão: ${partes.join(' e ')} guardado(s) no aparelho. Será enviado quando a conexão voltar.`
         : `${partes.join(' e ')} registrado(s) para ${lote.nome}${alertaId ? ' e ligado(s) ao aviso aceito' : ''}.` })
-      setV({ vacas: v.vacas ?? '', ...(clima?.disponivel ? { temp: String(clima.temp), ur: String(clima.ur) } : {}) })
       setClimaManual(false); setEvento({ tipo: 'outro', descricao: '' }); setMais('')
+      setRecarga((n) => n + 1)       // recarrega o dia: o formulário passa a mostrar o que ficou gravado
       if (alertaId) { params.delete('alerta'); params.delete('evento'); setParams(params, { replace: true }) }
       onEnviado()
     } catch (e: any) { setErro(e.message) }
@@ -262,10 +279,19 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
         <input type="date" className="input flex-1" value={data} max={hoje} onChange={(e) => setData(e.target.value)} />
       </div>
 
+      {Object.keys(doDia).length > 0 && (
+        <div className="rounded-xl bg-campo-50 p-3 text-sm text-campo-900">
+          <p className="font-medium">Já anotado em {dataBR(data)}:</p>
+          <p className="mt-0.5">{Object.values(doDia).map((r) => `${NOME_INDICADOR[r.indicador] ?? r.indicador} ${valorIndicador(r.indicador, r.valor, r.texto)}`).join(' · ')}</p>
+          <p className="mt-1 text-xs text-campo-700">Preencha só o que falta; o que já está anotado não é enviado de novo (a não ser que você mude o valor).</p>
+        </div>
+      )}
+
       <section className="card space-y-3 p-4">
         <div className="grid grid-cols-2 gap-3">
           <Numero rotulo="Vacas ordenhadas" un="nº" valor={v.vacas ?? ''} onChange={set('vacas')} />
-          <Numero rotulo="Litros do lote" un="L" valor={v.litros ?? ''} onChange={set('litros')} dica={anterior.litros ? `último: ${anterior.litros.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}` : ''} />
+          {!doDia.litros && <Numero rotulo="Litros do lote" un="L" valor={v.litros ?? ''} onChange={set('litros')} dica={anterior.litros ? `último: ${anterior.litros.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}` : ''} />}
+          {doDia.litros && <CampoLitros campo valor={v.litros ?? ''} onChange={set('litros')} gravado={doDia.litros} modo={modoLitros} setModo={setModoLitros} />}
         </div>
         <Numero rotulo="Concentrado" un="kg/vaca" valor={v.concentrado_kg_vaca ?? ''} onChange={set('concentrado_kg_vaca')} dica={anterior.concentrado_kg_vaca ? `último: ${anterior.concentrado_kg_vaca}` : ''} />
         {lote?.sistema !== 'pasto' && <EscalaEscore tipo="cocho" valor={v.escore_cocho ?? ''} onChange={set('escore_cocho')} />}
@@ -350,7 +376,42 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
         </div>
       )}
       <button className="btn-primario titulo w-full py-4 text-xl" onClick={() => enviar()}>Enviar registro</button>
+
+      {lote && <HistoricoCampo regs={regs} lote={lote} onAbrir={(d) => { setData(d); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />}
     </div>
+  )
+}
+
+/** Últimos dias anotados do lote; tocar num dia abre esse dia no formulário para completar ou corrigir. */
+function HistoricoCampo({ regs, lote, onAbrir }: { regs: Registro[]; lote: Lote; onAbrir: (d: string) => void }) {
+  const fila = lerJSON<Pendente[]>(CHAVE_FILA, []).filter((p) => p.caminho === `/lotes/${lote.id}/registros`)
+  const dias = porDia(regs).slice(0, 10)
+  return (
+    <section className="space-y-2 pt-2">
+      <h2 className="text-sm font-semibold text-stone-800">Últimos registros · {lote.nome.replace(/ — .*/, '')}</h2>
+      {fila.map((p) => (
+        <div key={p.id} className="rounded-lg border border-dashed border-amber-400 bg-amber-50 p-2 text-xs text-amber-900">
+          Aguardando conexão · {dataBR(p.corpo.data)}: {Object.entries(p.corpo.valores ?? {}).map(([k, x]) => `${NOME_INDICADOR[k] ?? k} ${valorIndicador(k, x as number)}`).join(' · ')}
+        </div>
+      ))}
+      {dias.length === 0 && <p className="text-xs text-stone-500">Nada anotado nos últimos dias.</p>}
+      {dias.map(([d, ind]) => {
+        const lv = ind.litros && ind.vacas ? ind.litros.valor / ind.vacas.valor : null
+        const faltando = ['litros', 'vacas', 'concentrado_kg_vaca', ...(lote.sistema !== 'pasto' ? ['escore_cocho'] : [])]
+          .filter((k) => !ind[k] && !(k === 'escore_cocho' && ind.sobras_pct))
+        return (
+          <button key={d} onClick={() => onAbrir(d)} className="card block w-full p-3 text-left">
+            <div className="flex items-baseline justify-between">
+              <span className="font-semibold text-stone-900">{dataBR(d)}</span>
+              {lv !== null && <span className="num text-sm text-campo-700">{numero(lv)} L/vaca</span>}
+            </div>
+            <p className="mt-0.5 text-xs text-stone-600">{Object.values(ind).map((r) => `${NOME_INDICADOR[r.indicador] ?? r.indicador} ${valorIndicador(r.indicador, r.valor, r.texto)}`).join(' · ')}</p>
+            {faltando.length > 0 && <p className="mt-0.5 text-xs text-amber-700">Faltou: {faltando.map((k) => NOME_INDICADOR[k].toLowerCase()).join(', ')} — toque para completar</p>}
+            <p className="mt-0.5 text-[11px] text-stone-400">última anotação às {hora(Object.values(ind).map((r) => r.atualizado_em ?? '').sort().pop())}</p>
+          </button>
+        )
+      })}
+    </section>
   )
 }
 

@@ -151,3 +151,44 @@ def test_graus_do_mesmo_problema_sao_um_episodio_que_agrava_e_atenua(sessao_memo
     [ep] = s.exec(select(AlertaDB).where(AlertaDB.lote_id == lote.id, AlertaDB.problema == "perda_ecc")).all()
     assert ep.regra == "ACP-09" and ep.nivel == "atencao" and ep.ocorrencias == 3
     assert tipos(s, ep) == ["aberto", "agravado", "atenuado"]
+
+
+def test_registro_em_partes_nao_apaga_o_que_ja_foi_anotado_e_apagar_reprocessa(sessao_memoria, monkeypatch):
+    """Cocho de manhã e leite à noite em envios separados: cada envio só toca nos seus indicadores."""
+    from app.api import fazendas
+    from app.api.schemas import RegistroIn
+    from app.db.models import Registro
+    s = sessao_memoria
+    lote, _ = lote_sintetico(s)
+    monkeypatch.setattr(fazendas, "sessao", lambda: _Mesma(s))
+    hoje = date.today() + timedelta(days=1)
+    fazendas.registrar(lote.id, RegistroIn(data=hoje, valores={"escore_cocho": 3}))
+    fazendas.registrar(lote.id, RegistroIn(data=hoje, valores={"vacas": 18, "litros": 400}))
+    dia = {r.indicador: r.valor for r in s.exec(select(Registro).where(Registro.lote_id == lote.id, Registro.data == hoje)).all()}
+    assert dia == {"escore_cocho": 3, "vacas": 18, "litros": 400}
+    # 2ª ordenha: soma ao total do dia, guardando as parcelas
+    fazendas.registrar(lote.id, RegistroIn(data=hoje, valores={"litros": 350}, somar=["litros"]))
+    litros = s.exec(select(Registro).where(Registro.lote_id == lote.id, Registro.data == hoje, Registro.indicador == "litros")).one()
+    assert litros.valor == 750 and litros.texto == "400 + 350"
+    fazendas.registrar(lote.id, RegistroIn(data=hoje, valores={"litros": 760}))          # correção do total
+    s.refresh(litros)
+    assert litros.valor == 760 and litros.texto is None
+    with pytest.raises(Exception):
+        fazendas.registrar(lote.id, RegistroIn(data=hoje, valores={"vacas": 2}, somar=["vacas"]))
+    fazendas.apagar_registro(lote.id, hoje, "escore_cocho")
+    assert not s.exec(select(Registro).where(Registro.lote_id == lote.id, Registro.data == hoje,
+                                             Registro.indicador == "escore_cocho")).first()
+    with pytest.raises(Exception):
+        fazendas.registrar(lote.id, RegistroIn(data=hoje, valores={}))
+
+
+class _Mesma:
+    """Usa a sessão do teste dentro das rotas (with sessao() as s)."""
+    def __init__(self, s):
+        self.s = s
+
+    def __enter__(self):
+        return self.s
+
+    def __exit__(self, *a):
+        return False

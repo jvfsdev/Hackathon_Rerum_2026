@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { CartesianGrid, ComposedChart, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { api, certeza, comEpisodios, dataBR, fmt, numero, OPCOES, reais, rotulo, tecnico, textoAlerta, UNIDADES, type Alerta, type Alimento, type Dieta, type ItemDieta, type ItemHistorico, type Lote, type Resultado } from '../api'
+import { api, certeza, comEpisodios, dataBR, fmt, numero, OPCOES, reais, rotulo, tecnico, textoAlerta, UNIDADES, type Alerta, type Alimento, type Dieta, type ItemDieta, type ItemHistorico, type Lote, type Resultado, hora, NOME_INDICADOR, porDia, valorIndicador, type Registro, mudou, paraCampo } from '../api'
 import LoteForm from '../components/LoteForm'
 import { EscalaEscore } from '../components/Escala'
+import { CampoLitros, type ModoLitros } from '../components/Litros'
 import { AjusteMinimo, AlertaItem, BotaoComo, Brinco, CabecalhoPagina, Carregando, CfBarra, Erro, ExplicacaoAlerta, Gaveta, Icone, LinhaDoTempo, NivelBadge, Painel } from '../components/ui'
 import { AbaPrevisao, AbaSimular, AbaTrato, PlanoTransicao, Sensibilidade } from './LoteExtras'
 
@@ -781,8 +782,23 @@ function AbaRegistro({ lote }: { lote: Lote }) {
   const eventoSugerido = params.get('evento')
   const hoje = new Date().toISOString().slice(0, 10)
   const [data, setData] = useState(hoje)
-  const [valores, setValores] = useState<Record<string, string>>({ vacas: String(lote.n_vacas) })
+  const [valores, setValores] = useState<Record<string, string>>({})
+  const [regs, setRegs] = useState<Registro[]>([])
+  const [recarga, setRecarga] = useState(0)
+  const [modoLitros, setModoLitros] = useState<ModoLitros>('somar')
   const [abertos, setAbertos] = useState<Record<string, boolean>>({ diario: true })
+  const doDia = useMemo(() => Object.fromEntries(regs.filter((r) => r.data === data).map((r) => [r.indicador, r])) as Record<string, Registro>, [regs, data])
+  const somarLitros = !!doDia.litros && modoLitros === 'somar'
+  // o formulário abre com o que já está anotado no dia; nº de vacas vem do último registro (ou do cadastro)
+  useEffect(() => {
+    api.get<Registro[]>(`/lotes/${lote.id}/registros?desde=${new Date(Date.now() - 45 * 864e5).toISOString().slice(0, 10)}`).then((lista) => {
+      setRegs(lista)
+      const dia = Object.fromEntries(lista.filter((r) => r.data === data).map((r) => [r.indicador, paraCampo(r.valor)]))
+      delete dia.litros            // o total do dia aparece abaixo do campo; o campo fica para a próxima ordenha
+      const ultVacas = [...lista].filter((r) => r.indicador === 'vacas' && r.data < data).pop()?.valor
+      setValores({ ...dia, vacas: dia.vacas ?? String(ultVacas ?? lote.n_vacas) })
+    }).catch(() => setRegs([]))
+  }, [lote.id, lote.n_vacas, data, recarga])
   const [evento, setEvento] = useState({ tipo: eventoSugerido ?? 'troca_volumoso', descricao: '' })
   useEffect(() => { if (eventoSugerido) setEvento((e) => ({ ...e, tipo: eventoSugerido })) }, [eventoSugerido])
   const [res, setRes] = useState<Resultado | null>(null)
@@ -801,12 +817,24 @@ function AbaRegistro({ lote }: { lote: Lote }) {
   }
   const enviar = async () => {
     setErro(''); setOk('')
-    const nums = Object.fromEntries(Object.entries(valores).filter(([, v]) => v !== '').map(([k, v]) => [k, Number(v.replace(',', '.'))]))
+    // só vai o que é novo ou foi mudado: leite e cocho podem ser anotados em momentos diferentes
+    const nums = Object.fromEntries(Object.entries(valores).filter(([, v]) => v !== '').map(([k, v]) => [k, Number(v.replace(',', '.'))])
+      .filter(([k, v]) => (k === 'litros' && somarLitros) || mudou(doDia[k as string]?.valor, v as number)))
+    if (!Object.keys(nums).length) { setErro(Object.keys(doDia).length ? 'Nada novo: esses valores já estão anotados neste dia.' : 'Preencha ao menos um valor.'); return }
     try {
-      setRes(await api.post<Resultado>(`/lotes/${lote.id}/registros`, { data, valores: nums, alerta_id: alertaId }))
-      setOk(alertaId ? 'Registro salvo, acompanhamento executado e ação registrada no histórico do alerta.' : 'Registro salvo e acompanhamento executado.')
+      setRes(await api.post<Resultado>(`/lotes/${lote.id}/registros`, { data, valores: nums, alerta_id: alertaId,
+        somar: somarLitros && nums.litros !== undefined ? ['litros'] : [] }))
+      setOk((alertaId ? 'Registro salvo, acompanhamento executado e ação registrada no histórico do alerta.' : 'Registro salvo e acompanhamento executado.')
+        + ` (${Object.keys(nums).length} valor(es) novo(s)).`)
+      setRecarga((n) => n + 1)
       if (alertaId) concluir()
     } catch (e: any) { setErro(e.message) }
+  }
+  const apagar = async (ind: string) => {
+    if (!window.confirm(`Apagar ${NOME_INDICADOR[ind] ?? ind} de ${dataBR(data)}? O acompanhamento é refeito a partir desse dia.`)) return
+    setErro(''); setOk('')
+    try { await api.del(`/lotes/${lote.id}/registros?data=${data}&indicador=${ind}`); setOk('Valor apagado e acompanhamento refeito.'); setRecarga((n) => n + 1) }
+    catch (e: any) { setErro(e.message) }
   }
   const enviarEvento = async () => {
     setErro(''); setOk('')
@@ -835,7 +863,9 @@ function AbaRegistro({ lote }: { lote: Lote }) {
       )}
       {abertos[k] && (
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {CAMPOS[k].map(([ind, nome, un]) => (
+          {CAMPOS[k].map(([ind, nome, un]) => ind === 'litros' && doDia.litros ? (
+            <CampoLitros key={ind} valor={valores.litros ?? ''} onChange={(x) => setValores({ ...valores, litros: x })} gravado={doDia.litros} modo={modoLitros} setModo={setModoLitros} />
+          ) : (
             <label key={ind}>
               <span className="rotulo">{nome} ({un})</span>
               <input className="input num" inputMode="decimal" value={valores[ind] ?? ''} onChange={(e) => setValores({ ...valores, [ind]: e.target.value })} />
@@ -855,6 +885,19 @@ function AbaRegistro({ lote }: { lote: Lote }) {
             <label><span className="rotulo">Data</span><input type="date" className="input" value={data} onChange={(e) => setData(e.target.value)} /></label>
             <button className="btn-secundario" onClick={clima}>Buscar clima do dia (meteorologia)</button>
           </div>
+          {Object.keys(doDia).length > 0 && (
+            <div className="mb-3 rounded-lg bg-campo-50 p-3 text-sm text-campo-900">
+              <p className="font-medium">Já anotado em {dataBR(data)} (o formulário mostra esses valores; só o que você mudar será enviado):</p>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {Object.values(doDia).map((r) => (
+                  <span key={r.indicador} className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs ring-1 ring-campo-100" title={`gravado às ${hora(r.atualizado_em)}${r.metodo ? ` · ${r.metodo}` : ''}`}>
+                    {NOME_INDICADOR[r.indicador] ?? r.indicador} <b className="num">{valorIndicador(r.indicador, r.valor, r.texto)}</b>
+                    <button className="text-stone-400 hover:text-critico" onClick={() => apagar(r.indicador)} aria-label="apagar">✕</button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="space-y-3">
             {secao('diario', 'Diário (produção, concentrado, clima e cocho)')}
             {secao('semanal', 'Semanal (silagem, ECC, fezes, pasto)')}
@@ -890,7 +933,51 @@ function AbaRegistro({ lote }: { lote: Lote }) {
         <ImportarPlanilha lote={lote} />
       </div>
     </div>
+    <HistoricoRegistros regs={regs} lote={lote} dataAtual={data} onAbrir={(d) => { setData(d); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />
     </div>
+  )
+}
+
+const COLUNAS_HIST: [string, string][] = [['vacas', 'Vacas'], ['litros', 'Litros'], ['concentrado_kg_vaca', 'Conc./vaca'], ['escore_cocho', 'Cocho'],
+  ['sobras_pct', 'Sobras %'], ['temp', '°C'], ['ur', 'UR %']]
+
+/** Histórico dos registros do lote (45 dias): uma linha por dia; clicar abre o dia no formulário para completar/corrigir. */
+function HistoricoRegistros({ regs, lote, dataAtual, onAbrir }: { regs: Registro[]; lote: Lote; dataAtual: string; onAbrir: (d: string) => void }) {
+  const [todos, setTodos] = useState(false)
+  const dias = porDia(regs)
+  const visiveis = todos ? dias : dias.slice(0, 10)
+  const fixos = new Set(COLUNAS_HIST.map(([k]) => k))
+  return (
+    <Painel titulo="Histórico de registros" subtitulo="O que foi anotado em cada dia. Clique num dia para completar ou corrigir (o acompanhamento é refeito a partir dele).">
+      {dias.length === 0 && <p className="text-sm text-stone-500">Nada anotado nos últimos 45 dias.</p>}
+      {dias.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="text-xs text-stone-500">
+              <tr><th className="py-1 pr-3">Dia</th><th className="pr-3 text-right">L/vaca</th>{COLUNAS_HIST.map(([k, n]) => <th key={k} className="pr-3 text-right">{n}</th>)}<th className="pr-3">Outros</th><th>Última anotação</th></tr>
+            </thead>
+            <tbody>
+              {visiveis.map(([d, ind]) => {
+                const lv = ind.litros && ind.vacas ? ind.litros.valor / ind.vacas.valor : null
+                const outros = Object.values(ind).filter((r) => !fixos.has(r.indicador))
+                const falta = !ind.litros || !ind.vacas || (lote.sistema !== 'pasto' && !ind.escore_cocho && !ind.sobras_pct)
+                return (
+                  <tr key={d} onClick={() => onAbrir(d)} className={`cursor-pointer border-t border-stone-100 hover:bg-stone-50 ${d === dataAtual ? 'bg-campo-50' : ''}`}>
+                    <td className="py-1.5 pr-3 font-medium text-stone-800">{dataBR(d)}{falta && <span className="ml-1 text-xs text-amber-700" title="faltou leite, vacas ou cocho">●</span>}</td>
+                    <td className="num pr-3 text-right font-semibold text-campo-700">{lv !== null ? numero(lv) : '—'}</td>
+                    {COLUNAS_HIST.map(([k]) => <td key={k} className="num pr-3 text-right text-stone-700">{ind[k] ? numero(ind[k].valor, k === 'concentrado_kg_vaca' ? 2 : 1) : <span className="text-stone-300">—</span>}</td>)}
+                    <td className="pr-3 text-xs text-stone-500">{outros.map((r) => `${NOME_INDICADOR[r.indicador] ?? r.indicador} ${valorIndicador(r.indicador, r.valor, r.texto)}`).join(' · ')}</td>
+                    <td className="text-xs text-stone-400">{hora(Object.values(ind).map((r) => r.atualizado_em ?? '').sort().pop())}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {dias.length > 10 && <button className="mt-2 text-sm text-campo-600 hover:underline" onClick={() => setTodos(!todos)}>{todos ? 'mostrar menos' : `mostrar os ${dias.length} dias`}</button>}
+      <p className="mt-2 text-xs text-stone-400">● faltou leite, vacas ou leitura de cocho nesse dia.</p>
+    </Painel>
   )
 }
 

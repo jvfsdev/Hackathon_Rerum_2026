@@ -60,6 +60,7 @@ class RegistroIn(BaseModel):
     valores: dict[str, float]
     metodo: str | None = None
     alerta_id: int | None = None
+    somar: list[str] = []             # indicadores somados ao valor já gravado no dia (ex.: litros da 2ª ordenha)
 
 
 class EventoIn(BaseModel):

@@ -195,7 +195,7 @@ def importar(lote_id: int, dados: ImportacaoIn):
             existente = s.exec(select(Registro).where(Registro.lote_id == lote_id, Registro.data == r["data"],
                                                       Registro.indicador == r["indicador"])).first()
             if existente:
-                existente.valor = r["valor"]
+                existente.valor, existente.atualizado_em, existente.metodo = r["valor"], datetime.now(), "importação CSV"
                 s.add(existente)
             else:
                 s.add(Registro(lote_id=lote_id, metodo="importação CSV", **r))
@@ -288,25 +288,58 @@ def nova_dieta(lote_id: int, dados: DietaIn):
 
 @router.post("/lotes/{lote_id}/registros")
 def registrar(lote_id: int, dados: RegistroIn):
-    """Grava os valores do dia (substitui o mesmo indicador na mesma data) e roda o acompanhamento."""
+    """Grava os valores do dia (substitui o mesmo indicador na mesma data) e roda o acompanhamento. Só os indicadores
+    enviados são tocados: leite à noite e cocho de manhã podem ser registrados em envios separados."""
     with sessao() as s:
         lote = _lote(s, lote_id)
+        if not dados.valores:
+            raise HTTPException(422, "nenhum valor para registrar")
+        if set(dados.somar) - SOMAVEIS:
+            raise HTTPException(422, f"só dá para somar: {', '.join(sorted(SOMAVEIS))}")
         for ind, valor in dados.valores.items():
             existente = s.exec(select(Registro).where(Registro.lote_id == lote_id, Registro.data == dados.data,
                                                       Registro.indicador == ind)).first()
+            somar = ind in dados.somar
+            if somar and valor <= 0:
+                raise HTTPException(422, f"{ind}: a parcela a somar precisa ser maior que zero")
             if existente:
-                existente.valor = valor
+                # 2ª ordenha (ou 2º trato): soma ao total do dia e guarda as parcelas; senão substitui (correção)
+                if somar:
+                    partes = existente.texto or f"{existente.valor:g}"
+                    existente.valor, existente.texto = existente.valor + valor, f"{partes} + {valor:g}"
+                else:
+                    existente.valor, existente.texto = valor, None
+                existente.atualizado_em = datetime.now()
+                existente.metodo = dados.metodo or existente.metodo
                 s.add(existente)
             else:
                 s.add(Registro(lote_id=lote_id, data=dados.data, indicador=ind, valor=valor, metodo=dados.metodo))
         s.commit()
         _acao(s, dados.alerta_id, lote_id, f"Registro de {dados.data:%d/%m}: " + ", ".join(
-            f"{k} {v:g}" for k, v in dados.valores.items()), {"registro_data": dados.data.isoformat()})
+            f"{k} {'+' if k in dados.somar else ''}{v:g}" for k, v in dados.valores.items()), {"registro_data": dados.data.isoformat()})
         out = services.monitorar(s, lote, dados.data)
         hoje = date.today()
         if dados.data < hoje:   # registro retroativo: os dias seguintes dependem dele (série, corrida, médias)
             services.reprocessar(s, lote, dados.data + timedelta(days=1), hoje)
         return out
+
+
+SOMAVEIS = {"litros", "trato_kg"}
+
+
+@router.delete("/lotes/{lote_id}/registros")
+def apagar_registro(lote_id: int, data: date, indicador: str):
+    """Remove um valor digitado errado e refaz o acompanhamento a partir daquela data."""
+    with sessao() as s:
+        lote = _lote(s, lote_id)
+        r = s.exec(select(Registro).where(Registro.lote_id == lote_id, Registro.data == data,
+                                          Registro.indicador == indicador)).first()
+        if not r:
+            raise HTTPException(404, "registro não encontrado")
+        s.delete(r)
+        s.commit()
+        services.reprocessar(s, lote, data, date.today())
+        return {"apagado": True, "data": data, "indicador": indicador}
 
 
 @router.get("/lotes/{lote_id}/registros")

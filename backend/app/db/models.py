@@ -148,6 +148,7 @@ class Registro(SQLModel, table=True):
     texto: str | None = None
     metodo: str | None = None
     confianca: str = "medido"
+    atualizado_em: NaiveDatetime = Field(default_factory=datetime.now)   # quando o valor foi gravado/corrigido
 
 
 class Evento(SQLModel, table=True):
