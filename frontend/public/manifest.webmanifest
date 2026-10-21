@@ -1,6 +1,6 @@
 {
-  "name": "Leite por Lote — campo",
-  "short_name": "Leite no campo",
+  "name": "CochoCerto — campo",
+  "short_name": "CochoCerto",
   "start_url": "/campo",
   "scope": "/",
   "display": "standalone",

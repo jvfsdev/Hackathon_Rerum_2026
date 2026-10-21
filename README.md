@@ -1,10 +1,10 @@
-# Leite por Lote — sistema especialista de dietas
+# CochoCerto — sistema especialista de dietas por lote
 
 Hackathon UFJF 2026 (XXVIII Semana da Computação · RERUM), **Tema T2 — Dietas**.
 
 Orienta e acompanha **lotes** de vacas leiteiras: classifica o lote, calcula exigências, verifica a dieta, sugere a dieta de **custo mínimo** e acompanha o dia a dia (produção × curva esperada, cocho, silagem, ECC, laudo do laticínio). Os alertas vêm com causa provável, ação sugerida e explicação **"por quê?/como?"**.
 
-Quem decide é a **base de conhecimento (111 regras de produção com fator de certeza)** + **motor de inferência próprio** (encadeamento progressivo e regressivo, resolução de conflito, CF estilo MYCIN). Não há LLM no sistema: as decisões são determinísticas e auditáveis.
+Quem decide é a **base de conhecimento (153 regras de produção com fator de certeza)** + **motor de inferência próprio** (encadeamento progressivo e regressivo, resolução de conflito, CF estilo MYCIN). Não há LLM no sistema: as decisões são determinísticas e auditáveis.
 
 ## Rodar (localhost)
 
@@ -25,7 +25,7 @@ npm run dev                                 # http://localhost:5173
 
 No celular (mesma rede Wi-Fi): `npm run dev:rede` e abra `http://<ip-do-computador>:5173` — a página inicial vira o **modo campo** (registro rápido + avisos, funciona sem conexão e envia depois).
 
-Testes: `cd backend && .venv/bin/pytest -q`, com 62 testes, entre eles 33 casos de resultado conhecido em `backend/tests/cases.yaml`.
+Testes: `cd backend && .venv/bin/pytest -q`, com 453 testes, entre eles 33 casos de resultado conhecido em `backend/tests/cases.yaml`.
 
 ## Onde está cada coisa
 

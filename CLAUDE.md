@@ -1,4 +1,4 @@
-# Sistema especialista de dietas por lote — Hackathon UFJF 2026 (T2)
+# CochoCerto — sistema especialista de dietas por lote · Hackathon UFJF 2026 (T2)
 
 Aplicação local que orienta e acompanha lotes de vacas leiteiras em dieta e comportamento alimentar.
 Entrega: quinta 22/10 às 20h. Demo: sexta 23/10 às 9h, rodando em localhost.

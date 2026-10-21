@@ -1,4 +1,4 @@
-# Regras de produção — base v1.4.0
+# Regras de produção — base v1.4.1
 
 153 regras · 114 parâmetros · 13 alimentos. Gerado automaticamente de `backend/kb/` (não editar à mão).
 

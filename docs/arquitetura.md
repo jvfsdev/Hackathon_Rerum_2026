@@ -12,8 +12,8 @@ Tudo roda em localhost. O motor de inferência é o único componente que decide
         │          │  ▲                                                    │
         │          ▼  │                                                    │
         │   MOTOR DE INFERÊNCIA ── lê ──▶ BASE DE CONHECIMENTO (YAML)      │
-        │   match → conflito → disparo     111 regras · 81 parâmetros      │
-        │   forward + backward + CF        12 alimentos · versão + changelog│
+        │   match → conflito → disparo     153 regras · 114 parâmetros     │
+        │   forward + backward + CF        13 alimentos · versão + changelog│
         │          │                                                       │
         │          ├── chama ──▶ calc/ (CMS, ELl, PM, ITU, curva, R$)     │
         │          ├── metas ──▶ optimizer/ (PL custo mínimo, HiGHS)      │

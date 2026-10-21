@@ -1,5 +1,10 @@
 # Histórico da base de conhecimento
 
+## 1.4.1 — 21/10/2026
+- Alertas ganham a chave `problema`: regras que medem o mesmo problema em graus diferentes viram um alerta só
+  (o mais grave, citando os demais em `tambem`) e um único episódio que agrava ou atenua.
+  `perda_ecc` = ACP-05 + ACP-09; `cocho_baixo` = ACP-06 + ACP-06B + ACP-S03.
+
 ## 1.4.0 — 21/10/2026
 - Composição dos alimentos atualizada pelo **CQBAL 4.0** (Valadares Filho et al., 2018; www.cqbal.com.br) via
   scripts/importar_cqbal.py: MS, PB, EE, MM, FDN, CNF (medido), NDT (observado com n ≥ 10, senão BR-CORTE 2016),

@@ -91,17 +91,18 @@ def sincronizar(s: Session, kb: BaseConhecimento, lote_id: int, d: date, resulta
                 origem: str, modulos: set[str] | None = None, causa_extra: str = "") -> None:
     """Atualiza os episódios do lote a partir dos alertas de uma execução do motor no dia d."""
     modulo_de = {r["id"]: r["modulo"] for r in kb.regras}
-    disparados = {a.regra: a for a in resultado.alertas
+    disparados = {(a.problema or a.regra): a for a in resultado.alertas
                   if modulos is None or modulo_de.get(a.regra) in modulos}
-    abertos = {a.regra: a for a in s.exec(select(AlertaDB).where(
+    abertos = {(a.problema or a.regra): a for a in s.exec(select(AlertaDB).where(
         AlertaDB.lote_id == lote_id, AlertaDB.origem == origem, AlertaDB.estado.in_(ATIVOS))).all()}
     quando = _quando(d) if origem == "acompanhamento" else datetime.now()
 
-    for regra, a in disparados.items():
-        ep = abertos.get(regra)
+    for problema, a in disparados.items():
+        regra = a.regra
+        ep = abertos.get(problema)
         contexto = _contexto(resultado, regra)
         if ep is None:
-            ep = AlertaDB(lote_id=lote_id, regra=regra, modulo=modulo_de.get(regra, ""), origem=origem, nivel=a.nivel,
+            ep = AlertaDB(lote_id=lote_id, regra=regra, problema=problema, modulo=modulo_de.get(regra, ""), origem=origem, nivel=a.nivel,
                           titulo=a.titulo, causa=a.causa, acao=a.acao, categoria=a.categoria, cf=a.cf, fonte=a.fonte,
                           forca=a.forca, suprimido=a.status == "suprimido", nota=a.nota, aberto_em=d,
                           ultima_ocorrencia=d, sessao_id=sessao_id, contexto=contexto)
@@ -117,6 +118,10 @@ def sincronizar(s: Session, kb: BaseConhecimento, lote_id: int, d: date, resulta
             if ep.estado == "recusado":
                 ep.estado, ep.estado_em = "aberto", d
                 _historico(s, ep, "reaberto", "Recusado anteriormente, mas o problema se agravou", quando)
+        elif NIVEL[a.nivel] < NIVEL[ep.nivel] and ep.regra != regra:
+            _historico(s, ep, "atenuado", f"Nível {ep.nivel} → {a.nivel}: {a.titulo}", quando)
+            ep.nivel = a.nivel
+        ep.regra, ep.modulo = regra, modulo_de.get(regra, ep.modulo)
         ep.titulo, ep.causa, ep.acao, ep.cf = a.titulo, a.causa, a.acao, a.cf
         ep.suprimido, ep.nota = a.status == "suprimido", a.nota
         ep.ultima_ocorrencia, ep.ocorrencias, ep.sessao_id = d, ep.ocorrencias + 1, sessao_id
@@ -125,8 +130,8 @@ def sincronizar(s: Session, kb: BaseConhecimento, lote_id: int, d: date, resulta
 
     dias_resolver = kb.params["resolucao_dias"]["valor"]
     atuais = {f.nome: f.valor for f in resultado.wm.fatos.values()}
-    for regra, ep in abertos.items():
-        if regra in disparados:
+    for problema, ep in abertos.items():
+        if problema in disparados:
             continue
         if (d - ep.ultima_ocorrencia).days < dias_resolver.get(ep.modulo, 1):
             continue

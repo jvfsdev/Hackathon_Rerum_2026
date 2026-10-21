@@ -184,7 +184,8 @@ def gerar():
         from .models import AlertaDB
 
         def episodio(n, regra):
-            return s.exec(select(AlertaDB).where(AlertaDB.lote_id == lotes[n].id, AlertaDB.regra == regra,
+            return s.exec(select(AlertaDB).where(AlertaDB.lote_id == lotes[n].id,
+                                                 (AlertaDB.regra == regra) | (AlertaDB.problema == regra),
                                                  AlertaDB.estado.in_(alertas.ATIVOS))).first()
 
         def acoes_do_dia(i):

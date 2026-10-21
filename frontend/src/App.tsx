@@ -33,7 +33,7 @@ export default function App() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
           <NavLink to="/" className="flex items-center gap-2 text-white">
             <span className="text-xl">🐄</span>
-            <span className="font-semibold">Leite por Lote</span>
+            <span className="font-semibold">CochoCerto</span>
             <span className="hidden text-xs text-campo-100 sm:inline">· sistema especialista de dietas</span>
           </NavLink>
           <nav className="flex flex-wrap gap-1">

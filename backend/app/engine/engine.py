@@ -72,6 +72,7 @@ class Motor:
             entrada["concorrentes"] = [c[1]["id"] for c in conjunto[1:]]
             resultado.traco.append(entrada)
         self._aplicar_supressoes(resultado)
+        self._agrupar_problemas(resultado)
         return resultado
 
 
@@ -155,7 +156,26 @@ class Motor:
         return Alerta(regra=regra["id"], nivel=spec.get("nivel", "atencao"),
                       titulo=formatar(spec["titulo"], res), causa=formatar(spec.get("causa", ""), res),
                       acao=formatar(spec.get("acao", ""), res), categoria=spec.get("categoria", "geral"),
-                      cf=cf, fonte=regra.get("fonte", ""), forca=regra.get("forca", ""))
+                      cf=cf, fonte=regra.get("fonte", ""), forca=regra.get("forca", ""),
+                      problema=spec.get("problema", regra["id"]))
+
+    def _agrupar_problemas(self, resultado: Resultado) -> None:
+        """Regras com o mesmo `problema` (graus do mesmo problema) viram um alerta só: fica o de nível mais alto
+        (empate: maior CF); os demais ficam registrados em `tambem` e continuam no traço."""
+        grupos: dict[str, list[Alerta]] = {}
+        for a in resultado.alertas:
+            grupos.setdefault(a.problema or a.regra, []).append(a)
+        manter = []
+        for alertas in grupos.values():
+            if len(alertas) == 1:
+                manter.append(alertas[0])
+                continue
+            ativos = [a for a in alertas if a.status == "ativo"] or alertas
+            principal = max(ativos, key=lambda a: (NIVEIS.index(a.nivel), a.cf))
+            principal.extra["tambem"] = [a.regra for a in alertas if a is not principal]
+            manter.append(principal)
+        ids = {id(a) for a in manter}
+        resultado.alertas = [a for a in resultado.alertas if id(a) in ids]
 
     def _aplicar_supressoes(self, resultado: Resultado) -> None:
         for alerta in resultado.alertas:

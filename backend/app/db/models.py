@@ -150,7 +150,8 @@ class AlertaDB(SQLModel, table=True):
     __tablename__ = "alerta"
     id: int | None = Field(default=None, primary_key=True)
     lote_id: int = Field(foreign_key="lote.id", index=True)
-    regra: str = Field(index=True)
+    regra: str = Field(index=True)          # regra que sustenta o episódio agora (pode mudar com o grau do problema)
+    problema: str = Field(default="", index=True)   # chave do episódio; padrão = id da regra
     modulo: str = ""
     origem: str = "acompanhamento"        # acompanhamento | verificacao (dieta ativa)
     nivel: str

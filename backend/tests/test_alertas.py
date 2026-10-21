@@ -128,3 +128,26 @@ def test_reanalisar_hoje_preserva_abertura_de_alerta_ja_aceito(sessao_memoria):
     s.refresh(ep)
     assert tipos(s, ep)[:2] == ["aberto", "aceito"] and ep.estado == "aceito"
     assert all(c["fato"].startswith(("mon.", "ver.", "laudo.", "clima.", "dieta.", "exig.", "meta.")) for c in ep.contexto)
+
+
+def test_graus_do_mesmo_problema_sao_um_episodio_que_agrava_e_atenua(sessao_memoria):
+    """ECC: ACP-09 (atenção) → ACP-05 (crítico) → ACP-09 de novo continuam no MESMO episódio (problema perda_ecc)."""
+    from app.engine.engine import Resultado
+    from app.engine.facts import Alerta
+    from app.engine.working_memory import MemoriaTrabalho
+    s = sessao_memoria
+    lote, d0 = lote_sintetico(s)
+    kb = services.kb()
+
+    def dia(i, regra, nivel):
+        r = Resultado(wm=MemoriaTrabalho())
+        r.alertas.append(Alerta(regra=regra, nivel=nivel, titulo=f"{regra} dia {i}", causa="", acao="",
+                                categoria="dieta", cf=0.8, problema="perda_ecc"))
+        alertas.sincronizar(s, kb, lote.id, d0 + timedelta(days=i), r, None, "acompanhamento")
+
+    dia(1, "ACP-09", "atencao")
+    dia(8, "ACP-05", "critico")
+    dia(15, "ACP-09", "atencao")
+    [ep] = s.exec(select(AlertaDB).where(AlertaDB.lote_id == lote.id, AlertaDB.problema == "perda_ecc")).all()
+    assert ep.regra == "ACP-09" and ep.nivel == "atencao" and ep.ocorrencias == 3
+    assert tipos(s, ep) == ["aberto", "agravado", "atenuado"]

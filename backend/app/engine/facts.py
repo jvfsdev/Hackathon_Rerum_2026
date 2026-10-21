@@ -31,6 +31,7 @@ class Alerta:
     cf: float
     fonte: str = ""
     forca: str = ""
+    problema: str = ""               # chave do problema: regras que medem o mesmo problema em graus diferentes
     status: str = "ativo"            # ativo | suprimido
     nota: str | None = None
     extra: dict = field(default_factory=dict)
@@ -38,4 +39,4 @@ class Alerta:
     def to_dict(self) -> dict:
         return {"regra": self.regra, "nivel": self.nivel, "titulo": self.titulo, "causa": self.causa,
                 "acao": self.acao, "categoria": self.categoria, "cf": round(self.cf, 3), "fonte": self.fonte,
-                "forca": self.forca, "status": self.status, "nota": self.nota, **self.extra}
+                "forca": self.forca, "problema": self.problema, "status": self.status, "nota": self.nota, **self.extra}

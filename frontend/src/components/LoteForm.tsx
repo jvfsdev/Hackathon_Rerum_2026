@@ -23,10 +23,27 @@ export function valoresIniciais(lote?: Lote, fatos?: Record<string, any>): Valor
   }
 }
 
+/** Fatos `lote.*` da consulta guiada → campos do formulário (o que não for do cadastro, como clima, é ignorado). */
+const CAMPO_DO_FATO: Record<string, keyof ValoresLote> = {
+  'lote.estado': 'estado', 'lote.sistema': 'sistema', 'lote.grupo_genetico': 'grupo_genetico', 'lote.pv': 'pv',
+  'lote.del': 'del_ref', 'lote.dias_para_parto': 'dias_para_parto_ref', 'lote.dias_gestacao': 'dias_gestacao_ref',
+  'lote.fracao_primiparas': 'fracao_primiparas', 'lote.ecc': 'ecc', 'lote.distancia_km': 'distancia_km', 'lote.relevo': 'relevo',
+  'lote.forrageira': 'forrageira', 'lote.leite': 'leite', 'lote.gordura': 'gordura', 'lote.proteina': 'proteina',
+}
+
+export function valoresDaConsulta(fatos: Record<string, any>): Partial<ValoresLote> {
+  const out: Partial<ValoresLote> = {}
+  for (const [fato, campo] of Object.entries(CAMPO_DO_FATO)) {
+    const x = fatos[fato]
+    if (x !== null && x !== undefined) out[campo] = typeof x === 'number' ? s(x) : String(x)
+  }
+  return out
+}
+
 const num = (v: string) => (v.trim() === '' ? null : Number(v.replace(',', '.')))
 
-export default function LoteForm({ lote, fatos, onSalvo }: { lote?: Lote; fatos?: Record<string, any>; onSalvo: (l: Lote) => void }) {
-  const [v, setV] = useState<ValoresLote>(valoresIniciais(lote, fatos))
+export default function LoteForm({ lote, fatos, inicial, onSalvo }: { lote?: Lote; fatos?: Record<string, any>; inicial?: Partial<ValoresLote>; onSalvo: (l: Lote) => void }) {
+  const [v, setV] = useState<ValoresLote>({ ...valoresIniciais(lote, fatos), ...inicial })
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
   const set = (k: keyof ValoresLote) => (e: { target: { value: string } }) => setV({ ...v, [k]: e.target.value })

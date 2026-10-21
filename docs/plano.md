@@ -1,4 +1,4 @@
-# Plano — Sistema Especialista de Dietas por Lote (Hackathon UFJF 2026, Tema T2)
+# Plano — CochoCerto, sistema especialista de dietas por lote (Hackathon UFJF 2026, Tema T2)
 
 ## Context
 

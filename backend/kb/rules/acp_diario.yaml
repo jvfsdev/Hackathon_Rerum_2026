@@ -311,6 +311,7 @@
     - {fato: mon.sobras_max3, op: "<", valor: $meta.sobras.min}
   entao:
     - alerta:
+        problema: cocho_baixo
         nivel: atencao
         categoria: cocho
         titulo: "Sobras baixas: {mon.sobras_texto}; meta {meta.sobras.min:.0f}–{meta.sobras.max:.0f}% (escore 3)"
@@ -348,6 +349,7 @@
     - {fato: perfil.fase, op: in, valor: [recem_parida, inicio]}
   entao:
     - alerta:
+        problema: cocho_baixo
         nivel: critico
         categoria: cocho
         titulo: "Cocho vazio há {mon.dias_cocho_vazio} leituras"
@@ -367,6 +369,7 @@
     - {fato: perfil.fase, op: nao_in, valor: [recem_parida, inicio]}
   entao:
     - alerta:
+        problema: cocho_baixo
         nivel: atencao
         categoria: cocho
         titulo: "Cocho vazio há {mon.dias_cocho_vazio} leituras"

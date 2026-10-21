@@ -29,7 +29,10 @@ def test_escore_1_em_dias_seguidos_e_cocho_vazio_e_alerta_cita_o_escore(sessao_m
     assert out["fatos"]["mon.dias_cocho_vazio"]["valor"] == 3
     assert "escore médio" in out["fatos"]["mon.sobras_texto"]["valor"]
     regras = {a["regra"]: a for a in out["alertas"]}
-    assert "ACP-06" in regras and "ACP-S03" in regras and "escore" in regras["ACP-S03"]["titulo"]
+    # cocho vazio e sobras baixas são o mesmo problema: um alerta só, o mais grave, citando o outro
+    assert set(regras) & {"ACP-06", "ACP-S03"} == {"ACP-06"}
+    assert regras["ACP-06"]["problema"] == "cocho_baixo" and regras["ACP-06"]["tambem"] == ["ACP-S03"]
+    assert "ACP-S03" in {t["regra"] for t in out["traco"]}
 
 
 def test_escore_na_meta_nao_gera_alerta(sessao_memoria):

@@ -1,13 +1,13 @@
 [project]
-name = "leite-especialista"
+name = "cochocerto"
 version = "0.1.0"
-description = "Sistema especialista de dietas por lote para vacas leiteiras (Hackathon UFJF 2026, T2)"
+description = "CochoCerto — sistema especialista de dietas por lote para vacas leiteiras (Hackathon UFJF 2026, T2)"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.110",
   "uvicorn[standard]>=0.29",
-  "sqlmodel>=0.0.16",
-  "pulp>=2.8",
+  "sqlmodel>=0.0.48",
+  "pulp>=4.0",
   "numpy>=1.26",
   "highspy>=1.7",
   "pyyaml>=6.0",

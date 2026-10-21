@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, fmt, OPCOES, rotulo } from '../api'
 import { Carregando, Erro, Painel } from '../components/ui'
 import { EscalaEscore } from '../components/Escala'
@@ -11,6 +12,7 @@ export default function ConsultaPagina() {
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState('')
   const [verPorQue, setVerPorQue] = useState(false)
+  const navegar = useNavigate()
 
   const iniciar = async () => {
     setCarregando(true); setErro('')
@@ -97,7 +99,12 @@ export default function ConsultaPagina() {
           <>
             <div className="rounded-xl bg-campo-50 p-4 text-sm text-campo-900">Pronto: o motor tem todos os fatos para concluir. {estado.padroes.length > 0 && `Valores padrão usados (CF menor): ${estado.padroes.map(rotulo).join(', ')}.`}</div>
             <ResultadoAvaliacao r={estado.resultado} />
-            <button className="btn-secundario" onClick={() => { setEstado(null); setValor('') }}>Nova consulta</button>
+            <div className="flex flex-wrap gap-2">
+              <button className="btn-primario" onClick={() => navegar('/lotes/novo', { state: { fatos: estado.fatos, padroes: estado.padroes } })}>
+                Criar lote com estas respostas
+              </button>
+              <button className="btn-secundario" onClick={() => { setEstado(null); setValor('') }}>Nova consulta</button>
+            </div>
           </>
         )}
       </div>

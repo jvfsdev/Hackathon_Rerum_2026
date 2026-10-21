@@ -73,7 +73,7 @@ export default function CampoPagina() {
   return (
     <div className="min-h-screen bg-stone-50 pb-20">
       <header className="sticky top-0 z-20 flex items-center justify-between bg-campo-700 px-4 py-3 text-white">
-        <span className="font-semibold">🐄 Leite por Lote · campo</span>
+        <span className="font-semibold">🐄 CochoCerto · campo</span>
         <Link to="/?completo=1" className="text-xs text-campo-100 underline">versão completa</Link>
       </header>
       {fila.fila.length > 0 && (

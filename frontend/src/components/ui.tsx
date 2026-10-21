@@ -262,7 +262,7 @@ export function AlertaAcoes({ alerta, onMudou }: { alerta: Alerta; onMudou?: (a:
 }
 
 const TIPO_HIST: Record<string, [string, string]> = {
-  aberto: ['Alerta aberto', 'bg-amber-500'], agravado: ['Agravou', 'bg-red-600'], reaberto: ['Reaberto', 'bg-red-600'],
+  aberto: ['Alerta aberto', 'bg-amber-500'], agravado: ['Agravou', 'bg-red-600'], atenuado: ['Atenuou', 'bg-amber-400'], reaberto: ['Reaberto', 'bg-red-600'],
   aceito: ['Recomendação aceita', 'bg-campo-500'], acao_registrada: ['Ação registrada', 'bg-campo-700'],
   recusado: ['Recusado', 'bg-stone-500'], resolvido: ['Resolvido', 'bg-campo-600'], expirado: ['Expirado', 'bg-stone-400'],
 }

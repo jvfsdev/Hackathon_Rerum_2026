@@ -53,6 +53,7 @@
   entao:
     - concluir: {fato: hipotese.ben_severo, valor: true}
     - alerta:
+        problema: perda_ecc
         nivel: critico
         categoria: dieta
         titulo: "Balanço energético negativo severo: perdeu {mon.ecc_perda:.2f} ponto(s) de ECC"
@@ -72,6 +73,7 @@
     - {fato: hipotese.ben_severo, op: ausente}
   entao:
     - alerta:
+        problema: perda_ecc
         nivel: atencao
         categoria: dieta
         titulo: "Lote perdendo condição corporal ({mon.ecc_perda:.2f} ponto)"

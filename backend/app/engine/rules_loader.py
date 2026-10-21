@@ -102,6 +102,8 @@ def validar(kb: BaseConhecimento) -> None:
                     except TypeError as e:
                         erros.append(f"{rid}: argumentos de {spec['funcao']} inválidos ({e})")
             if "alerta" in acao:
+                if "problema" in spec and not re.fullmatch(r"[a-z0-9_]+", str(spec["problema"])):
+                    erros.append(f"{rid}: problema '{spec['problema']}' deve ser uma chave (a-z, 0-9, _)")
                 if spec.get("nivel", "atencao") not in NIVEIS_VALIDOS:
                     erros.append(f"{rid}: nível de alerta inválido {spec.get('nivel')}")
                 for campo in ("titulo", "causa", "acao"):
