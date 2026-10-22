@@ -102,16 +102,30 @@
   fonte: "Oba & Allen 1999 (0,17 kg por ponto); Dossiê EXG-09; FDND de referência: escolha de engenharia"
   forca: C
 
+- id: EXG-01V
+  versao: 1
+  modulo: exigencias
+  descricao: Cocho vazio em leituras seguidas — o lote come tudo o que recebe, então o consumo real é pelo menos a oferta mais o ajuste do cocho (medição vence a previsão)
+  prioridade: 85
+  cf: 0.8
+  se:
+    - {fato: mon.dias_cocho_vazio, op: ">=", valor: "@params.cocho_vazio_dias"}
+    - {fato: mon.ms_ofertada_cocho, op: ">", valor: 0}
+  entao:
+    - calcular: {fato: exig.cms_observado, funcao: aumentar_pct, args: {valor: $mon.ms_ofertada_cocho, pct: "@params.sobras_ajuste_pct"}}
+  fonte: "Dossiê ACP-06 (cocho vazio = consumo limitado pela oferta); contar a oferta + o ajuste como consumo: escolha de engenharia"
+  forca: D
+
 - id: EXG-01E
   versao: 1
   modulo: exigencias
-  descricao: CMS esperado é o menor entre a equação e o teto de fibra
+  descricao: CMS esperado é o menor entre a equação e o teto de fibra (com cocho vazio, o consumo observado é o piso)
   prioridade: 40
   se:
     - {fato: exig.cms_equacao, op: existe}
     - {fato: perfil.cms_baixa_confianca, op: ausente}
   entao:
-    - calcular: {fato: exig.cms, funcao: cms_final, args: {equacao: $exig.cms_equacao, ajuste: "$exig.cms_ajuste_fdnd|0", teto: "$exig.cms_teto_fibra|null"}}
+    - calcular: {fato: exig.cms, funcao: cms_final, args: {equacao: $exig.cms_equacao, ajuste: "$exig.cms_ajuste_fdnd|0", teto: "$exig.cms_teto_fibra|null", observado: "$exig.cms_observado|null"}}
   fonte: "NRC 2001; Mertens"
   forca: B
 
@@ -125,7 +139,7 @@
     - {fato: exig.cms_equacao, op: existe}
     - {fato: perfil.cms_baixa_confianca, op: "=", valor: true}
   entao:
-    - calcular: {fato: exig.cms, funcao: cms_final, args: {equacao: $exig.cms_equacao, ajuste: "$exig.cms_ajuste_fdnd|0", teto: "$exig.cms_teto_fibra|null"}}
+    - calcular: {fato: exig.cms, funcao: cms_final, args: {equacao: $exig.cms_equacao, ajuste: "$exig.cms_ajuste_fdnd|0", teto: "$exig.cms_teto_fibra|null", observado: "$exig.cms_observado|null"}}
     - alerta:
         nivel: informativo
         categoria: dieta

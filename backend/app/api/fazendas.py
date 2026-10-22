@@ -277,8 +277,17 @@ def nova_dieta(lote_id: int, dados: DietaIn):
             ms = services.historico(s, lote_id).serie("ms_silagem", date.today(), 14)
             ms_ref = ms[-1][1] if ms else cat[silagem["alimento"]]["ms"]
         versao = max((d.versao for d in anteriores), default=0) + 1
-        transicao = (services.planejar_transicao(lote, ativa.itens, itens, cat, date.today(), ativa.versao)
-                     if dados.gradual and ativa else None)
+        hoje = date.today()
+        transicao = None
+        if ativa:
+            fator = services.fator_proporcional(ativa.itens, itens)
+            if fator and services.em_transicao(ativa, hoje):
+                # ajuste de oferta no meio de uma troca gradual: a troca continua, com os dias que faltam × fator
+                transicao = services.escalar_transicao(ativa.transicao, fator, hoje)
+            elif dados.gradual:
+                # a troca parte do que está no cocho hoje (a mistura do dia, se já havia uma troca em andamento)
+                transicao = services.planejar_transicao(lote, services.itens_do_dia(ativa, hoje), itens, cat, hoje,
+                                                        ativa.versao)
         dieta = Dieta(lote_id=lote_id, versao=versao, itens=itens, transicao=transicao,
                       origem=dados.origem, motivo=dados.motivo, inicio=date.today(), ativa=True, ms_silagem_ref=ms_ref,
                       parecer={"parecer": parecer["fatos"].get("parecer.dieta", {}).get("valor"),
@@ -373,9 +382,29 @@ def listar_registros(lote_id: int, desde: date | None = None):
 
 @router.post("/lotes/{lote_id}/eventos")
 def registrar_evento(lote_id: int, dados: EventoIn):
+    """Registra um evento. Movimentação com nº de vacas atualiza o cadastro do lote (e do outro lote, se informado)."""
     with sessao() as s:
-        _lote(s, lote_id)
-        ev = Evento(lote_id=lote_id, **dados.model_dump(exclude={"alerta_id"}))
+        lote = _lote(s, lote_id)
+        ev = Evento(lote_id=lote_id, **dados.model_dump(exclude={"alerta_id", "vacas", "outro_lote_id"}))
+        if dados.tipo == "movimentacao" and dados.vacas:
+            outro = _lote(s, dados.outro_lote_id) if dados.outro_lote_id else None
+            if outro is not None and outro.id == lote_id:
+                raise HTTPException(422, "o outro lote precisa ser diferente")
+            antes = lote.n_vacas
+            if antes + dados.vacas < 1 or (outro is not None and outro.n_vacas - dados.vacas < 0):
+                raise HTTPException(422, "o lote ficaria sem vacas: confira o número")
+            lote.n_vacas = antes + dados.vacas
+            s.add(lote)
+            sentido = "Entrada" if dados.vacas > 0 else "Saída"
+            ev.descricao = (f"{sentido} de {abs(dados.vacas)} vaca(s)" + (f" {'do' if dados.vacas > 0 else 'para o'} {outro.nome}" if outro else "")
+                            + f" ({antes} → {lote.n_vacas})" + (f". {dados.descricao}" if dados.descricao else ""))
+            if outro is not None:
+                antes_o = outro.n_vacas
+                outro.n_vacas = antes_o - dados.vacas
+                s.add(outro)
+                s.add(Evento(lote_id=outro.id, data_hora=dados.data_hora, tipo="movimentacao",
+                             descricao=f"{'Saída' if dados.vacas > 0 else 'Entrada'} de {abs(dados.vacas)} vaca(s) "
+                                       f"{'para o' if dados.vacas > 0 else 'do'} {lote.nome} ({antes_o} → {outro.n_vacas})"))
         s.add(ev)
         s.commit()
         s.refresh(ev)
@@ -503,6 +532,16 @@ def obter_alerta(alerta_id: int):
         if not a:
             raise HTTPException(404, "alerta não encontrado")
         return _ep(a) | {"historico": alertas.historico_do(s, alerta_id)}
+
+
+@router.get("/alertas/{alerta_id}/proposta")
+def proposta_alerta(alerta_id: int):
+    """Dieta proposta pelo aviso (decidida pela regra): a tela da dieta já abre com ela para conferir e salvar."""
+    with sessao() as s:
+        a = s.get(AlertaDB, alerta_id)
+        if not a:
+            raise HTTPException(404, "alerta não encontrado")
+        return services.proposta_ajuste(s, a)
 
 
 @router.post("/alertas/{alerta_id}/aceitar")

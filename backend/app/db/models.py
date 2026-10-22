@@ -190,6 +190,8 @@ class AlertaDB(SQLModel, table=True):
     resolucao: str | None = None
     sessao_id: int | None = None
     contexto: list = Field(default_factory=list, sa_column=Column(JSON))   # fatos de entrada que sustentaram o alerta
+    ajuste: dict | None = Field(default=None, sa_column=Column(JSON))     # proposta de dieta da regra (oferta, proteína)
+    resolucao_produtor: str | None = None
 
 
 class HistoricoAlerta(SQLModel, table=True):
@@ -201,6 +203,7 @@ class HistoricoAlerta(SQLModel, table=True):
     tipo: str
     descricao: str = ""
     automatico: bool = True               # False = ação do usuário
+    descricao_produtor: str | None = None  # a mesma passagem em linguagem do produtor (vazio = usar a técnica)
     ref: dict | None = Field(default=None, sa_column=Column(JSON))   # ex.: {"dieta_id": 7} ou {"evento_id": 3}
 
 

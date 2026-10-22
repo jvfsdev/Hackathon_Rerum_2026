@@ -222,3 +222,23 @@ def test_regras_de_previsao_da_fazenda():
     res = Motor(KB, ["previsao"]).executar(services.memoria(
         {"prev.dias": 30, "prev.fazenda.variacao_receita_pct": -22.0, "prev.fazenda.margem_total": -100.0}, origem="sistema"))
     assert {a.regra for a in res.alertas} == {"PRV-10", "PRV-11"}
+
+
+def test_todo_fato_que_aparece_na_tela_tem_nome_para_o_produtor():
+    """A visão do produtor nunca mostra nome interno (ex.: mon.bonificacao_perda_rs_mes): todo fato citado ou concluído
+    pelas regras, perguntado ou produzido pelo monitor/serviços tem rótulo em ROTULOS_PRODUTOR (frontend/src/api.ts)."""
+    import re
+    from pathlib import Path
+    from app.engine.rules_loader import fatos_concluidos, fatos_requeridos
+    raiz = Path(__file__).resolve().parents[1]
+    ts = (raiz.parent / "frontend" / "src" / "api.ts").read_text(encoding="utf-8")
+    bloco = ts[ts.index("ROTULOS_PRODUTOR"):]
+    bloco = bloco[:bloco.index("\n}\n")]
+    rotulados = set(re.findall(r"'([a-z_]+(?:\.[\w.]+)?)'\s*:", bloco))
+    fatos = set(KB.perguntas)
+    for r in KB.regras:
+        fatos |= set(fatos_requeridos(r)) | set(fatos_concluidos(r))
+    for arq in ("app/monitor/fatos.py", "app/services.py", "app/previsao.py", "app/estoque.py"):
+        fatos |= set(re.findall(r'["\']((?:mon|laudo|prev|estoque|lote|exig|ver|dieta|meta|perfil|clima)\.[a-z_][\w.]*)["\']',
+                                (raiz / arq).read_text(encoding="utf-8")))
+    assert sorted(f for f in fatos if f not in rotulados) == []

@@ -82,6 +82,23 @@ Agente usado: **Claude Code** (Anthropic), no VS Code. A IA ajudou a pesquisar, 
     fora da literatura (5 → 7 dias; 1,0 → 0,5 kg/dia), uma afirmação errada sobre a IN 77 (CCS não suspende a coleta) e
     incoerências do seed (dietas sem energia para o leite produzido, NUL subindo com proteína em falta). Base 1.7.0.
 
+18. **Testes finais com o sistema na mão (22/10).** O time usou o sistema como produtor, no computador e no celular, e
+    trouxe problemas concretos; o agente procurou a causa de cada um em vez do remendo:
+    - nomes internos de fatos (`mon.bonificacao_perda_rs_mes`) na visão do produtor: faltavam 127 rótulos; agora um teste
+      lê o frontend e exige nome para todo fato, e o histórico/resolução ganharam texto do produtor;
+    - "registrar a ação" do cocho vazio não ajustava a dieta: os avisos passaram a carregar uma proposta decidida pela
+      regra (oferta ± x%, proteína − x p.p.), que não desfaz troca de dieta em andamento. O agente pegou um erro na
+      própria primeira versão (a proposta de "baixar proteína" subia a ureia quando a PB já estava no mínimo) e cobrou
+      no teste que a proposta nunca suba a proteína;
+    - a proposta de +5% gerava "comida demais" e a dieta acusava "falta energia": a causa comum era a equação de consumo
+      vencendo a medição (cocho vazio). Regra nova EXG-01V: o consumo observado é o piso (base 1.9.0);
+    - gráfico "item por item" com todos os traços na mesma posição (era razão normalizada): cada linha ganhou escala;
+    - movimentação de vacas era só texto: agora atualiza o cadastro dos lotes;
+    - fila do celular presa após reinícios da API: reenvio ganhou prazo e a faixa mostra o que está guardado;
+    - texto afirmando que "a entrega leva uns 5 dias" (escolha de engenharia, sem fonte): reescrito como prazo configurado;
+    - a Base de conhecimento passou a aparecer só na visão técnica.
+    Junto, o agente gerou um guia de estudo do sistema inteiro (artefato) para a preparação da apresentação.
+
 ## O que os testes pegaram
 
 - Casos que o agente escreveu com expectativa errada: perda por CCS interpolada linearmente em vez de em escala logarítmica, e soma da MS da dieta. Foi corrigida a expectativa, não o código, e o motivo ficou registrado.
@@ -94,6 +111,10 @@ Agente usado: **Claude Code** (Anthropic), no VS Code. A IA ajudou a pesquisar, 
   verificação sem a restrição correspondente no PL faz o teste falhar. A DCAD do pré-parto tem teste próprio
   (`test_dcad.py`) que formula com sal aniônico e exige o parecer "adequada".
 - Mudanças de API em bibliotecas novas (PuLP 4 sem solver embutido, SQLModel exigindo fuso horário, Tailwind 4), documentadas no CLAUDE.md.
+- O teste de rótulos do produtor pegou na hora os dois fatos novos da regra EXG-01V sem nome na tela.
+- O teste da proposta de proteína exige que ela nunca suba a PB: foi assim que a primeira versão (que subia a ureia) foi barrada.
+- O teste da proposta de cocho falhou pelo motivo certo num lote sem leitura de cocho vazio: sem a evidência, +5% de fato
+  passa do consumo previsto, e a proposta corrige isso. O teste foi separado em dois cenários (com e sem a evidência).
 
 ## Prompts principais (resumo)
 
@@ -109,6 +130,8 @@ Agente usado: **Claude Code** (Anthropic), no VS Code. A IA ajudou a pesquisar, 
 - "Sem implementar nada ainda, sugira ideias de coisas novas… implemente 1, 2, 5, 6, 7, 8, 9 e 10; o sistema está muito técnico, o fazendeiro precisa de linguagem clara." (etapa 16)
 - "Analise novamente, veja se cumprimos os requisitos da Hackathon e se o sistema está correto e completo." (etapa 15)
 - "Designe um exército de subagentes para verificar cada valor do sistema, incluindo do seed; nenhum valor pode ser inventado." (etapa 17)
+- "No cocho 3, quando aperto para registrar ação do cocho vazio, ele aumenta a dieta que está ruim e ainda fala que está dando mais comida que o lote consegue comer; seria bom juntar esses avisos de dieta." (etapa 18)
+- "De onde tirou que a entrega leva uns 5 dias?" (etapa 18)
 
 ## O que aprendemos com o processo
 

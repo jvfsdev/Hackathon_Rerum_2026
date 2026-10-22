@@ -37,10 +37,12 @@ class Alerta:
     problema: str = ""               # chave do problema: regras que medem o mesmo problema em graus diferentes
     status: str = "ativo"            # ativo | suprimido
     nota: str | None = None
+    ajuste: dict = field(default_factory=dict)   # proposta de mudança na dieta decidida pela regra (ex.: oferta +5%)
     extra: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {"regra": self.regra, "nivel": self.nivel, "titulo": self.titulo, "causa": self.causa,
                 "acao": self.acao, "categoria": self.categoria, "cf": round(self.cf, 3), "fonte": self.fonte,
                 "forca": self.forca, "problema": self.problema, "titulo_produtor": self.titulo_produtor,
-                "causa_produtor": self.causa_produtor, "acao_produtor": self.acao_produtor, "status": self.status, "nota": self.nota, **self.extra}
+                "causa_produtor": self.causa_produtor, "acao_produtor": self.acao_produtor, "status": self.status, "nota": self.nota,
+                **({"ajuste": self.ajuste} if self.ajuste else {}), **self.extra}

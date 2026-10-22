@@ -15,10 +15,10 @@
         problema: estoque_baixo
         titulo: "Estoque de {estoque.item_nome} para {estoque.dias_restantes:.0f} dia(s)"
         causa: "Saldo estimado de {estoque.saldo_texto}; consumo das dietas de {estoque.consumo_texto} por dia."
-        acao: "Comprar já: o prazo de entrega é de {@params.estoque_prazo_compra} dias."
+        acao: "Comprar já: o prazo de entrega configurado é de {@params.estoque_prazo_compra} dias (ajuste ao seu fornecedor na base)."
         titulo_produtor: "{estoque.item_nome} acaba em {estoque.dias_restantes:.0f} dia(s)"
         causa_produtor: "Tem cerca de {estoque.saldo_texto} e os lotes usam {estoque.consumo_texto} por dia."
-        acao_produtor: "Compre hoje: a entrega leva uns {@params.estoque_prazo_compra} dias."
+        acao_produtor: "Compre hoje. O sistema está contando {@params.estoque_prazo_compra} dias para a entrega; se o seu fornecedor demora mais ou menos, peça para o técnico ajustar."
   fonte: "Escolha de engenharia (prazo de compra)"
   forca: D
 

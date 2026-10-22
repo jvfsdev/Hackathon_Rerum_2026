@@ -15,7 +15,7 @@ Tudo roda em localhost. O motor de inferência é o único componente que decide
         │          │  ▲                                                                   │
         │          ▼  │                                                                   │
         │   MOTOR DE INFERÊNCIA ── lê ──▶ BASE DE CONHECIMENTO (YAML, versionada)         │
-        │   match → conflito → disparo     172 regras · 163 parâmetros · 13 alimentos     │
+        │   match → conflito → disparo     173 regras · 165 parâmetros · 13 alimentos     │
         │   forward + backward + CF        perguntas · versão + changelog                 │
         │          │                                                                      │
         │          ├── chama ──▶ calc/ (CMS, ELl, PM, ITU, curva, DCAD, R$, bonificação)  │
@@ -38,13 +38,13 @@ Tudo roda em localhost. O motor de inferência é o único componente que decide
 ## Fluxo
 
 1. **Classificação (A · CLS):** fatos brutos (DEL, estado, grupo genético, sistema, ITU) → fato derivado `perfil.*` (fase, equação de consumo, gestação, crescimento, pastejo, estresse térmico).
-2. **Exigências (B · EXG):** CMS (NRC 2001, NASEM 2021 com ECC ou BR-Leite conforme o grupo; teto pela fibra), ELl = mantença + leite + gestação + crescimento + atividade ± ECC, PB alvo e metas de fibra/FDND/CNF/gordura/ureia/DCAD.
+2. **Exigências (B · EXG):** CMS (NRC 2001, NASEM 2021 com ECC ou BR-Leite conforme o grupo; teto pela fibra; com cocho vazio, o consumo observado é o piso — EXG-01V), ELl = mantença + leite + gestação + crescimento + atividade ± ECC, PB alvo e metas de fibra/FDND/CNF/gordura/ureia/DCAD.
 3. **Verificação (C · VER):** composição da dieta (MN → MS, minerais e DCAD quando todos os itens têm Na/K/Cl/S), oferta × exigência, restrições, parecer (adequada / ajustar / bloqueada).
 4. **Formulação (F · FOR):** as regras montam as restrições do PL. O PuLP + HiGHS minimiza o custo com os preços da fazenda. Se for inviável, um diagnóstico relaxa grupos de restrições e as regras explicam o que falta. A dieta resultante volta para o módulo C.
 5. **Acompanhamento (D1–D3 · ACP):** cada registro diário/semanal/mensal vira fatos datados. O esperado vem da curva de lactação (Cobuci) × escala da fazenda − perda por ITU. Detectores com persistência (Shewhart, corrida, EWMA, queda de 7 dias) se combinam por CF e geram alertas com causa provável. Leitura de cocho diária por escore 1–5 (ou pesagem), MS da silagem, ECC, fezes, altura do pasto, laudo do laticínio (NUL, G:P, CCS, lactose, crioscopia), economia (custo de concentrado, IOFC, bonificação).
 6. **Meta-regras (M · META):**
    - "mastite primeiro" suprime os alertas de dieta;
-   - "calor explica" rebaixa os alertas de dieta motivados pela queda;
+   - "calor explica" rebaixa a informativo os alertas de dieta motivados pela queda (e a queda a atenção);
    - movimentação de vacas ou correção da MS suprime os alertas de queda por 48 h.
 
 ## Garantias verificadas por teste
@@ -61,6 +61,11 @@ Tudo roda em localhost. O motor de inferência é o único componente que decide
 - **Validação estática da base:** o carregamento falha com operador, função, argumento, ação, nível ou fato
   desconhecido, inclusive dentro dos textos de alerta.
 - **Acompanhamento:** um dia isolado nunca vira queda sustentada; registro retroativo reprocessa os dias seguintes.
+- **Linguagem do produtor:** todo alerta tem os três textos do produtor e todo fato que pode aparecer na tela tem nome
+  para o produtor (`ROTULOS_PRODUTOR`); o teste lê o frontend e falha se faltar algum.
+- **Propostas dos avisos:** a de cocho passa na verificação sem "oferta acima do consumo"; a de proteína nunca sobe a PB.
+- **Fila offline:** 9 cenários (`npm run test:fila`): ordem, recusas guardadas, uma sincronização por vez, prazo para
+  reenvio sem resposta, descarte.
 
 ## Alertas e ações (`backend/app/alertas.py`)
 
@@ -78,6 +83,11 @@ chave `problema`: viram um alerta só (o mais grave, citando os demais) e um ún
 - **Expirado:** se o laudo que sustentava o alerta vence sem um novo, o episódio é encerrado como "expirado".
 - Os alertas da verificação da **dieta ativa** também são episódios, resolvidos quando uma nova versão passa na regra.
 - Reprocessar dias desfaz só o que é automático; ações do usuário nunca são apagadas.
+- **Proposta de dieta:** a regra pode declarar `ajuste` no alerta (`oferta` ± x% ou `proteina` − x p.p.). Ao aceitar, a tela
+  da dieta abre com a proposta (`GET /alertas/{id}/proposta`, `services.proposta_ajuste`). A de cocho junta os avisos da
+  dieta: se a dieta com a nova oferta ainda tem problema, aplica o ajuste mínimo do PL por cima. Ajuste de oferta no meio
+  de uma troca gradual escala os dias que faltam; outra mudança replaneja a troca a partir da mistura do dia.
+- Cada passo do histórico e a resolução têm também texto do produtor (`descricao_produtor`, `resolucao_produtor`).
 
 ## Motor de inferência (`backend/app/engine/`)
 
@@ -109,12 +119,13 @@ chave `problema`: viram um alerta só (o mais grave, citando os demais) e um ún
 | Tela | O que faz |
 |---|---|
 | Painel | Cards por lote (leite × esperado, custo, alerta mais grave) e avisos do dia com aceitar/recusar. |
-| Lote | Abas: perfil e exigências ("como?"), dieta (verificar, sugerir custo mínimo, editor, versões, Pearson), acompanhamento (gráfico observado × esperado com eventos), registro (diário/semanal/mensal com escalas descritas, importação CSV), alertas e histórico. |
+| Lote | Abas: resumo/perfil e exigências ("como?", oferta × exigência com a escala de cada item), dieta (verificar, sugerir custo mínimo, ajuste mínimo, proposta do aviso, editor, versões, Pearson), simular, trato, previsão, acompanhamento (gráfico observado × esperado com eventos e linhas de referência da base), registro (diário/semanal/mensal com escalas descritas, eventos — movimentação atualiza o nº de vacas —, importação CSV), alertas e histórico. |
 | Novo lote | Cadastro; também pode vir preenchido pela consulta guiada. |
 | Consulta guiada | Encadeamento regressivo: pergunta só o que falta, com "por que estou perguntando?" e memória de trabalho visível. |
 | Insumos e preços | Preços da fazenda, insumos próprios com composição, bonificação, preços de referência com fonte. |
-| Base de conhecimento | Regras, parâmetros (editáveis no modo especialista), changelog e "rodar casos de teste". |
-| Modo campo (`/campo`) | Celular: registro rápido, clima automático, avisos; sem conexão, guarda numa fila e envia quando a API volta. |
+| Base de conhecimento | Só na visão técnica. Regras, parâmetros (editáveis no modo especialista), revisão pelo uso, changelog e "rodar casos de teste". |
+| Modo campo (`/campo`) | Celular: registro rápido, clima automático, avisos, trato; sem conexão, guarda numa fila e envia quando a API volta (mostra o que está guardado, com descartar). |
+| Estoque · Relatório | Saldo e dias até acabar com registro de contagem/compra · relatório semanal para imprimir/PDF. |
 
 ## Recursos de decisão e operação (v1.5)
 
@@ -133,11 +144,21 @@ chave `problema`: viram um alerta só (o mais grave, citando os demais) e um ún
   datas de gestação; custo pela dieta do dia. Regras PRV decidem os avisos. Rotas `/lotes/{id}/previsao`, `/fazendas/{id}/previsao`.
 - **Relatório semanal** (`app/relatorio.py`): produção, custo, sobra, avisos, ações e próximos passos por lote.
 
+## Recursos dos testes finais (v1.8–1.9)
+
+- **Avisos com proposta de dieta** e **junção dos avisos da dieta** (ver Alertas e ações).
+- **Medição vence a previsão (EXG-01V):** `services.fatos_lote(..., s)` acrescenta `mon.dias_cocho_vazio` e
+  `mon.ms_ofertada_cocho` (a leitura da manhã mostra o trato da véspera); com cocho vazio em 2+ leituras, o CMS tem como
+  piso essa MS × (1 + `sobras_ajuste_pct`). Antes, a equação menor gerava "falta energia" e "comida demais" ao mesmo tempo.
+- **Movimentação de vacas:** evento com `vacas` (+/−) e `outro_lote_id` atualiza o cadastro dos dois lotes.
+- **Base só na visão técnica**; nomes de fatos e textos do histórico sempre na linguagem da visão.
+- **Fila offline com prazo** (30 s) e lista do que está guardado.
+
 ## API
 
 Documentação interativa em `http://localhost:8000/docs`. Grupos de rotas:
 `/fazendas` (painel, preços, insumos, bonificação), `/lotes` (CRUD, dietas, registros, eventos, série, importação),
-`/alertas` e `/historico`, `/inferencia` (avaliar, formular, acompanhar, consulta guiada, sessões, como, por quê),
+`/alertas` (inclui `/alertas/{id}/proposta`) e `/historico`, `/inferencia` (avaliar, formular, acompanhar, consulta guiada, sessões, como, por quê),
 `/kb` (regras, parâmetros, perguntas, testes, revisão), `/lotes/{id}/trato`, `/fazendas/{id}/estoque`, `/fazendas/{id}/relatorio`,
 `/inferencia/lotes/{id}/ajuste|sensibilidade|simular`, `/referencias`, `/clima/{fazenda}`, `/ferramentas/pearson`.
 

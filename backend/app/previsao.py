@@ -53,7 +53,7 @@ def projetar_lote(s: Session, lote: Lote, dias: int = 30, hoje: date | None = No
     h = services.historico(s, lote.id)
     cat = services.catalogo(s, lote.fazenda_id)
     precos = services.precos_fazenda(s, lote.fazenda_id)
-    fatos = services.fatos_lote(lote, hoje, h)
+    fatos = services.fatos_lote(lote, hoje, h, s)
     vacas = services.vacas_em(h, lote, hoje)
     itu_futuro = itu_futuro or {}
     limiar, perda = parametros_itu(lote, p)

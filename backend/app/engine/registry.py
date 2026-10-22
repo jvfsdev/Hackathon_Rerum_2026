@@ -45,7 +45,8 @@ FUNCOES = {
     "metas_altura": _metas_altura,
     "cms_nasem2021": lambda pv, leite, gordura, proteina, ecc, del_, fracao_primiparas, lactose=None:
         intake.cms_nasem2021(pv, leite, gordura, proteina, ecc, del_, 1 - fracao_primiparas, lactose),
-    "cms_final": lambda equacao, ajuste=0.0, teto=None: intake.cms_final(equacao, ajuste, teto),
+    "cms_final": lambda equacao, ajuste=0.0, teto=None, observado=None: intake.cms_final(equacao, ajuste, teto, observado),
+    "aumentar_pct": lambda valor, pct: valor * (1 + pct / 100),
     "ecm": lambda leite, gordura, proteina: conversions.ecm(leite, gordura, proteina),
     "pct": lambda parte, total: 100 * parte / total if total else None,
     "mantenca": lambda pv, k: energy.mantenca(pv, k),

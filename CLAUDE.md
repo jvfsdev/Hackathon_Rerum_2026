@@ -66,7 +66,8 @@ cd frontend && npm install && npm run dev   # UI em :5173  (npm run dev:rede par
 - **Preços de referência** vêm de fontes públicas (`app/referencias/fontes.py`: Cepea milho e leite MG, Deral-PR/IPEADATA farelo de soja), coletados 1x/dia pelo agendador (desligue com `LEITE_SEM_COLETA=1`). Falha de fonte nunca apaga valor; valor implausível é descartado. Cepea é CC BY-NC 4.0: sempre exibir "Fonte: Cepea/Esalq-USP". Itens sem fonte pública ficam com o valor de demonstração de `foods.yaml`.
 - **Modo campo** (`frontend/src/pages/Campo.tsx`, rota `/campo`): registro rápido + avisos para o celular; no celular a página inicial redireciona para ele. Sem conexão, registros/eventos vão para a fila `campo_fila` no localStorage e são reenviados em ordem quando a API volta (evento `online` e a cada 60 s). "Sem conexão" = falha de fetch ou 5xx sem corpo (`ErroApi.semConexao`).
 - **Fila offline** (`frontend/src/lib/fila.ts`): ordem garantida, para no primeiro item sem conexão, recusa do servidor
-  vai para "recusados" (nunca some), uma sincronização por vez. Mudou a fila? Rode `npm run test:fila` (7 cenários).
+  vai para "recusados" (nunca some), uma sincronização por vez, reenvio sem resposta em 30 s conta como sem conexão (não trava). O banner mostra o que está
+  guardado, com "descartar". Mudou a fila? Rode `npm run test:fila` (9 cenários).
 - **Datas no front:** nunca `toISOString().slice(0, 10)` (é UTC: às 21h em Brasília já é amanhã). Use `hojeLocal()`,
   `diasAtras()` e `somarDias()` de `src/api.ts`.
 - **Registro diário:** valores validados pelas mesmas faixas da importação (`importacao.FAIXAS`, `problema_valor`) e
@@ -78,7 +79,17 @@ cd frontend && npm install && npm run dev   # UI em :5173  (npm run dev:rede par
 - Preço em `foods.yaml` é só **referência de demonstração**. O preço que vale é o da fazenda (`PrecoAlimento`, histórico com data e fonte; vigente = mais recente), aplicado por `services.alimento_com_preco` na verificação, na formulação e no painel. Nunca leia `preco_kg_mn` direto da base num fluxo de fazenda.
 - **Linguagem do produtor:** todo alerta novo traz `titulo_produtor`, `causa_produtor` e `acao_produtor` (sem jargão; números
   saem com vírgula). A interface tem "visão do produtor" (padrão: sem IDs de regra, CF ou traço) e "visão técnica" (`?visao=tecnico`).
-  `tests/test_novidades.py` falha se um alerta ficar sem texto do produtor.
+  `tests/test_novidades.py` falha se um alerta ficar sem texto do produtor ou se algum fato (regras, perguntas, monitor)
+  ficar sem nome em `ROTULOS_PRODUTOR` (`frontend/src/api.ts`). O histórico do alerta e a resolução também têm versão do
+  produtor (`descricao_produtor`, `resolucao_produtor`). A Base de conhecimento só aparece na visão técnica.
+- **Aviso com proposta de dieta:** a regra pode pôr `ajuste: {tipo: oferta, pct: "@params.x"}` ou `{tipo: proteina, pp: ...}`
+  no alerta; `services.proposta_ajuste` monta a dieta e a tela da dieta abre com ela ao aceitar. Ajuste de oferta no meio de
+  uma troca gradual escala os dias que faltam (`services.escalar_transicao`); outra mudança parte da mistura do dia.
+  O aviso de cocho junta os avisos da dieta: se a dieta com a nova oferta ainda tem problema, entra o ajuste mínimo por cima.
+- **Medição vence a previsão:** cocho vazio (`mon.dias_cocho_vazio`, `mon.ms_ofertada_cocho`, calculados em
+  `services.fatos_lote` quando recebe a sessão) vira piso do consumo (EXG-01V). Fluxos com sessão passam `s` para `fatos_lote`.
+- **Movimentação de vacas:** evento `movimentacao` com `vacas` (+ entrada, − saída) e `outro_lote_id` atualiza o nº de vacas
+  do cadastro dos dois lotes.
 - Módulos T (transição, `rules/transicao.yaml`) e E (estoque, `rules/estoque.yaml`) rodam fora do acompanhamento: a transição ao
   salvar uma dieta nova (`services.planejar_transicao`), o estoque em `app/estoque.py`. Durante a troca, o que vai no cocho é
   `services.itens_do_dia` (trato e estoque usam isso).

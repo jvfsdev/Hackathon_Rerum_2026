@@ -4,7 +4,7 @@ Hackathon UFJF 2026 (XXVIII Semana da Computação · RERUM), **Tema T2 — Diet
 
 Orienta e acompanha **lotes** de vacas leiteiras: classifica o lote, calcula exigências, verifica a dieta, sugere a dieta de **custo mínimo** e acompanha o dia a dia (produção × curva esperada, cocho, silagem, ECC, laudo do laticínio). Os alertas vêm com causa provável, ação sugerida e explicação **"por quê?/como?"**.
 
-Quem decide é a **base de conhecimento (172 regras de produção com fator de certeza)** + **motor de inferência próprio** (encadeamento progressivo e regressivo, resolução de conflito, CF estilo MYCIN). Não há LLM no sistema: as decisões são determinísticas e auditáveis.
+Quem decide é a **base de conhecimento (173 regras de produção com fator de certeza)** + **motor de inferência próprio** (encadeamento progressivo e regressivo, resolução de conflito, CF estilo MYCIN). Não há LLM no sistema: as decisões são determinísticas e auditáveis.
 
 ## Rodar (localhost)
 
@@ -25,7 +25,7 @@ npm run dev                                 # http://localhost:5173
 
 No celular (mesma rede Wi-Fi): `npm run dev:rede` e abra `http://<ip-do-computador>:5173` — a página inicial vira o **modo campo** (registro rápido + avisos, funciona sem conexão e envia depois).
 
-Testes: `cd backend && .venv/bin/pytest -q`, com 471 testes, entre eles 36 casos de resultado conhecido em `backend/tests/cases.yaml` (os mesmos rodam na tela **Base de conhecimento**).
+Testes: `cd backend && .venv/bin/pytest -q`, com 479 testes, entre eles 37 casos de resultado conhecido em `backend/tests/cases.yaml` (os mesmos rodam na tela **Base de conhecimento**).
 
 Sem internet o sistema funciona por completo: o clima passa a ser digitado e os preços de referência ficam no último valor coletado. Para desligar a coleta diária de preços: `LEITE_SEM_COLETA=1`. Documentação interativa da API: `http://localhost:8000/docs`.
 
@@ -34,10 +34,13 @@ Sem internet o sistema funciona por completo: o clima passa a ser digitado e os 
 - **Lotes:** cadastro (ou a partir da consulta guiada), perfil e exigências com "como?".
 - **Dieta:** verificação com parecer e CF, sugestão de custo mínimo (PL) verificada pelas mesmas regras, editor, versões e restauração, quadrado de Pearson, DCAD no pré-parto.
 - **Acompanhamento:** produção × curva esperada com eventos no gráfico, cocho diário por escore 1–5, MS da silagem, ECC e fezes com escalas descritas, laudo do laticínio, economia (custo de concentrado, IOFC, bonificação), importação CSV.
-- **Alertas:** causa provável, ação sugerida, aceitar (leva à tela da ação) ou recusar com motivo, resolução automática explicada e histórico.
+- **Alertas:** causa provável, ação sugerida, aceitar (leva à tela da ação) ou recusar com motivo, resolução automática explicada e histórico (também em linguagem do produtor).
+- **Avisos que já propõem a dieta:** cocho vazio ou sobras fora da faixa propõem mais ou menos trato (+5% / ±2,5%), e ureia do leite alta propõe a menor mudança que baixa a proteína sem faltar para o lote. A proposta junta os avisos da dieta numa mudança só e não desfaz uma troca de dieta em andamento.
+- **Medição vence a previsão:** com cocho vazio, o consumo medido passa a valer no lugar da equação (sem avisos contraditórios de "falta energia" e "comida demais").
 - **Insumos e preços:** preços por fazenda com histórico, insumos próprios com composição, preços de referência diários (Cepea, IPEADATA).
-- **Base de conhecimento:** regras, parâmetros editáveis (sobe a versão e roda os casos), changelog.
-- **Modo campo** no celular: registro rápido, clima automático, avisos e checklist do trato, com fila offline.
+- **Base de conhecimento** (só na visão técnica): regras, parâmetros editáveis (sobe a versão e roda os casos), changelog, revisão pelo uso.
+- **Modo campo** no celular: registro rápido, clima automático, avisos e checklist do trato, com fila offline (ordem garantida, não trava sem resposta, mostra o que está guardado).
+- **Movimentação de vacas:** o evento informa quantas entraram ou saíram (e de/para qual lote) e atualiza o cadastro dos lotes.
 - **Visão do produtor × visão técnica:** o produtor vê avisos em linguagem de fazenda; o técnico vê regras, CF e traço.
 - **"O que precisaria mudar?"** em cada aviso (explicação contrafactual) e **menor mudança na dieta** que a corrige.
 - **Simulador "e se?"**: mais/menos concentrado, troca de volumoso, preços e meta de leite → custo, leite que a comida sustenta e sobra por vaca.
@@ -54,7 +57,7 @@ Sem internet o sistema funciona por completo: o clima passa a ser digitado e os 
 | Motor de inferência | `backend/app/engine/` |
 | Memória de trabalho | `backend/app/engine/working_memory.py` |
 | Módulo de explicação | `backend/app/engine/explain.py` + gavetas "Como?" / "Por que este alerta?" na UI |
-| Aquisição de conhecimento | Tela **Base de conhecimento** (modo especialista) + edição dos YAML |
+| Aquisição de conhecimento | Tela **Base de conhecimento** (visão técnica, modo especialista) + revisão pelo uso + edição dos YAML |
 | Interface | `frontend/` (React) |
 | Fontes externas | Open-Meteo (clima → ITU), Cepea e IPEADATA (preços), CQBAL 4.0 (composição dos alimentos), CSV do controle leiteiro/laudo |
 

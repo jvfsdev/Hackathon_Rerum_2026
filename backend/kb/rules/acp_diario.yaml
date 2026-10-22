@@ -346,14 +346,15 @@
   entao:
     - alerta:
         problema: cocho_baixo
+        ajuste: {tipo: oferta, pct: "@params.sobras_ajuste_leve_pct"}
         nivel: atencao
         categoria: cocho
         titulo: "Sobras baixas: {mon.sobras_texto}; meta {meta.sobras.min:.0f}–{meta.sobras.max:.0f}% (escore 3)"
         causa: "O lote está comendo tudo; o consumo pode estar limitado pela oferta."
-        acao: "Aumentar a oferta em 2–3% e esperar {@params.sobras_dias} dias antes de novo ajuste."
+        acao: "Aumentar a oferta em ~{@params.sobras_ajuste_leve_pct}% e esperar {@params.sobras_dias} dias antes de novo ajuste."
         titulo_produtor: "As vacas estão limpando o cocho: {mon.sobras_texto}"
         causa_produtor: "O lote come tudo; pode estar faltando comida."
-        acao_produtor: "Aumente o trato em 2–3% e espere {@params.sobras_dias} dias antes de mexer de novo."
+        acao_produtor: "Aumente o trato em uns {@params.sobras_ajuste_leve_pct}% e espere {@params.sobras_dias} dias antes de mexer de novo."
   fonte: "Inferências (adaptado de eXtension; ajustar só após 3 dias fora da meta)"
   forca: C
 
@@ -368,14 +369,15 @@
   entao:
     - alerta:
         problema: cocho_alto
+        ajuste: {tipo: oferta, pct: "@params.sobras_ajuste_leve_pct", sentido: -1}
         nivel: atencao
         categoria: cocho
         titulo: "Sobras altas: {mon.sobras_texto}; meta {meta.sobras.min:.0f}–{meta.sobras.max:.0f}% (escore 3)"
         causa: "Oferta acima do consumo, rejeição ou seleção da dieta."
-        acao: "Reduzir a oferta em 2–3% e observar se sobra a parte grossa (seleção)."
+        acao: "Reduzir a oferta em ~{@params.sobras_ajuste_leve_pct}% e observar se sobra a parte grossa (seleção)."
         titulo_produtor: "Está sobrando muita comida no cocho: {mon.sobras_texto}"
         causa_produtor: "A oferta está maior que o consumo, ou as vacas estão escolhendo o que comem."
-        acao_produtor: "Diminua o trato em 2–3% e veja se sobra só a parte grossa."
+        acao_produtor: "Diminua o trato em uns {@params.sobras_ajuste_leve_pct}% e veja se sobra só a parte grossa."
   fonte: "Inferências (adaptado de eXtension); Dossiê ACP-07"
   forca: C
 
@@ -391,6 +393,7 @@
   entao:
     - alerta:
         problema: cocho_baixo
+        ajuste: {tipo: oferta, pct: "@params.sobras_ajuste_pct"}
         nivel: critico
         categoria: cocho
         titulo: "Cocho vazio há {mon.dias_cocho_vazio} leituras"
@@ -414,6 +417,7 @@
   entao:
     - alerta:
         problema: cocho_baixo
+        ajuste: {tipo: oferta, pct: "@params.sobras_ajuste_pct"}
         nivel: atencao
         categoria: cocho
         titulo: "Cocho vazio há {mon.dias_cocho_vazio} leituras"

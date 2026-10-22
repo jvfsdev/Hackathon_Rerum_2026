@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, dataBR, hora, mudou, paraCampo, NOME_INDICADOR, numero, peso, porDia, textoAlerta, valorIndicador, type Alerta, type Lote, type Registro, hojeLocal, diasAtras } from '../api'
-import { CHAVE_FILA, configurarFila, descartarRecusado, enviarOuGuardar, lerFila, lerJSON, gravarJSON, lerRecusados, reenviarRecusado, semConexao, sincronizarFila, type Pendente, type Recusado } from '../lib/fila'
+import { CHAVE_FILA, configurarFila, descartarPendente, descartarRecusado, enviarOuGuardar, lerFila, lerJSON, gravarJSON, lerRecusados, reenviarRecusado, semConexao, sincronizarFila, type Pendente, type Recusado } from '../lib/fila'
 import { EscalaEscore } from '../components/Escala'
 import { CampoLitros, type ModoLitros } from '../components/Litros'
 import { AlertaCorpo, BORDA_NIVEL, Brinco, Icone, NivelBadge } from '../components/ui'
@@ -59,7 +59,8 @@ function useFila() {
   }, [sincronizar, recarregar])
   const reenviar = (r: Recusado) => { reenviarRecusado(r.id); sincronizar() }
   const descartar = (r: Recusado) => { descartarRecusado(r.id); recarregar() }
-  return { fila, recusados, enviando, sincronizar, recarregar, reenviar, descartar }
+  const descartarGuardado = (p: Pendente) => { descartarPendente(p.id); recarregar() }
+  return { fila, recusados, enviando, sincronizar, recarregar, reenviar, descartar, descartarGuardado }
 }
 
 // ------------------------------------------------------------------ layout
@@ -88,9 +89,22 @@ export default function CampoPagina() {
         </div>
       </header>
       {fila.fila.length > 0 && (
-        <div className="flex items-center justify-between gap-2 border-b border-brinco/60 bg-brinco-claro px-4 py-2.5 text-sm text-stone-800">
-          <span>{fila.fila.length} registro(s) guardado(s) no aparelho, aguardando conexão.</span>
-          <button className="font-semibold underline" onClick={fila.sincronizar} disabled={fila.enviando}>{fila.enviando ? 'enviando…' : 'enviar agora'}</button>
+        <div className="border-b border-brinco/60 bg-brinco-claro px-4 py-2.5 text-sm text-stone-800">
+          <div className="flex items-center justify-between gap-2">
+            <span>{fila.fila.length} registro(s) guardado(s) no aparelho, aguardando conexão.</span>
+            <button className="font-semibold underline" onClick={fila.sincronizar} disabled={fila.enviando}>{fila.enviando ? 'enviando…' : 'enviar agora'}</button>
+          </div>
+          <details className="mt-1">
+            <summary className="cursor-pointer text-xs font-semibold text-stone-600">ver o que está guardado</summary>
+            {fila.fila.map((p) => (
+              <div key={p.id} className="mt-1.5 rounded-lg bg-white/70 p-2 text-xs">
+                <p className="font-medium text-stone-800">{p.descricao} <span className="font-normal text-stone-500">· guardado às {hora(p.criado)}</span></p>
+                <p className="text-stone-600">{Object.entries(p.corpo.valores ?? {}).map(([k, x]) => `${NOME_INDICADOR[k] ?? k} ${valorIndicador(k, x as number)}`).join(' · ') || p.corpo.descricao}</p>
+                <button className="mt-1 font-semibold text-stone-500 underline"
+                  onClick={() => window.confirm('Descartar este registro? Ele não será enviado.') && fila.descartarGuardado(p)}>descartar</button>
+              </div>
+            ))}
+          </details>
         </div>
       )}
       {fila.recusados.length > 0 && (
@@ -368,7 +382,7 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
                 className={`rounded-full border px-2.5 py-1 text-xs ${evento.tipo === k ? 'border-campo-600 bg-campo-600 text-white' : 'border-stone-300 bg-white text-stone-700'}`}>{r}</button>
             ))}
           </div>
-          <textarea className="input h-20" placeholder="O que foi feito (ex.: abri o silo 3; 5 vacas entraram do lote 2)" value={evento.descricao}
+          <textarea className="input h-20" placeholder="O que foi feito (ex.: abri o silo 3)" value={evento.descricao}
             onChange={(e) => setEvento({ ...evento, descricao: e.target.value })} />
         </section>
       )}

@@ -114,7 +114,7 @@ def gerar():
             Evento(lote_id=lotes[1].id, data_hora=quando(40), tipo="silo_novo", descricao="Silo 2 (milho, safrinha)"),
             Evento(lote_id=lotes[1].id, data_hora=quando(50, 7), tipo="correcao_ms", descricao="Silagem 36 → 43 kg MN"),
             Evento(lote_id=lotes[2].id, data_hora=quando(30), tipo="mudanca_concentrado", descricao="Concentrado 4,1 → 5,6 kg/vaca"),
-            Evento(lote_id=lotes[1].id, data_hora=quando(57, 7), tipo="movimentacao", descricao="Entrada de 5 vacas de outro retiro"),
+            Evento(lote_id=lotes[1].id, data_hora=quando(57, 7), tipo="movimentacao", descricao="Entrada de 5 vaca(s) de outro retiro (40 → 45)"),
             Evento(lote_id=lotes[2].id, data_hora=quando(57, 6), tipo="troca_volumoso", descricao="Sorgo → milho (transição gradual)"),
         ]
         for e in eventos:
@@ -246,6 +246,9 @@ def gerar():
                 if lote.estado != "lactacao" or (lote.del_ref + i) >= 1:
                     services.monitorar(s, lote, dia(i), historicos[n])
             acoes_do_dia(i)
+        lotes[1].n_vacas += 5                     # o cadastro acompanha a entrada das 5 vacas do dia 57
+        s.add(lotes[1])
+        s.commit()
         for lote in lotes.values():
             services.avaliar_lote(s, lote)        # alertas da dieta ativa
         # estoque: contagem no dia 52 e uma compra de milho no dia 55 (farelo de soja acabando)

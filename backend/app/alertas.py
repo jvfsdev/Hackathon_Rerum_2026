@@ -46,9 +46,9 @@ def _quando(d: date) -> datetime:
 
 
 def _historico(s: Session, alerta: AlertaDB, tipo: str, descricao: str, quando: datetime,
-               automatico: bool = True, ref: dict | None = None):
+               automatico: bool = True, ref: dict | None = None, produtor: str | None = None):
     s.add(HistoricoAlerta(alerta_id=alerta.id, lote_id=alerta.lote_id, data_hora=quando, tipo=tipo,
-                          descricao=descricao, automatico=automatico, ref=ref))
+                          descricao=descricao, automatico=automatico, ref=ref, descricao_produtor=produtor))
 
 
 # ------------------------------------------------------------------ contexto (o que sustentou o alerta)
@@ -106,26 +106,31 @@ def sincronizar(s: Session, kb: BaseConhecimento, lote_id: int, d: date, resulta
                           titulo=a.titulo, causa=a.causa, acao=a.acao, categoria=a.categoria, cf=a.cf, fonte=a.fonte,
                           forca=a.forca, suprimido=a.status == "suprimido", titulo_produtor=a.titulo_produtor,
                           causa_produtor=a.causa_produtor, acao_produtor=a.acao_produtor, nota=a.nota, aberto_em=d,
-                          ultima_ocorrencia=d, sessao_id=sessao_id, contexto=contexto)
+                          ultima_ocorrencia=d, sessao_id=sessao_id, contexto=contexto, ajuste=a.ajuste or None)
             s.add(ep)
             s.flush()
             base = "; ".join(f"{c['fato']} = {_fmt(c['valor'])}" for c in contexto)
-            _historico(s, ep, "aberto", f"{a.titulo}" + (f" ({base})" if base else ""), quando)
+            _historico(s, ep, "aberto", f"{a.titulo}" + (f" ({base})" if base else ""), quando,
+                       produtor=a.titulo_produtor or None)
             continue
         agravou = NIVEL[a.nivel] > NIVEL[ep.nivel]
         if agravou:
-            _historico(s, ep, "agravado", f"Nível {ep.nivel} → {a.nivel}: {a.titulo}", quando)
+            _historico(s, ep, "agravado", f"Nível {ep.nivel} → {a.nivel}: {a.titulo}", quando,
+                       produtor=f"Ficou mais sério: {a.titulo_produtor}" if a.titulo_produtor else None)
             ep.nivel = a.nivel
             if ep.estado == "recusado":
                 ep.estado, ep.estado_em = "aberto", d
-                _historico(s, ep, "reaberto", "Recusado anteriormente, mas o problema se agravou", quando)
+                _historico(s, ep, "reaberto", "Recusado anteriormente, mas o problema se agravou", quando,
+                           produtor="Você tinha recusado, mas o problema piorou: o aviso voltou")
         elif NIVEL[a.nivel] < NIVEL[ep.nivel] and ep.regra != regra:
-            _historico(s, ep, "atenuado", f"Nível {ep.nivel} → {a.nivel}: {a.titulo}", quando)
+            _historico(s, ep, "atenuado", f"Nível {ep.nivel} → {a.nivel}: {a.titulo}", quando,
+                       produtor=f"Melhorou um pouco: {a.titulo_produtor}" if a.titulo_produtor else None)
             ep.nivel = a.nivel
         ep.regra, ep.modulo = regra, modulo_de.get(regra, ep.modulo)
         ep.titulo, ep.causa, ep.acao, ep.cf = a.titulo, a.causa, a.acao, a.cf
         ep.titulo_produtor, ep.causa_produtor, ep.acao_produtor = a.titulo_produtor, a.causa_produtor, a.acao_produtor
         ep.suprimido, ep.nota = a.status == "suprimido", a.nota
+        ep.ajuste = a.ajuste or None
         ep.ultima_ocorrencia, ep.ocorrencias, ep.sessao_id = d, ep.ocorrencias + 1, sessao_id
         ep.contexto = contexto or ep.contexto
         s.add(ep)
@@ -155,17 +160,21 @@ def _encerrar(s: Session, ep: AlertaDB, d: date, atuais: dict, quando: datetime,
     if sem_dado:
         ep.estado = "expirado"
         texto = f"Sem dado atual para confirmar ({', '.join(sem_dado)}): o laudo que sustentava o alerta venceu."
+        produtor = "O laudo que mostrava o problema ficou velho. Mande o próximo laudo para o sistema confirmar."
     else:
         ep.estado = "resolvido"
         detalhes = mudou + [f"{f}: não se aplica mais" for f in sumiu]
         texto = "A condição deixou de valer" + (f" ({'; '.join(detalhes)})" if detalhes else "") + "."
+        produtor = "O problema não aparece mais" + (f" ({'; '.join(mudou)})" if mudou else "") + "."
     if causas:
         texto += " Mudanças no período: " + "; ".join(causas) + "."
+        produtor += " O que mudou nesse tempo: " + "; ".join(causas) + "."
     elif ep.estado == "resolvido":
         texto += " Nenhuma ação ou mudança registrada no período."
-    ep.estado_em, ep.resolucao = d, texto
+        produtor += " Ninguém registrou ação: o problema passou sozinho."
+    ep.estado_em, ep.resolucao, ep.resolucao_produtor = d, texto, produtor
     s.add(ep)
-    _historico(s, ep, ep.estado, texto, quando)
+    _historico(s, ep, ep.estado, texto, quando, produtor=produtor)
 
 
 def _mudancas_no_periodo(s: Session, ep: AlertaDB, d: date) -> list[str]:
@@ -211,6 +220,7 @@ def reverter_desde(s: Session, lote_id: int, d0: date) -> None:
             usuario = [h for h in restantes if not h.automatico and h.tipo in ("aceito", "recusado")]
             ep.estado = usuario[-1].tipo if usuario else "aberto"
             ep.estado_em, ep.resolucao = (usuario[-1].data_hora.date() if usuario else None), None
+            ep.resolucao_produtor = None
         if ep.ultima_ocorrencia >= d0:
             ep.ultima_ocorrencia = max(ep.aberto_em, d0 - timedelta(days=1))
         s.add(ep)
@@ -226,7 +236,8 @@ def aceitar(s: Session, ep: AlertaDB, observacao: str = "", quando: datetime | N
     ep.estado, ep.estado_em = "aceito", quando.date()
     s.add(ep)
     _historico(s, ep, "aceito", f"Recomendação aceita: {ep.acao.rstrip('.')}" + (f" — {observacao}" if observacao else "")
-               + f". Próximo passo: {ROTULO_DESTINO.get(rota, 'registrar a ação')}.", quando, automatico=False)
+               + f". Próximo passo: {ROTULO_DESTINO.get(rota, 'registrar a ação')}.", quando, automatico=False,
+               produtor=f"Você aceitou: {(ep.acao_produtor or ep.acao).rstrip('.')}" + (f" — {observacao}" if observacao else "") + ".")
     s.commit()
     return destino(ep)
 
@@ -239,7 +250,8 @@ def recusar(s: Session, ep: AlertaDB, motivo: str, quando: datetime | None = Non
     quando = quando or datetime.now()
     ep.estado, ep.estado_em = "recusado", quando.date()
     s.add(ep)
-    _historico(s, ep, "recusado", f"Recomendação recusada: {motivo.strip()}", quando, automatico=False)
+    _historico(s, ep, "recusado", f"Recomendação recusada: {motivo.strip()}", quando, automatico=False,
+               produtor=f"Você recusou: {motivo.strip()}")
     s.commit()
 
 
@@ -254,7 +266,8 @@ def registrar_acao(s: Session, alerta_id: int | None, lote_id: int, descricao: s
     quando = quando or datetime.now()
     if ep.estado == "aberto":       # registrou direto, sem passar pelo aceite: conta como aceite
         ep.estado, ep.estado_em = "aceito", quando.date()
-        _historico(s, ep, "aceito", "Recomendação aceita ao registrar a ação", quando, automatico=False)
+        _historico(s, ep, "aceito", "Recomendação aceita ao registrar a ação", quando, automatico=False,
+                   produtor="Você aceitou ao registrar o que foi feito")
     _historico(s, ep, "acao_registrada", descricao, quando, automatico=False, ref=ref)
     s.add(ep)
     s.commit()

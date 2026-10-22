@@ -36,11 +36,12 @@
   entao:
     - alerta:
         problema: nul_alto
+        ajuste: {tipo: proteina, pp: "@params.nul_reducao_pb_pp"}
         nivel: atencao
         categoria: dieta
         titulo: "NUL alto: {laudo.nul:.1f} mg/dL"
         causa: "Proteína degradável acima da energia fermentável: sobra amônia, vira ureia (desperdício)."
-        acao: "Reduzir ~1 p.p. de PB (≈ −2 mg/dL de NUL) ou aumentar energia fermentável (milho)."
+        acao: "Reduzir ~{@params.nul_reducao_pb_pp} p.p. de PB (≈ −2 mg/dL de NUL) ou aumentar energia fermentável (milho)."
         titulo_produtor: "Ureia do leite alta ({laudo.nul:.1f}): está sobrando proteína"
         causa_produtor: "Proteína a mais não vira leite: sai na urina e custa caro."
         acao_produtor: "Diminua um pouco o farelo de soja ou a ureia, ou aumente o milho."
@@ -58,6 +59,7 @@
   entao:
     - alerta:
         problema: nul_alto
+        ajuste: {tipo: proteina, pp: "@params.nul_reducao_pb_pp"}
         nivel: critico
         categoria: reproducao
         titulo: "NUL {laudo.nul:.1f} mg/dL: risco reprodutivo"
@@ -339,8 +341,8 @@
         titulo: "Bonificação: R$ {mon.bonificacao_rs_l:+.3f}/L hoje; deixando de ganhar ~R$ {mon.bonificacao_perda_rs_mes:.0f}/mês"
         causa: "Pela tabela do laticínio, a qualidade atual não está na melhor faixa: {mon.bonificacao_detalhe}."
         acao: "Priorizar o parâmetro com maior perda (CCS/CBT: rotina de ordenha e resfriamento; sólidos: dieta)."
-        titulo_produtor: "Bonificação de R$ {mon.bonificacao_rs_l:+.3f}/L: dá para ganhar ~R$ {mon.bonificacao_perda_rs_mes:.0f} a mais por mês"
-        causa_produtor: "A qualidade do leite não está na melhor faixa da tabela do laticínio ({mon.bonificacao_detalhe})."
+        titulo_produtor: "O laticínio pode pagar uns R$ {mon.bonificacao_perda_rs_mes:.0f} a mais por mês pelo leite deste lote"
+        causa_produtor: "O laticínio paga um extra por litro (bonificação) quando a CCS e a CBT estão baixas e a gordura e a proteína estão altas. Hoje: {mon.bonificacao_detalhe}."
         acao_produtor: "Comece pelo item que mais tira dinheiro (CCS e CBT: ordenha e resfriamento; sólidos: dieta)."
   fonte: "Tabela de bonificação do laticínio da fazenda; Dias et al. (Embrapa)"
   forca: B

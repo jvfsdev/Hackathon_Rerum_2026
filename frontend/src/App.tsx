@@ -38,14 +38,25 @@ export default function App() {
   )
 }
 
-const NAV: { to: string; nome: string; icone: string; end?: boolean }[] = [
+const NAV: { to: string; nome: string; icone: string; end?: boolean; soTecnico?: boolean }[] = [
   { to: '/', nome: 'Painel', icone: 'painel', end: true },
   { to: '/consulta', nome: 'Consulta guiada', icone: 'consulta' },
   { to: '/insumos', nome: 'Insumos e preços', icone: 'insumos' },
   { to: '/estoque', nome: 'Estoque', icone: 'estoque' },
   { to: '/relatorio', nome: 'Relatório', icone: 'relatorio' },
-  { to: '/base', nome: 'Base de conhecimento', icone: 'base' },
+  { to: '/base', nome: 'Base de conhecimento', icone: 'base', soTecnico: true },
 ]
+
+/** A base de conhecimento (regras, limiares, casos de teste) é área do técnico: some da visão do produtor. */
+function SoTecnico({ onTrocar }: { onTrocar: () => void }) {
+  return (
+    <div className="max-w-xl rounded-xl border border-stone-200 bg-white p-6">
+      <h1 className="titulo text-2xl font-semibold text-stone-900">Base de conhecimento</h1>
+      <p className="mt-2 text-stone-600">Aqui ficam as regras, os limites e os testes do sistema. É a área do técnico ou do zootecnista que cuida da fazenda: mexer nela muda as recomendações de todos os lotes.</p>
+      <button className="btn-primario mt-4" onClick={onTrocar}>Abrir na visão técnica</button>
+    </div>
+  )
+}
 
 /** Marca: o brinco amarelo com a letra C, ao lado do nome. */
 function Marca() {
@@ -90,7 +101,7 @@ function Completo({ modo, setModo }: { modo: Modo; setModo: (m: Modo) => void })
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-campo-900 px-4 py-5 lg:flex print:hidden">
         <Marca />
         <nav className="mt-8 flex flex-col gap-0.5" aria-label="Principal">
-          {NAV.map((n) => (
+          {NAV.filter((n) => !n.soTecnico || modo === 'tecnico').map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className={itemLateral}>
               <Icone nome={n.icone} className="h-[18px] w-[18px] opacity-80 group-hover:opacity-100" />{n.nome}
             </NavLink>
@@ -117,7 +128,7 @@ function Completo({ modo, setModo }: { modo: Modo; setModo: (m: Modo) => void })
           <SeletorModo modo={modo} setModo={setModo} compacto />
         </div>
         <nav className="flex overflow-x-auto px-2" aria-label="Principal">
-          {NAV.map((n) => <NavLink key={n.to} to={n.to} end={n.end} className={itemTopo}>{n.nome}</NavLink>)}
+          {NAV.filter((n) => !n.soTecnico || modo === 'tecnico').map((n) => <NavLink key={n.to} to={n.to} end={n.end} className={itemTopo}>{n.nome}</NavLink>)}
           <NavLink to="/campo" className={itemTopo}><Icone nome="celular" />Modo campo</NavLink>
         </nav>
       </header>
@@ -129,7 +140,7 @@ function Completo({ modo, setModo }: { modo: Modo; setModo: (m: Modo) => void })
             <Route path="/lotes/novo" element={<NovoLotePagina />} />
             <Route path="/lotes/:id/*" element={<LotePagina />} />
             <Route path="/consulta" element={<ConsultaPagina />} />
-            <Route path="/base" element={<BasePagina />} />
+            <Route path="/base" element={modo === 'tecnico' ? <BasePagina /> : <SoTecnico onTrocar={() => setModo('tecnico')} />} />
             <Route path="/insumos" element={<PrecosPagina />} />
             <Route path="/precos" element={<PrecosPagina />} />
             <Route path="/estoque" element={<EstoquePagina />} />

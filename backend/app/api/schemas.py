@@ -68,6 +68,8 @@ class EventoIn(BaseModel):
     tipo: str
     descricao: str = ""
     alerta_id: int | None = None
+    vacas: int | None = None          # movimentação: vacas que entraram (+) ou saíram (−); atualiza o cadastro do lote
+    outro_lote_id: int | None = None  # movimentação entre lotes: o outro lote recebe o movimento contrário
 
 
 class ConsultaIn(BaseModel):

@@ -92,4 +92,24 @@ await caso('envio direto recusado aparece como erro na hora (não entra na fila)
   assert.equal(F.lerFila().length, 0)
 })
 
+await caso('reenvio pendurado (sem resposta) não trava a fila: desiste no prazo e envia no ciclo seguinte', async () => {
+  const recebidos = []
+  F.configurarFila({ armazenamento: memoria(), prazoMs: 30, post: async () => { throw semRede() } })
+  await F.enviarOuGuardar('/x', { n: 1 }, '')
+  F.configurarFila({ post: () => new Promise(() => {}) })     // a requisição nunca responde
+  await F.sincronizarFila()
+  assert.deepEqual(F.lerFila().map((p) => p.corpo.n), [1])   // continua guardado, e a sincronização terminou
+  F.configurarFila({ post: async (c, b) => { recebidos.push(b.n) } })
+  await F.sincronizarFila()
+  assert.deepEqual(recebidos, [1])
+  assert.equal(F.lerFila().length, 0)
+})
+
+await caso('descartar um registro guardado tira só ele da fila', async () => {
+  F.configurarFila({ armazenamento: memoria(), post: async () => { throw semRede() } })
+  for (const n of [1, 2]) await F.enviarOuGuardar('/x', { n }, '')
+  F.descartarPendente(F.lerFila()[0].id)
+  assert.deepEqual(F.lerFila().map((p) => p.corpo.n), [2])
+})
+
 console.log(`\n${passou} casos da fila offline passaram`)

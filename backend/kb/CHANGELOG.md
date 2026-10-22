@@ -1,5 +1,26 @@
 # Histórico da base de conhecimento
 
+## 1.9.0 — 22/10/2026
+- **EXG-01V (nova): medição vence a previsão.** Cocho vazio em `@params.cocho_vazio_dias` leituras seguidas mostra que o lote
+  come tudo o que recebe: o consumo esperado passa a ter como piso a MS que estava no cocho × (1 + `@params.sobras_ajuste_pct`).
+  Antes, a equação (menor) limitava a energia consumida e gerava "déficit de energia" e "oferta acima do consumo" que
+  contradiziam o cocho vazio. `cms_final` ganhou o argumento `observado` (EXG-01E e EXG-01P). Caso N16.
+- **Aviso de cocho junta os avisos da dieta:** se a dieta com a nova oferta ainda tem problema, a proposta aplica por cima a
+  menor mudança que resolve tudo (ajuste mínimo do PL) e diz o que corrige.
+
+## 1.8.1 — 22/10/2026
+- EST-01: o texto não afirma mais que "a entrega leva uns 5 dias"; diz que é o prazo configurado (`@params.estoque_prazo_compra`,
+  escolha de engenharia sem fonte) e que deve ser ajustado ao fornecedor. Fontes de `estoque_dias_critico` e
+  `estoque_prazo_compra` deixam explícito que não há fonte publicada.
+
+## 1.8.0 — 22/10/2026
+- **Avisos com proposta de dieta:** o alerta pode declarar `ajuste` (decidido pela regra). Cocho vazio (ACP-06/06B) propõe
+  oferta +`@params.sobras_ajuste_pct` (5%); sobras baixas/altas por 3 dias (ACP-S03/S04) ±`@params.sobras_ajuste_leve_pct`
+  (2,5%, novo); NUL alto (ACP-01/01R) propõe baixar a PB em `@params.nul_reducao_pb_pp` (1 p.p., novo) com o ajuste mínimo
+  do PL, nunca abaixo do alvo do lote. Ao aceitar, a tela da dieta abre com a proposta. Ajuste de oferta no meio de uma
+  troca gradual não desfaz a troca: os dias que faltam são multiplicados pelo mesmo fator.
+- ACP-M08 (bonificação): textos do produtor reescritos; o detalhe lista só o que está fora da melhor faixa, em português.
+
 ## 1.7.0 — 21/10/2026
 Auditoria de todos os valores (10 subagentes, cada valor contra a fonte citada). Nenhum valor de composição ou equação
 era inventado; correções:

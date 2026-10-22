@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta
 
 import pytest
 from sqlmodel import select
-from test_auditoria import lote_sintetico, sessao_memoria  # noqa: F401 (fixture)
+from test_auditoria import DIETA as DIETA_TESTE, lote_sintetico, sessao_memoria  # noqa: F401 (fixture)
 
 from app import alertas, services
 from app.db.models import AlertaDB, Dieta, Evento, HistoricoAlerta
@@ -216,3 +216,112 @@ def test_mastite_primeiro_tambem_suprime_os_avisos_da_verificacao_da_dieta(sessa
     alertas.aplicar_meta_na_verificacao(s, lote.id, {})          # mastite resolvida: volta ao primeiro plano
     s.refresh(ep)
     assert not ep.suprimido and ep.nota is None
+
+
+def _episodio(s, lote, ajuste, regra="ACP-06"):
+    ep = AlertaDB(lote_id=lote.id, regra=regra, problema=regra, modulo="acompanhamento_diario", nivel="critico",
+                  titulo="t", categoria="cocho", aberto_em=date.today(), ultima_ocorrencia=date.today(), ajuste=ajuste)
+    s.add(ep)
+    s.commit()
+    return ep
+
+
+def test_regra_de_cocho_vazio_carrega_a_proposta_de_mais_oferta():
+    from app.engine.engine import Motor
+    r = Motor(services.kb(), ["classificacao", "acompanhamento_diario"]).executar(
+        services.memoria({"lote.estado": "lactacao", "lote.del": 10, "mon.dias_cocho_vazio": 3}, origem="medido"))
+    [a] = [a for a in r.alertas if a.regra == "ACP-06"]
+    assert a.ajuste == {"tipo": "oferta", "pct": services.kb().params["sobras_ajuste_pct"]["valor"]}
+
+
+def test_aviso_de_cocho_propoe_mais_oferta_e_nao_desfaz_a_troca_de_dieta_em_andamento(sessao_memoria, monkeypatch):
+    """Lote no meio de uma troca gradual aceita o aviso de cocho vazio: a dieta nova é a atual +5% e a troca continua,
+    com os dias que faltam também +5% (o ajuste soma, não substitui a troca)."""
+    from app.api import fazendas
+    from app.api.schemas import DietaIn, ItemDieta
+    s = sessao_memoria
+    lote, _ = lote_sintetico(s)
+    monkeypatch.setattr(fazendas, "sessao", lambda: _Mesma(s))
+    nova = [{"alimento": "silagem_sorgo", "kg_mn": 35}] + [i for i in DIETA_TESTE if i["alimento"] != "silagem_milho"]
+    v2 = fazendas.nova_dieta(lote.id, DietaIn(itens=[ItemDieta(**i) for i in nova], motivo="troca de silagem"))
+    assert v2["transicao"] and v2["transicao"]["dias"] >= 2
+    ep = _episodio(s, lote, {"tipo": "oferta", "pct": 5.0})
+    p = services.proposta_ajuste(s, ep)
+    assert p["em_transicao"] and p["nota"]
+    mais5 = [{"alimento": i["alimento"], "kg_mn": services.arredondar_kg(i["kg_mn"] * 1.05)} for i in nova]
+    v3 = fazendas.nova_dieta(lote.id, DietaIn(itens=[ItemDieta(**i) for i in mais5], motivo=p["motivo"], alerta_id=ep.id))
+    t2, t3 = v2["transicao"], v3["transicao"]
+    assert t3["ajuste_oferta"]["fator"] == pytest.approx(1.05, abs=0.002) and t3["dias"] == t2["dias"] and t3["de_versao"] == t2["de_versao"]
+    hoje = date.today().isoformat()
+    antes = next(e for e in t2["plano"] if e["data"] == hoje)
+    depois = next(e for e in t3["plano"] if e["data"] == hoje)
+    for a, b in zip(antes["itens"], depois["itens"]):
+        assert b["kg_mn"] == pytest.approx(a["kg_mn"] * 1.05, rel=0.02)
+
+
+def test_aviso_de_ureia_do_leite_propoe_menos_proteina_sem_faltar_para_o_lote(sessao_memoria):
+    s = sessao_memoria
+    lote, _ = lote_sintetico(s)
+    ep = _episodio(s, lote, {"tipo": "proteina", "pp": 1.0}, regra="ACP-01R")
+    p = services.proposta_ajuste(s, ep)
+    assert p["tipo"] == "proteina" and p["itens"]
+    assert p["mudancas"] or p["nota"]          # ou muda a dieta, ou explica por que não dá para baixar mais
+    cat = services.catalogo(s, lote.fazenda_id)
+    pb = lambda itens: services.composicao_itens(itens, {}, cat)["pb_pct"]  # noqa: E731
+    dieta = services.dieta_ativa(s, lote.id)
+    assert pb(p["itens"]) < pb(dieta.itens) if p["mudancas"] else p["itens"] == dieta.itens   # nunca sobe a proteína
+    parecer = services.avaliar_lote(s, lote, p["itens"])["fatos"]["parecer.dieta"]["valor"]
+    assert parecer != "bloqueada"
+
+
+def test_movimentacao_atualiza_o_numero_de_vacas_dos_dois_lotes(sessao_memoria, monkeypatch):
+    from app.api import fazendas
+    from app.api.schemas import EventoIn
+    s = sessao_memoria
+    lote, _ = lote_sintetico(s)
+    outro, _ = lote_sintetico(s)
+    monkeypatch.setattr(fazendas, "sessao", lambda: _Mesma(s))
+    ev = fazendas.registrar_evento(lote.id, EventoIn(data_hora=datetime.now(), tipo="movimentacao", vacas=5, outro_lote_id=outro.id))
+    s.refresh(lote)
+    s.refresh(outro)
+    assert (lote.n_vacas, outro.n_vacas) == (25, 15) and "20 → 25" in ev["descricao"]
+    assert s.exec(select(Evento).where(Evento.lote_id == outro.id, Evento.tipo == "movimentacao")).first()
+    with pytest.raises(Exception):
+        fazendas.registrar_evento(lote.id, EventoIn(data_hora=datetime.now(), tipo="movimentacao", vacas=-100))
+
+
+def test_historico_e_resolucao_tem_texto_do_produtor(sessao_memoria):
+    from app.engine.engine import Resultado
+    from app.engine.facts import Alerta
+    from app.engine.working_memory import MemoriaTrabalho
+    s = sessao_memoria
+    lote, _ = lote_sintetico(s)
+    d0 = date.today() - timedelta(days=10)
+    r = Resultado(wm=MemoriaTrabalho())
+    r.alertas.append(Alerta(regra="ACP-09", nivel="atencao", titulo="técnico", causa="", acao="a", categoria="dieta", cf=0.8,
+                            titulo_produtor="As vacas estão emagrecendo", acao_produtor="Dê mais energia"))
+    alertas.sincronizar(s, services.kb(), lote.id, d0, r, None, "acompanhamento")
+    alertas.sincronizar(s, services.kb(), lote.id, d0 + timedelta(days=9), Resultado(wm=MemoriaTrabalho()), None, "acompanhamento")
+    ep = s.exec(select(AlertaDB).where(AlertaDB.lote_id == lote.id)).one()
+    hist = alertas.historico_do(s, ep.id)
+    assert [h.descricao_produtor for h in hist][0] == "As vacas estão emagrecendo"
+    assert ep.estado == "resolvido" and ep.resolucao_produtor.startswith("O problema não aparece mais")
+
+
+def test_cocho_vazio_junta_os_avisos_da_dieta_numa_proposta_so(sessao_memoria):
+    """Lote comendo tudo (cocho vazio) com dieta fraca: a proposta aumenta a oferta e já corrige o resto, e a dieta
+    proposta não é acusada de "mais comida do que o lote come" (o consumo medido vence a equação: EXG-01V)."""
+    from app.db.models import Registro
+    s = sessao_memoria
+    extra = {(i, "escore_cocho"): 1 for i in range(37, 40)}
+    lote, _ = lote_sintetico(s, extra=extra)
+    fatos = services.fatos_lote(lote, date.today(), services.historico(s, lote.id), s)
+    assert fatos["mon.dias_cocho_vazio"] >= 2 and fatos["mon.ms_ofertada_cocho"] > 0
+    ep = _episodio(s, lote, {"tipo": "oferta", "pct": 5.0})
+    p = services.proposta_ajuste(s, ep)
+    r = services.avaliar_lote(s, lote, p["itens"])
+    regras = {a["regra"] for a in r["alertas"] if a["status"] == "ativo"}
+    assert "VER-06" not in regras                             # não reclama de oferta acima do consumo
+    assert r["fatos"]["exig.cms"]["valor"] >= fatos["mon.ms_ofertada_cocho"]   # medição é o piso do consumo
+    if p.get("corrige"):                                      # havia outros problemas: a proposta os resolve junto
+        assert r["fatos"]["parecer.dieta"]["valor"] in ("adequada", "ajustar") and "VER-01" not in regras

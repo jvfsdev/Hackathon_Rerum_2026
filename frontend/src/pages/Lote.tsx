@@ -52,7 +52,7 @@ export default function LotePagina() {
         <Route path="trato" element={<AbaTrato lote={lote} />} />
         <Route path="previsao" element={<AbaPrevisao lote={lote} />} />
         <Route path="acompanhamento" element={<AbaAcompanhamento loteId={lote.id} />} />
-        <Route path="registro" element={<AbaRegistro lote={lote} />} />
+        <Route path="registro" element={<AbaRegistro lote={lote} onLoteMudou={recarregar} />} />
         <Route path="alertas" element={<AbaAlertas loteId={lote.id} />} />
       </Routes>
     </div>
@@ -272,24 +272,30 @@ function Comparacao({ r }: { r: Resultado }) {
   const soPrimiparas = (v('lote.fracao_primiparas') ?? 0) >= 1     // DCAD negativa só vale para multíparas (VER-15)
   return (
     <Painel titulo={t ? 'Oferta × exigência' : 'A dieta item por item'} subtitulo={t ? `Dieta: ${fmt(v('dieta.ms_kg'))} kg MS · R$ ${fmt(v('dieta.custo_vaca_dia'))}/vaca/dia · ${fmt(v('dieta.forragem_pct'))}% de volumoso na MS`
-      : `Barra verde: dentro do certo. Amarela: falta ou passou. O traço escuro é o necessário. ${fmt(v('dieta.forragem_pct'))}% da comida é volumoso.`}>
-      <div className="space-y-2">
+      : `Cada linha tem a sua escala. Barra verde: dentro do certo; amarela: falta ou passou. O traço escuro é o necessário e a faixa clara, o que é aceito. ${fmt(v('dieta.forragem_pct'))}% da comida é volumoso.`}>
+      <div className="space-y-2.5">
         {linhas.map((l) => {
-          const razao = l.tipo === 'dcad' ? (l.oferta + 300) / 300 : l.oferta / l.alvo
+          const razao = l.oferta / l.alvo
           const ok = l.tipo === 'dcad' ? soPrimiparas || l.oferta <= l.alvo : l.tipo === 'min' ? razao >= (l.min ?? 1)
             : l.tipo === 'max' ? l.oferta <= l.alvo : razao >= (l.min ?? 0) && razao <= (l.max ?? Infinity)
-          const largura = Math.max(0, Math.min(100, (razao / 1.5) * 100))
+          // escala própria de cada linha: 0 até um pouco além do maior valor relevante (a DCAD vai de −300 a +300)
+          const lo = l.tipo === 'dcad' ? -300 : 0
+          const hi = l.tipo === 'dcad' ? 300 : Math.max(l.oferta, l.alvo * (l.max ?? 1)) * 1.15 || 1
+          const pos = (x: number) => `${Math.max(0, Math.min(100, ((x - lo) / (hi - lo)) * 100))}%`
+          const faixa = l.tipo === 'faixa' ? [l.alvo * (l.min ?? 1), l.alvo * (l.max ?? 1)]
+            : l.tipo === 'min' ? [l.alvo * (l.min ?? 1), hi] : [lo, l.alvo]
+          const estado = ok ? 'ok' : l.tipo === 'max' || l.tipo === 'dcad' ? 'passou do limite' : razao < (l.min ?? 1) ? 'falta' : 'passou'
           return (
-            <div key={l.nome} className="grid grid-cols-[110px_1fr_auto] items-center gap-3 text-sm sm:grid-cols-[150px_1fr_200px]">
+            <div key={l.nome} className="grid grid-cols-[110px_1fr] items-center gap-x-3 gap-y-1 text-sm sm:grid-cols-[150px_1fr_210px]">
               <span className="text-stone-600">{l.nome}</span>
               <span className="relative h-3.5 rounded-sm bg-stone-100 ring-1 ring-inset ring-stone-200">
-                <span className={`absolute inset-y-0 left-0 rounded-sm ${ok ? 'bg-campo-500' : 'bg-brinco'}`} style={{ width: `${largura}%` }} />
-                <span className="absolute inset-y-[-4px] w-[3px] rounded-full bg-stone-900" style={{ left: `calc(${(1 / 1.5) * 100}% - 1px)` }} title="alvo" />
+                <span className="absolute inset-y-0 bg-campo-100" style={{ left: pos(faixa[0]), width: `calc(${pos(faixa[1])} - ${pos(faixa[0])})` }} title="faixa aceita" />
+                <span className={`absolute inset-y-[3px] left-0 rounded-sm ${ok ? 'bg-campo-500' : 'bg-brinco'}`} style={{ width: pos(l.oferta) }} />
+                <span className="absolute inset-y-[-4px] w-[3px] rounded-full bg-stone-900" style={{ left: `calc(${pos(l.alvo)} - 1px)` }} title="necessário" />
               </span>
-              <span className="num text-right text-xs text-stone-700">
+              <span className="num col-span-2 text-xs text-stone-700 sm:col-span-1 sm:text-right">
                 {t ? <>{fmt(l.oferta)} {l.tipo === 'max' || l.tipo === 'dcad' ? '≤' : l.tipo === 'min' ? '≥' : '≈'} {fmt(l.alvo)} {l.un} {ok ? '✓' : '⚠'}</>
-                  : ok ? <span className="text-campo-700">ok</span>
-                  : <span className="font-medium text-atencao">{l.tipo === 'max' || l.tipo === 'dcad' ? 'passou do limite' : razao < (l.min ?? 1) ? 'falta' : 'sobra'}</span>}
+                  : <>{fmt(l.oferta)} {l.tipo === 'max' || l.tipo === 'dcad' ? 'de no máximo' : 'para'} {fmt(l.alvo)} {l.un} · <span className={ok ? 'text-campo-700' : 'font-medium text-atencao'}>{estado}</span></>}
               </span>
             </div>
           )
@@ -397,6 +403,15 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
   useEffect(() => {
     if (hash === '#sugerir' && alimentos.length) document.getElementById('sugerir')?.scrollIntoView({ behavior: 'smooth' })
   }, [hash, alimentos.length])
+  // aviso aceito que traz proposta de dieta (decidida pela regra): o editor já abre com ela para conferir e salvar
+  const [proposta, setProposta] = useState<any>(null)
+  useEffect(() => {
+    if (!alerta?.id || !alerta.ajuste || !dietaAtiva) { setProposta(null); return }
+    api.get<any>(`/alertas/${alerta.id}/proposta`).then((p) => {
+      setProposta(p)
+      carregarNoEditor(p.itens, tecnico() ? 'Proposta do aviso' : 'Proposta do aviso (já ajustada)', 'ajuste', p.motivo)
+    }).catch(() => setProposta(null))
+  }, [alerta?.id, dietaAtiva?.versao])  // eslint-disable-line react-hooks/exhaustive-deps
   // veio do "o que precisaria mudar" ou do simulador com uma dieta pronta para revisar
   useEffect(() => {
     const st = loc.state as { itensAjuste?: ItemDieta[]; rotulo?: string; origem?: string } | null
@@ -417,7 +432,8 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
       setVersoes(await api.get<Dieta[]>(`/lotes/${lote.id}/dietas`)); setMotivo(''); onSalvo()
       const salvos = lista.map((i) => ({ ...i }))
       setItens(salvos); setBase({ rotulo: `Dieta ativa v${d.versao}`, origem: 'usuario', motivo: '', itens: salvos.map((i) => ({ ...i })) })
-      const troca = d.transicao ? ` A troca será feita aos poucos, em ${d.transicao.dias} dias: a planilha de trato já mostra a mistura de cada dia.` : ''
+      const troca = d.transicao?.ajuste_oferta ? ' A troca de dieta que já estava em andamento continua, com as quantidades ajustadas nos dias que faltam.'
+        : d.transicao ? ` A troca será feita aos poucos, em ${d.transicao.dias} dias: a planilha de trato já mostra a mistura de cada dia.` : ''
       setRegistrado((alertaId ? `Dieta v${d.versao} salva e registrada como ação do aviso.` : `Dieta v${d.versao} salva.`) + troca)
       if (alertaId) concluir()
     } catch (e: any) { setErro(e.message) }
@@ -432,6 +448,12 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
   return (
     <div className="space-y-4">
       <BannerAcao alerta={alerta} onCancelar={concluir} />
+      {proposta && alerta && (
+        <div className="rounded-lg bg-white p-3 text-sm ring-1 ring-campo-100">
+          <p className="font-medium text-stone-900">{tecnico() ? proposta.texto : proposta.texto_produtor} O editor abaixo já está com a proposta: confira e salve.</p>
+          {proposta.nota && <p className="mt-1 text-stone-600">{proposta.nota}</p>}
+        </div>
+      )}
       {registrado && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-campo-50 p-3 text-sm text-campo-800">
           {registrado}<Link to="../alertas" className="font-medium underline">ver alertas e ações</Link>
@@ -800,7 +822,7 @@ const CAMPOS = {
   mensal: [['laudo_gordura', 'Gordura', '%'], ['laudo_proteina', 'Proteína', '%'], ['laudo_lactose', 'Lactose', '%'], ['laudo_ureia', 'Ureia', 'mg/dL'], ['laudo_nul', 'NUL', 'mg/dL'], ['laudo_ccs', 'CCS', 'mil/mL'], ['laudo_cbt', 'CBT', 'mil UFC/mL'], ['laudo_crioscopia', 'Crioscopia', '°H']],
 } as const
 
-function AbaRegistro({ lote }: { lote: Lote }) {
+function AbaRegistro({ lote, onLoteMudou }: { lote: Lote; onLoteMudou: () => void }) {
   const { alertaId, alerta, concluir } = useAlertaDaAcao()
   const [params] = useSearchParams()
   const eventoSugerido = params.get('evento')
@@ -825,6 +847,10 @@ function AbaRegistro({ lote }: { lote: Lote }) {
   }, [lote.id, lote.n_vacas, data, recarga])
   const [evento, setEvento] = useState({ tipo: eventoSugerido ?? 'troca_volumoso', descricao: '' })
   useEffect(() => { if (eventoSugerido) setEvento((e) => ({ ...e, tipo: eventoSugerido })) }, [eventoSugerido])
+  // movimentação: quantas vacas entraram ou saíram (atualiza o cadastro deste lote e, se informado, do outro lote)
+  const [mov, setMov] = useState({ sentido: 1, vacas: '', outro: '' })
+  const [outrosLotes, setOutrosLotes] = useState<Lote[]>([])
+  useEffect(() => { api.get<Lote[]>(`/lotes?fazenda_id=${lote.fazenda_id}`).then((ls) => setOutrosLotes(ls.filter((l) => l.id !== lote.id))).catch(() => {}) }, [lote.id, lote.fazenda_id])
   const [res, setRes] = useState<Resultado | null>(null)
   const [erro, setErro] = useState('')
   const [ok, setOk] = useState('')
@@ -862,12 +888,17 @@ function AbaRegistro({ lote }: { lote: Lote }) {
   }
   const enviarEvento = async () => {
     setErro(''); setOk('')
-    if (!evento.descricao.trim() && alertaId) { setErro('Descreva o que foi feito.'); return }
+    const movimento = evento.tipo === 'movimentacao' && Number(mov.vacas) > 0
+    if (evento.tipo === 'movimentacao' && mov.vacas !== '' && !(Number(mov.vacas) > 0 && Number.isInteger(Number(mov.vacas)))) { setErro('Informe o número de vacas (inteiro).'); return }
+    if (!evento.descricao.trim() && alertaId && !movimento) { setErro('Descreva o que foi feito.'); return }
     try {
       const agora = new Date().toTimeString().slice(0, 5)
-      await api.post(`/lotes/${lote.id}/eventos`, { data_hora: `${data}T${data === hoje ? agora : '08:00'}:00`, ...evento, alerta_id: alertaId })
-      setOk(alertaId ? 'Ação registrada no histórico do alerta. A resolução é confirmada quando a condição deixar de valer.' : 'Evento registrado: abre janelas de supressão e de atribuição de causa.')
+      await api.post(`/lotes/${lote.id}/eventos`, { data_hora: `${data}T${data === hoje ? agora : '08:00'}:00`, ...evento, alerta_id: alertaId,
+        ...(movimento ? { vacas: mov.sentido * Number(mov.vacas), outro_lote_id: mov.outro ? Number(mov.outro) : null } : {}) })
+      setOk(movimento ? `Movimentação registrada: o lote passa a ter ${lote.n_vacas + mov.sentido * Number(mov.vacas)} vacas no cadastro.`
+        : alertaId ? 'Ação registrada no histórico do alerta. A resolução é confirmada quando a condição deixar de valer.' : 'Evento registrado: abre janelas de supressão e de atribuição de causa.')
       setEvento({ ...evento, descricao: '' })
+      if (movimento) { setMov({ sentido: 1, vacas: '', outro: '' }); onLoteMudou(); setRecarga((n) => n + 1) }
       if (alertaId) concluir()
     } catch (e: any) { setErro(e.message) }
   }
@@ -949,8 +980,24 @@ function AbaRegistro({ lote }: { lote: Lote }) {
               <select className="input" value={evento.tipo} onChange={(e) => setEvento({ ...evento, tipo: e.target.value })}>
                 {Object.entries(ROTULO_EVENTO).map(([k, v]) => <option key={k} value={k}>{v[0].toUpperCase() + v.slice(1)}</option>)}
               </select></label>
+            {evento.tipo === 'movimentacao' && (
+              <div className="grid grid-cols-2 gap-2 rounded-lg bg-stone-50 p-2">
+                <label><span className="rotulo">Vacas</span>
+                  <select id="mov-sentido" className="input" value={mov.sentido} onChange={(e) => setMov({ ...mov, sentido: Number(e.target.value) })}>
+                    <option value={1}>entraram</option><option value={-1}>saíram</option>
+                  </select></label>
+                <label><span className="rotulo">Quantas</span>
+                  <input id="mov-vacas" className="input num" inputMode="numeric" value={mov.vacas} onChange={(e) => setMov({ ...mov, vacas: e.target.value })} /></label>
+                <label className="col-span-2"><span className="rotulo">{mov.sentido > 0 ? 'Vieram de' : 'Foram para'}</span>
+                  <select id="mov-outro" className="input" value={mov.outro} onChange={(e) => setMov({ ...mov, outro: e.target.value })}>
+                    <option value="">fora da fazenda (compra, venda, outro retiro)</option>
+                    {outrosLotes.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
+                  </select></label>
+                <p className="col-span-2 text-xs text-stone-500">Hoje o cadastro tem {lote.n_vacas} vacas. O número é atualizado aqui{mov.outro ? ' e no outro lote' : ''}; a queda de leite dos 2 dias seguintes não vira alerta.</p>
+              </div>
+            )}
             <label className="block"><span className="rotulo">{alerta ? 'O que foi feito' : 'Descrição'}</span>
-              <textarea className="input h-20" placeholder={alerta ? 'Ex.: aspersão ligada das 11h às 16h' : 'Ex.: abri o silo 3; 5 vacas entraram do lote 2'} value={evento.descricao} onChange={(e) => setEvento({ ...evento, descricao: e.target.value })} /></label>
+              <textarea className="input h-20" placeholder={alerta ? 'Ex.: aspersão ligada das 11h às 16h' : 'Ex.: abri o silo 3 (vacas que entraram ou saíram: escolha Movimentação)'} value={evento.descricao} onChange={(e) => setEvento({ ...evento, descricao: e.target.value })} /></label>
             <button className="btn-secundario" onClick={enviarEvento}>Registrar evento</button>
           </div>
         </Painel>

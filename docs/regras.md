@@ -1,6 +1,6 @@
-# Regras de produção — base v1.7.0
+# Regras de produção — base v1.9.0
 
-172 regras · 163 parâmetros · 13 alimentos. Gerado automaticamente de `backend/kb/` (não editar à mão).
+173 regras · 165 parâmetros · 13 alimentos. Gerado automaticamente de `backend/kb/` (não editar à mão).
 
 Formato: **SE** condições **ENTÃO** ações [CF da regra]. Limiares `@params.*` estão na tabela de parâmetros no fim.
 Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão com dados; C = extensão sem dados ou população diferente; D = escolha de engenharia.
@@ -42,7 +42,8 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | EXG-01D | Teto de consumo pelo enchimento (consumo de FDN ≤ 1,25% do PV) | `dieta.fdn_pct` > 0 E `exig.cms_equacao` existe | calcular `exig.cms_teto_fibra` = teto_fibra(…) | 1.0 | B | Mertens via Epagri |
 | EXG-01N | CMS pela equação NASEM 2021 baseada no animal (ECC e paridade) | `perfil.equacao_cms` = nasem2021 | calcular `exig.cms_equacao` = cms_nasem2021(…) | 1.0 | B | NASEM 2021 via ICAR Appendix 2 |
 | EXG-01F | Digestibilidade da FDN do volumoso acima/abaixo da referência ajusta o consumo esperado | `dieta.fdnd_forragem` existe E `exig.cms_equacao` existe | calcular `exig.cms_ajuste_fdnd` = ajuste_fdnd(…) | 0.8 | C | Oba & Allen 1999 (0,17 kg por ponto); Dossiê EXG-09; FDND de referência: escolha de engenharia |
-| EXG-01E | CMS esperado é o menor entre a equação e o teto de fibra | `exig.cms_equacao` existe E `perfil.cms_baixa_confianca` ausente | calcular `exig.cms` = cms_final(…) | 1.0 | B | NRC 2001; Mertens |
+| EXG-01V | Cocho vazio em leituras seguidas — o lote come tudo o que recebe, então o consumo real é pelo menos a oferta mais o ajuste do cocho (medição vence a previsão) | `mon.dias_cocho_vazio` >= @params.cocho_vazio_dias E `mon.ms_ofertada_cocho` > 0 | calcular `exig.cms_observado` = aumentar_pct(…) | 0.8 | D | Dossiê ACP-06 (cocho vazio = consumo limitado pela oferta); contar a oferta + o ajuste como consumo: escolha de engenharia |
+| EXG-01E | CMS esperado é o menor entre a equação e o teto de fibra (com cocho vazio, o consumo observado é o piso) | `exig.cms_equacao` existe E `perfil.cms_baixa_confianca` ausente | calcular `exig.cms` = cms_final(…) | 1.0 | B | NRC 2001; Mertens |
 | EXG-01P | Em pasto com mestiças o CMS é estimado com confiança reduzida | `exig.cms_equacao` existe E `perfil.cms_baixa_confianca` = True | calcular `exig.cms` = cms_final(…); alerta **informativo** (dieta): Consumo em pasto estimado com baixa confiança | 0.6 | B | Embrapa 2012 (Jardim et al.) |
 | EXG-03 | Vacas secas e pré-parto consomem cerca de 1,8–2% do PV | `perfil.fase` in ['pre_parto', 'seca'] | calcular `exig.cms` = cms_preparto(…) | 1.0 | B | NASEM 2021 via Drackley 2021 |
 | EXG-02A | Energia de mantença = k × PV^0,75 | `lote.pv` existe E `perfil.fase` existe | calcular `exig.ell_mantenca` = mantenca(…) | 1.0 | B | NRC 2001 (NASEM 2021: 0,10) |
@@ -341,6 +342,7 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | `escore_cocho_pct` | {1: 0.0, 2: 0.5, 3: 3.0, 4: 7.5, 5: 12.0} | escore → % de sobra | D | Inferências (1 = vazio há horas; 2 = <1%; 3 = 2–4%, meta; 4 = 5–10%; 5 = >10% ou intocado) — escolha de engenharia | Conversão da leitura de cocho (1–5) em % de sobra equivalente |
 | `sobras_faixas` | {'recem_parida': [3, 5], 'inicio': [2, 4], 'meio': [2, 4], 'final': [1, 3], 'pre_parto': [2, 4], 'seca': [1, 3]} | % oferta | C | Inferências (adaptado de eXtension: recém-paridas 3–5%, alta produção 1–5%, final 0,5–3%); pré-parto e seca: escolha de engenharia | Faixa-alvo de sobras por fase |
 | `sobras_dias` | 3 | dias | C | Inferências (esperar 3 dias fora da meta antes de mexer) | Leituras de cocho que entram na média móvel de sobras |
+| `sobras_ajuste_leve_pct` | 2.5 | % da oferta | C | Inferências (±2–3% por vez com sobras fora da faixa; esperar 3 dias) | Ajuste de oferta sugerido com sobras fora da faixa por 3 dias |
 | `sobras_ajuste_pct` | 5 | % da oferta | D | Dossiê ACP-06 (ajuste a validar); Inferências (±2–3% por vez com sobras fora da faixa) | Aumento de oferta sugerido com cocho vazio |
 | `cocho_vazio_sobra_pct` | 0.5 | % da oferta | D | Escolha de engenharia (equivale ao escore 2 de escore_cocho_pct) | Sobra pesada igual ou abaixo disto conta como cocho vazio |
 | `cocho_vazio_dias` | 2 | dias | C | Dossiê ACP-06 | Leituras seguidas com cocho vazio |
@@ -357,6 +359,7 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | `gp_ben_del_max` | 40 | dias | B | Penn State (≤40 DEL) | Janela de DEL em que G:P alta indica BEN/cetose |
 | `gp_ben_min` | 1.4 | razão | B | Penn State (≤40 DEL) | G:P acima disso em recém-paridas sugere BEN/cetose |
 | `gordura_queda_pp` | -0.3 | p.p. | D | Inferências, regra MFD-1 (queda de 0,2–0,3 p.p., D); mecanismo: eXtension | Queda de gordura vs linha de base |
+| `nul_reducao_pb_pp` | 1.0 | p.p. de PB | C | Inferências (cada p.p. de PB muda o NUL em ~2 mg/dL) | Redução de PB proposta quando o NUL está alto (sem descer abaixo do alvo do lote) |
 | `proteina_estavel_pp` | 0.1 | p.p. | D | Escolha de engenharia | Variação de proteína considerada estável |
 | `crioscopia_faixa` | [-0.555, -0.53] | °H | A | IN 76/2018 | Índice crioscópico normal do leite |
 | `lactose_min` | 4.3 | % | A | IN 76/2018 | Lactose mínima |
@@ -379,9 +382,9 @@ Força da evidência: A = norma/meta-análise; B = estudo revisado ou extensão 
 | `transicao_extensao_dias` | 2 | dias | D | Escolha de engenharia | Dias a mais na etapa atual quando o lote não se adapta à mistura |
 | `trato_ordem` | ['volumoso_seco', 'concentrado', 'mineral', 'ureia', 'volumoso_umido'] | categorias | C | Penn State (silagem por último, misturar 3–5 min); extensão (feno longo primeiro). A ordem varia com o misturador: siga o fabricante | Ordem de carregamento do vagão misturador |
 | `trato_ms_seco` | 80 | % MS | D | Escolha de engenharia | Volumoso com MS acima disto é carregado como seco (feno, palha) |
-| `estoque_dias_critico` | 7 | dias | D | Escolha de engenharia (prazo típico de compra e entrega) | Estoque para menos que isto é crítico |
+| `estoque_dias_critico` | 7 | dias | D | Escolha de engenharia (sem fonte publicada; ajustar ao fornecedor da fazenda) | Estoque para menos que isto é crítico |
 | `estoque_dias_atencao` | 15 | dias | D | Escolha de engenharia | Estoque para menos que isto pede programar a compra |
-| `estoque_prazo_compra` | 5 | dias | D | Escolha de engenharia | Dias entre fazer o pedido e o insumo chegar |
+| `estoque_prazo_compra` | 5 | dias | D | Escolha de engenharia (sem fonte publicada; cada fazenda deve informar o prazo do seu fornecedor) | Dias entre fazer o pedido e o insumo chegar |
 | `revisao_min_episodios` | 2 | episódios | D | Escolha de engenharia | Mínimo de episódios para uma regra entrar na revisão |
 | `revisao_taxa_recusa` | 0.5 | fração | D | Escolha de engenharia | Fração de recusas que sugere rever a regra |
 | `revisao_taxa_sozinho` | 0.7 | fração | D | Escolha de engenharia | Fração de episódios resolvidos sem ação que sugere regra sensível demais |

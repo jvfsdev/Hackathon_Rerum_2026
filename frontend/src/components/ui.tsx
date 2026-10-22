@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, certeza, dataBR, fmt, numero, reais, rotulo, tecnico, textoAlerta, UNIDADES, type Alerta, type EstadoAlerta, type ItemDieta, type ItemHistorico, type NoComo, type Nivel } from '../api'
+import { api, certeza, dataBR, fmt, legivel, numero, reais, rotulo, tecnico, textoAlerta, UNIDADES, type Alerta, type EstadoAlerta, type ItemDieta, type ItemHistorico, type NoComo, type Nivel } from '../api'
 
 const COR_NIVEL: Record<Nivel, string> = {
   critico: 'bg-critico text-white ring-critico',
@@ -210,10 +210,9 @@ export function BotaoComo({ no, titulo }: { no?: NoComo; titulo?: string }) {
 /** "De onde vem?" para o produtor: os dados que entraram na conta, sem regras nem fatores de certeza. */
 function ComoSimples({ no }: { no: NoComo }) {
   const folhas = new Map<string, NoComo>()
-  const passos: string[] = []
   const visita = (n: NoComo) => {
     if (n.regras?.length) {
-      n.regras.forEach((r) => { if (!passos.includes(r.descricao)) passos.push(r.descricao); r.premissas.forEach(visita) })
+      n.regras.forEach((r) => r.premissas.forEach(visita))
     } else if (n.conhecido !== false && n.valor !== undefined && !folhas.has(n.fato)) folhas.set(n.fato, n)
   }
   visita(no)
@@ -233,12 +232,6 @@ function ComoSimples({ no }: { no: NoComo }) {
         </ul>
         {padrao.length > 0 && <p className="mt-2 text-xs text-amber-700">Valores padrão deixam a conta menos certa: informe {padrao.map((f) => rotulo(f.fato).toLowerCase()).join(', ')} para melhorar.</p>}
       </div>
-      {passos.length > 0 && (
-        <div>
-          <h4 className="mb-1 font-semibold text-stone-800">O que o sistema considerou</h4>
-          <ul className="ml-4 list-disc space-y-0.5 text-stone-600">{passos.slice(0, 8).map((p) => <li key={p}>{p}</li>)}</ul>
-        </div>
-      )}
       <p className="text-xs text-stone-400">Na visão técnica aparecem as regras, as fontes e os fatores de certeza.</p>
     </div>
   )
@@ -338,7 +331,7 @@ export function AlertaCorpo({ alerta }: { alerta: Alerta }) {
       {alerta.nota && <p className="mt-1 rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">{tec ? `Meta-regra ${alerta.nota}` : `Observação: ${alerta.nota.replace(/^[A-Z]+-[\w]+: /, '')}`}</p>}
       {alerta.resolucao && (
         <p className={`mt-1.5 rounded-lg px-2 py-1.5 text-sm ${alerta.estado === 'resolvido' ? 'bg-campo-50 text-campo-900' : 'bg-stone-100 text-stone-700'}`}>
-          <b>{alerta.estado === 'resolvido' ? 'Resolvido' : 'Encerrado'} em {dataBR(alerta.estado_em)}:</b> {alerta.resolucao}
+          <b>{alerta.estado === 'resolvido' ? 'Resolvido' : 'Encerrado'} em {dataBR(alerta.estado_em)}:</b> {tec ? alerta.resolucao : legivel(alerta.resolucao_produtor || alerta.resolucao)}
         </p>
       )}
     </div>
@@ -413,7 +406,7 @@ export function LinhaDoTempo({ itens, mostrarAlerta = false, onAbrirAlerta }: { 
                 </button>
               )}
             </div>
-            <p className="mt-0.5 text-sm text-stone-700">{h.descricao}</p>
+            <p className="mt-0.5 text-sm text-stone-700">{tecnico() ? h.descricao : legivel(h.descricao_produtor || h.descricao)}</p>
           </li>
         )
       })}

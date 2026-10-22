@@ -58,6 +58,7 @@ def carregar(diretorio: Path = KB_DIR) -> BaseConhecimento:
 OPS_VALIDOS = set(OPERADORES) | {"existe", "ausente"}
 ACOES_VALIDAS = {"concluir", "calcular", "alerta", "suprimir", "rebaixar"}
 NIVEIS_VALIDOS = {"critico", "atencao", "informativo"}
+TIPOS_AJUSTE = {"oferta", "proteina"}     # propostas de dieta que um alerta pode carregar (services.proposta_ajuste)
 # Fatos que entram na memória de trabalho vindos de fora das regras (usuário, registros, laudos, sistema).
 PREFIXOS_ENTRADA = ("lote.", "dieta.", "mon.", "laudo.", "fazenda.", "formulacao.", "pl.", "transicao.", "estoque.", "prev.")
 _TEMPLATE = re.compile(r"\{([@a-z_][\w\.]*)(?::[^}]+)?\}")
@@ -112,6 +113,8 @@ def validar(kb: BaseConhecimento) -> None:
             if "alerta" in acao:
                 if "problema" in spec and not re.fullmatch(r"[a-z0-9_]+", str(spec["problema"])):
                     erros.append(f"{rid}: problema '{spec['problema']}' deve ser uma chave (a-z, 0-9, _)")
+                if "ajuste" in spec and spec["ajuste"].get("tipo") not in TIPOS_AJUSTE:
+                    erros.append(f"{rid}: ajuste de tipo inválido {spec['ajuste'].get('tipo')}")
                 if spec.get("nivel", "atencao") not in NIVEIS_VALIDOS:
                     erros.append(f"{rid}: nível de alerta inválido {spec.get('nivel')}")
                 for campo in ("titulo", "causa", "acao", "titulo_produtor", "causa_produtor", "acao_produtor"):

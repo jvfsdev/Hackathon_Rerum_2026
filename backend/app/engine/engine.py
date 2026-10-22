@@ -158,6 +158,7 @@ class Motor:
                       acao=formatar(spec.get("acao", ""), res), categoria=spec.get("categoria", "geral"),
                       cf=cf, fonte=regra.get("fonte", ""), forca=regra.get("forca", ""),
                       problema=spec.get("problema", regra["id"]),
+                      ajuste={k: res.valor(v) for k, v in spec.get("ajuste", {}).items()},
                       **{f"{c}_produtor": formatar(spec.get(f"{c}_produtor", ""), res, br=True) for c in ("titulo", "causa", "acao")})
 
     def _agrupar_problemas(self, resultado: Resultado) -> None:

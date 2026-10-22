@@ -13,10 +13,12 @@ export interface Alerta {
   // mesmos fatos em linguagem do produtor (vazio = usar o texto técnico)
   titulo_produtor?: string; causa_produtor?: string; acao_produtor?: string; problema?: string; tambem?: string[]
   contexto?: { fato: string; valor: any }[]
+  resolucao_produtor?: string | null
+  ajuste?: { tipo: 'oferta' | 'proteina'; pct?: number; sentido?: number; pp?: number } | null
 }
 export interface ItemHistorico {
   id: number; alerta_id: number; lote_id: number; data_hora: string; tipo: string; descricao: string
-  automatico: boolean; ref?: Record<string, any> | null
+  automatico: boolean; ref?: Record<string, any> | null; descricao_produtor?: string | null
   alerta?: { id: number; regra: string; titulo: string; titulo_produtor?: string; nivel: Nivel; estado: EstadoAlerta; categoria: string }
 }
 export interface Premissa { fato: string; op: string; esperado: any; valor: any; cf: number }
@@ -51,7 +53,8 @@ export interface Lote {
   leite: number | null; gordura: number | null; proteina: number | null
 }
 export interface EtapaTransicao { dia: number; data: string; pct_nova: number; itens: ItemDieta[] }
-export interface Transicao { dias: number; de_versao: number | null; plano: EtapaTransicao[]; alerta?: Alerta | null }
+export interface Transicao { dias: number; de_versao: number | null; plano: EtapaTransicao[]; alerta?: Alerta | null
+  ajuste_oferta?: { fator: number; desde: string } }
 export interface Dieta { id: number; lote_id: number; versao: number; itens: ItemDieta[]; origem: string; motivo: string; inicio: string; ativa: boolean; parecer?: any
   transicao?: Transicao | null }
 
@@ -186,8 +189,75 @@ export const ROTULOS_PRODUTOR: Record<string, string> = {
   'hipotese.queda_sustentada': 'Leite caindo há vários dias', 'hipotese.acidose': 'Suspeita de acidose', 'hipotese.mastite': 'Suspeita de mastite',
   'hipotese.ben_severo': 'Emagrecimento forte', 'hipotese.causa_calor': 'Calor como causa', 'hipotese.dgl': 'Queda da gordura do leite',
   'estoque.dias_restantes': 'Dias de estoque', 'estoque.saldo_kg': 'Estoque (kg)',
+  // dieta e exigências
+  'dieta': 'Dieta', 'dieta.itens': 'Dieta', 'dieta.ell_mcal': 'Energia da comida oferecida', 'dieta.ell_mcal_kg': 'Energia por kg de comida',
+  'dieta.ndt_pct': 'Energia da dieta (NDT)', 'dieta.fdnd_forragem': 'Quanto da fibra do volumoso é digerida',
+  'dieta.inclusao_excedida': 'Alimentos acima do máximo seguro', 'dieta.cana_unico_volumoso': 'Só cana como volumoso',
+  'dieta.n_volumosos': 'Quantos volumosos', 'dieta.tem_pastejo': 'Tem pasto na dieta',
+  'dieta.ca_pct': 'Cálcio da dieta', 'dieta.p_pct': 'Fósforo da dieta', 'dieta.mg_pct': 'Magnésio da dieta', 'dieta.k_pct': 'Potássio da dieta',
+  'dieta.na_pct': 'Sódio da dieta', 'dieta.cl_pct': 'Cloro da dieta', 'dieta.s_pct': 'Enxofre da dieta',
+  'exig.cms_equacao': 'Quanto a vaca come (pela conta da raça)', 'exig.cms_teto_fibra': 'Quanto a vaca come antes de encher o rúmen',
+  'exig.cms_ajuste_fdnd': 'Ajuste pela fibra mais ou menos digestível',
+  'exig.cms_observado': 'Quanto o lote come de verdade (cocho vazio)', 'mon.ms_ofertada_cocho': 'Comida que estava no cocho (matéria seca)',
+  'exig.ell_mantenca': 'Energia para se manter', 'exig.ell_leite': 'Energia para produzir o leite', 'exig.ell_gestacao': 'Energia para o bezerro',
+  'exig.ell_crescimento': 'Energia para as novilhas crescerem', 'exig.ell_atividade': 'Energia gasta andando no pasto',
+  'exig.ell_ecc': 'Energia para recuperar o escore', 'exig.pm_leite': 'Proteína para o leite', 'exig.pm_gestacao': 'Proteína para o bezerro',
+  'meta': 'Metas da dieta', 'meta.fator_energia_min': 'Energia mínima aceita (do necessário)', 'meta.ecc_max': 'Escore corporal máximo da fase',
+  'meta.sobras': 'Sobra certa no cocho', 'meta.altura': 'Altura certa do pasto', 'meta.altura.entrada_max': 'Altura máxima para entrar no piquete',
+  'meta.altura.saida_min': 'Altura mínima para tirar as vacas', 'meta.altura.media_min': 'Altura mínima do pasto', 'meta.altura.media_max': 'Altura máxima do pasto',
+  'parecer.dieta': 'Resultado da dieta', 'parecer.bloqueio': 'Dieta com problema grave',
+  'ver.deficit_energetico': 'Falta energia', 'ver.deficit_proteico': 'Falta proteína', 'ver.risco_acidose': 'Risco de acidose',
+  'ver.excesso_energetico': 'Energia demais', 'ver.excesso_gordura': 'Gordura demais', 'ver.oferta_excessiva': 'Comida demais (vai sobrar)',
+  'ver.subalimentacao': 'Comida de menos', 'ver.volumoso_limitante': 'Volumoso fraco para a produção', 'ver.inclusao_excedida': 'Alimento acima do máximo',
+  'ver.pastejo_em_confinado': 'Pasto em lote confinado', 'ver.dcad_alta': 'Dieta aniônica não está ácida', 'ver.ecc_alto': 'Vacas gordas demais',
+  // perfil e lote
+  'perfil.equacao_cms': 'Conta de consumo usada', 'perfil.cms_baixa_confianca': 'Consumo difícil de prever', 'perfil.cms_pct_pv': 'Consumo (% do peso)',
+  'perfil.atividade_pastejo': 'Gasta energia andando', 'perfil.crescimento': 'Novilhas ainda crescendo', 'perfil.dias_gestacao': 'Dias de prenhez',
+  'perfil.itu_limiar': 'Calor que a raça aguenta', 'perfil.semana_lactacao': 'Semana de lactação',
+  'lote.dias_gestacao': 'Dias de prenhez', 'lote.forrageira': 'Capim do pasto', 'lote.lactose': 'Lactose do leite', 'lote.relevo': 'Terreno',
+  'lote.n_vacas': 'Vacas no lote', 'fazenda.preco_leite': 'Preço do leite',
+  // acompanhamento
+  'mon.bonificacao_detalhe': 'Itens fora da melhor faixa do laticínio', 'mon.bonificacao_perda_rs_mes': 'Bonificação que deixa de ganhar (R$/mês)',
+  'mon.preco_leite_efetivo': 'Preço do leite com a bonificação', 'mon.custo_dieta_vaca': 'Custo da comida por vaca/dia',
+  'mon.custo_conc_litro_ref': 'Concentrado por litro (normal do mês)', 'mon.cms_medido': 'Quanto as vacas comeram (oferta − sobra)',
+  'mon.ecm': 'Leite corrigido pela gordura e proteína', 'mon.litros_lote': 'Leite do lote no dia', 'mon.perda_ccs': 'Perda de leite pela CCS',
+  'mon.calibrando_dias': 'Dias de dados para aprender a curva', 'mon.sem_registro_hoje': 'Sem anotação hoje',
+  'mon.horas_desde_correcao_ms': 'Horas desde a correção da silagem', 'mon.ms_silagem_formulacao': 'Matéria seca da silagem na dieta',
+  'mon.silagem_kg_mn_atual': 'Silagem por vaca hoje (kg)', 'mon.silagem_kg_mn_novo': 'Silagem por vaca corrigida (kg)',
+  'mon.silagem_kg_ms': 'Silagem por vaca (matéria seca)', 'mon.silo_novo': 'Silo novo aberto', 'mon.sobras_texto': 'Leitura do cocho',
+  'mon.ruminacao_queda': 'Queda da ruminação (min/dia)',
+  'laudo.gordura': 'Gordura do leite (laudo)', 'laudo.proteina': 'Proteína do leite (laudo)', 'laudo.proteina_delta_abs': 'Mudança da proteína do leite',
+  'hipotese.causa_volumoso': 'Volumoso novo como causa', 'hipotese.causa_dieta_nova': 'Dieta nova como causa', 'hipotese.acidose_reforcada': 'Acidose confirmada por outro sinal',
+  // formulação, transição, estoque e previsão
+  'formulacao.solicitada': 'Pedido de dieta mais barata', 'pl.status': 'Resultado da dieta mais barata', 'pl.restricoes_violadas': 'O que não deu para atender',
+  'pl.alimentos_excluidos': 'Alimentos que não podem entrar', 'pl.ms_min': 'Comida mínima (matéria seca)', 'pl.ms_max': 'Comida máxima (matéria seca)',
+  'pl.ell_min': 'Energia mínima', 'pl.ell_max': 'Energia máxima', 'pl.pb_min': 'Proteína mínima', 'pl.pb_max': 'Proteína máxima',
+  'pl.fdn_max_kg': 'Fibra máxima que cabe no rúmen (kg)', 'pl.cana_max_pct_volumoso': 'Máximo de cana no volumoso', 'pl.excluir_pastejo': 'Sem pasto (lote confinado)',
+  'pl.dcad_max': 'DCAD máxima',
+  'transicao.dias': 'Dias de troca de dieta', 'transicao.dias_volumoso': 'Dias pela troca do volumoso', 'transicao.dias_concentrado': 'Dias pelo aumento de concentrado',
+  'transicao.dias_geral': 'Dias pela mudança da dieta', 'transicao.motivo_volumoso': 'Volumoso trocado', 'transicao.mudanca_pct': 'Quanto da dieta muda (%)',
+  'transicao.volumoso_trocado_pct': 'Quanto do volumoso muda (%)', 'transicao.concentrado_delta_kg': 'Mudança no concentrado (kg)',
+  'estoque.consumo_kg_dia': 'Gasto por dia (kg)', 'estoque.consumo_texto': 'Gasto por dia', 'estoque.data_pedido': 'Data para fazer o pedido',
+  'estoque.item_nome': 'Insumo', 'estoque.saldo_texto': 'Estoque',
+  'prev.dias': 'Dias da previsão', 'prev.lote.nome': 'Lote', 'prev.lote.leite_total': 'Leite previsto do lote', 'prev.lote.margem_total': 'Sobra prevista do lote (R$)',
+  'prev.lote.variacao_leite_pct': 'Mudança prevista no leite (%)', 'prev.lote.dias_para_secagem': 'Dias para secar',
+  'prev.lote.leite_dia_antes_secagem': 'Leite por dia antes de secar', 'prev.lote.data_margem_negativa': 'Data em que a comida passa a custar mais que o leite',
+  'prev.lote.dias_margem_negativa': 'Dias com a comida custando mais que o leite', 'prev.lote.sobra_energia_l': 'Leite a mais que a energia da dieta sustenta',
+  'prev.fazenda.margem_total': 'Sobra prevista da fazenda (R$)', 'prev.fazenda.variacao_receita_pct': 'Mudança prevista no dinheiro do leite (%)',
 }
-export const rotulo = (f: string) => (modoAtual === 'produtor' && ROTULOS_PRODUTOR[f]) || ROTULOS[f] || f
+/** Nome do fato na visão atual. O produtor nunca vê o nome interno (tests/test_novidades.py cobra rótulo para todo fato). */
+export const rotulo = (f: string) => modoAtual === 'produtor'
+  ? ROTULOS_PRODUTOR[f] || ROTULOS[f] || f.split('.').pop()!.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
+  : ROTULOS[f] || f
+
+const FATO_NO_TEXTO = /\b(?:mon|laudo|ver|dieta|exig|meta|clima|lote|perfil|prev|estoque|transicao|pl|hipotese|parecer)\.[a-z_][\w.]*[a-z0-9_]/g
+/** Texto gravado pelo sistema (histórico, resolução) na linguagem da visão atual: nomes de fatos viram rótulos e,
+ * para o produtor, números saem com vírgula. */
+export function legivel(texto?: string | null): string {
+  if (!texto) return ''
+  if (modoAtual !== 'produtor') return texto
+  return texto.replace(FATO_NO_TEXTO, (f) => rotulo(f)).replace(/(\d)\.(\d)/g, '$1,$2')
+}
 
 /** Título, causa e ação do alerta na linguagem da visão atual. */
 export function textoAlerta(a: Alerta) {

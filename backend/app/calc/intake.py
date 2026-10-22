@@ -47,7 +47,9 @@ def cms_nasem2021(pv: float, leite: float, gordura_pct: float, proteina_pct: flo
     return base * (1 - (0.212 + par * 0.136) * math.exp(-0.053 * del_))
 
 
-def cms_final(equacao: float, ajuste: float = 0.0, teto: float | None = None) -> float:
-    """CMS esperado = equação + ajustes (ex.: digestibilidade da FDN), limitado pelo teto de enchimento."""
+def cms_final(equacao: float, ajuste: float = 0.0, teto: float | None = None, observado: float | None = None) -> float:
+    """CMS esperado = equação + ajustes (ex.: digestibilidade da FDN), limitado pelo teto de enchimento. Consumo
+    observado (o lote comeu tudo o que recebeu) é piso: a medição vence a previsão."""
     valor = equacao + (ajuste or 0.0)
-    return min(valor, teto) if teto is not None else valor
+    valor = min(valor, teto) if teto is not None else valor
+    return max(valor, observado) if observado is not None else valor

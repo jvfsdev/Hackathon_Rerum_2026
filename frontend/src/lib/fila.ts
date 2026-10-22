@@ -6,7 +6,8 @@
  * 3. Recusa do servidor (4xx, ou 5xx com corpo) nunca some: vai para "recusados", com o motivo, até reenviar ou descartar.
  * 4. Uma sincronização por vez; quem pede durante uma em andamento espera a mesma. O que entra na fila durante a
  *    sincronização é preservado: a fila é relida a cada item e só o item processado sai.
- * 5. Envio novo com fila pendente entra no fim da fila (não fura a ordem). */
+ * 5. Envio novo com fila pendente entra no fim da fila (não fura a ordem).
+ * 6. Reenvio sem resposta em `prazoMs` conta como sem conexão: a fila não trava esperando uma requisição pendurada. */
 export interface Pendente { id: string; caminho: string; corpo: any; descricao: string; criado: string }
 export interface Recusado extends Pendente { erro: string; quando: string }
 
@@ -17,11 +18,20 @@ interface Armazenamento { getItem(k: string): string | null; setItem(k: string, 
 let post: (caminho: string, corpo: any) => Promise<any> = async () => { throw new TypeError('fila não configurada') }
 let aoMudar: () => void = () => {}
 let armazenamento: Armazenamento | null = typeof localStorage !== 'undefined' ? localStorage : null
+let prazoMs = 30_000
 
-export function configurarFila(c: { post?: typeof post; aoMudar?: () => void; armazenamento?: Armazenamento }) {
+export function configurarFila(c: { post?: typeof post; aoMudar?: () => void; armazenamento?: Armazenamento; prazoMs?: number }) {
   if (c.post) post = c.post
   if (c.aoMudar) aoMudar = c.aoMudar
   if (c.armazenamento) armazenamento = c.armazenamento
+  if (c.prazoMs) prazoMs = c.prazoMs
+}
+
+/** Reenvio com prazo: sem resposta a tempo, desiste (sem conexão) e tenta de novo no próximo ciclo. */
+function comPrazo<T>(p: Promise<T>): Promise<T> {
+  let t: ReturnType<typeof setTimeout>
+  const limite = new Promise<never>((_, rej) => { t = setTimeout(() => rej(Object.assign(new Error('sem resposta'), { semConexao: true })), prazoMs) })
+  return Promise.race([p, limite]).finally(() => clearTimeout(t))
 }
 
 export function lerJSON<T>(chave: string, padrao: T): T {
@@ -50,7 +60,7 @@ export function sincronizarFila(): Promise<void> {
     try {
       for (let p = lerFila()[0]; p; p = lerFila()[0]) {
         try {
-          await post(p.caminho, p.corpo)
+          await comPrazo(post(p.caminho, p.corpo))
           tirarDaFila(p.id)
         } catch (e: any) {
           if (semConexao(e)) break
@@ -91,4 +101,6 @@ export function reenviarRecusado(id: string) {
   const { erro: _e, quando: _q, ...p } = r
   enfileirar(p)
 }
+/** Tira da fila um registro guardado que o usuário não quer mais enviar. */
+export function descartarPendente(id: string) { tirarDaFila(id) }
 export function descartarRecusado(id: string) { gravarJSON(CHAVE_RECUSADOS, lerRecusados().filter((x) => x.id !== id)); aoMudar() }

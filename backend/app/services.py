@@ -33,8 +33,9 @@ def recarregar_kb() -> BaseConhecimento:
 
 
 # ------------------------------------------------------------------ fatos de entrada
-def fatos_lote(lote: Lote, d: date | None = None, h: HistoricoLote | None = None) -> dict:
-    """Fatos lote.* (DEL e gestação avançam a partir da data de referência)."""
+def fatos_lote(lote: Lote, d: date | None = None, h: HistoricoLote | None = None, s: Session | None = None) -> dict:
+    """Fatos lote.* (DEL e gestação avançam a partir da data de referência). Com sessão e histórico, também a
+    evidência medida que as exigências usam (cocho vazio → consumo observado)."""
     d = d or date.today()
     dias = (d - lote.data_ref).days
     f = {"lote.estado": lote.estado, "lote.sistema": lote.sistema, "lote.grupo_genetico": lote.grupo_genetico,
@@ -68,7 +69,29 @@ def fatos_lote(lote: Lote, d: date | None = None, h: HistoricoLote | None = None
             pts = h.serie(f"laudo_{ind}", d)
             if pts:
                 f[f"lote.{ind}"] = pts[-1][1]
+        if s is not None:
+            f.update(_evidencia_cocho(s, lote, d, h))
     return f
+
+
+def _evidencia_cocho(s: Session, lote: Lote, d: date, h: HistoricoLote) -> dict:
+    """Leituras seguidas de cocho vazio até d e a MS que estava no cocho (a leitura da manhã mostra o trato da véspera)."""
+    from .monitor.fatos import leituras_cocho
+    leituras = leituras_cocho(h, d, kb().params, dias=10)
+    vazio, ultima = 0, None
+    for l in reversed(leituras):
+        if l["vazio"] and (d - l["data"]).days == vazio:
+            vazio, ultima = vazio + 1, ultima or l["data"]
+        else:
+            break
+    if not vazio:
+        return {}
+    vespera = ultima - timedelta(days=1)
+    itens = itens_do_dia(dieta_vigente(s, lote.id, vespera), vespera)
+    if not itens:
+        return {"mon.dias_cocho_vazio": vazio}
+    ms = composicao_itens(itens, precos_fazenda(s, lote.fazenda_id), catalogo(s, lote.fazenda_id)).get("ms_kg")
+    return {"mon.dias_cocho_vazio": vazio, **({"mon.ms_ofertada_cocho": ms} if ms else {})}
 
 
 # ------------------------------------------------------------------ catálogo de alimentos (base + fazenda)
@@ -324,7 +347,7 @@ def avaliar_lote(s: Session, lote: Lote, itens: list[dict] | None = None) -> dic
     dieta = dieta_ativa(s, lote.id)
     simulacao = itens is not None
     itens = itens if simulacao else (dieta.itens if dieta else None)
-    fatos = fatos_lote(lote, date.today(), h)
+    fatos = fatos_lote(lote, date.today(), h, s)
     out = avaliar(fatos, itens, precos=precos_fazenda(s, lote.fazenda_id), cat=catalogo(s, lote.fazenda_id))
     out["sessao_id"] = _salvar_sessao(s, lote.id, "avaliacao", out)
     if not simulacao and dieta:
@@ -352,7 +375,7 @@ def alertas_resultado(pacote: dict) -> Resultado:
     r = resultado_de_dict(pacote)
     r.alertas = [Alerta(**{k: a[k] for k in ("regra", "nivel", "titulo", "causa", "acao", "categoria", "cf", "fonte",
                                              "forca", "status", "nota", "problema", "titulo_produtor", "causa_produtor",
-                                             "acao_produtor") if k in a}) for a in pacote["alertas"]]
+                                             "acao_produtor", "ajuste") if k in a}) for a in pacote["alertas"]]
     return r
 
 
@@ -364,7 +387,7 @@ def episodios_por_regra(s: Session, lote_id: int, origem: str) -> dict:
 
 # ------------------------------------------------------------------ formulação (PL)
 def formular(fatos: dict, alimentos_ids: list[str], precos: dict | None = None, cat: dict | None = None,
-             resolver=None) -> dict:
+             resolver=None, pb_teto: float | None = None) -> dict:
     """Formulação: o motor monta metas e restrições, o PL acha as quantidades e a verificação confere.
     `resolver(alimentos, restricoes)` troca o objetivo do PL (padrão: custo mínimo; ver ajuste_dieta)."""
     base = kb()
@@ -385,6 +408,10 @@ def formular(fatos: dict, alimentos_ids: list[str], precos: dict | None = None, 
                   "margem": base.params["pl_margem"]["valor"], "fator_ms_min": base.params["pl_fator_ms_min"]["valor"],
                   "teto_fibra_aplica": v("exig.cms_equacao") is not None, "ell_max": v("pl.ell_max"),
                   "dcad_max": v("pl.dcad_max"), "dcad_folga": base.params["pl_margem_dcad"]["valor"]}
+    if pb_teto is not None:      # proposta de um aviso (NUL alto): baixar a PB, nunca abaixo do mínimo que o lote precisa
+        m = restricoes["margem"]
+        piso = restricoes["pb_min"] * (1 + m) / (1 - m) + 0.01
+        restricoes["pb_max"] = max(min(restricoes["pb_max"], pb_teto), piso)
     alimentos = [alimento_com_preco(a, precos, cat) for a in alimentos_ids]
     excluidos = [a["nome"] for a in alimentos if restricoes["excluir_pastejo"] and a.get("pastejo")]
     wm.declarar("pl.alimentos_excluidos", excluidos, origem="sistema")
@@ -437,13 +464,13 @@ def arredondar_kg(kg: float) -> float:
 def formular_lote(s: Session, lote: Lote, alimentos_ids: list[str], precos: dict | None = None) -> dict:
     """Formula com os preços vigentes da fazenda; `precos` (opcional) simula outros valores sem gravar."""
     vigentes = precos_fazenda(s, lote.fazenda_id) | (precos or {})
-    out = formular(fatos_lote(lote, date.today(), historico(s, lote.id)), alimentos_ids, vigentes,
+    out = formular(fatos_lote(lote, date.today(), historico(s, lote.id), s), alimentos_ids, vigentes,
                    catalogo(s, lote.fazenda_id))
     out["sessao_id"] = _salvar_sessao(s, lote.id, "formulacao", out)
     return out
 
 
-def ajustar_dieta_lote(s: Session, lote: Lote, itens: list[dict] | None = None) -> dict:
+def ajustar_dieta_lote(s: Session, lote: Lote, itens: list[dict] | None = None, pb_teto: float | None = None) -> dict:
     """Menor mudança na dieta (ativa ou informada) que a faz passar em todas as restrições de verificação.
     Pode acrescentar alimentos do catálogo da fazenda, mas prefere mexer nos que já estão na dieta."""
     from functools import partial
@@ -461,7 +488,7 @@ def ajustar_dieta_lote(s: Session, lote: Lote, itens: list[dict] | None = None) 
         atual[a["id"]] = atual.get(a["id"], 0.0) + i["kg_mn"] * a["ms"] / 100
     ids = list(dict.fromkeys([i["alimento"] for i in itens] + list(catalogo(s, lote.fazenda_id, so_ativos=True))))
     resolver = partial(lp.ajuste_minimo, atual=atual, peso_novo=kb().params["ajuste_peso_alimento_novo"]["valor"])
-    out = formular(fatos_lote(lote, date.today(), historico(s, lote.id)), ids, precos, cat, resolver=resolver)
+    out = formular(fatos_lote(lote, date.today(), historico(s, lote.id), s), ids, precos, cat, resolver=resolver, pb_teto=pb_teto)
     # alertas informativos da formulação falam de "custo mínimo"; aqui só interessam os diagnósticos
     out["alertas"] = [a for a in out["alertas"] if a["nivel"] == "critico"]
     if out["pl"].get("itens"):
@@ -530,6 +557,100 @@ def planejar_transicao(lote: Lote, antigos: list[dict], novos: list[dict], cat: 
     alerta = next((a.to_dict() for a in resultado.alertas), None)
     return {"dias": dias, "de_versao": de_versao, "plano": plano, "fatos": {k: round(v, 2) for k, v in fatos.items()},
             "regras": resultado.disparadas(), "alerta": alerta}
+
+
+def em_transicao(dieta: Dieta | None, d: date) -> bool:
+    """A troca gradual desta versão ainda tem dias pela frente (d incluído)."""
+    return bool(dieta and dieta.transicao and date.fromisoformat(dieta.transicao["plano"][-1]["data"]) >= d)
+
+
+def fator_proporcional(antigos: list[dict], novos: list[dict]) -> float | None:
+    """Se a dieta nova é a antiga com todos os alimentos multiplicados pelo mesmo fator (ajuste de oferta), devolve o
+    fator; senão None. Tolerância de 1,5% por item por causa do arredondamento dos kg."""
+    a = {i["alimento"]: i["kg_mn"] for i in antigos if i.get("kg_mn")}
+    b = {i["alimento"]: i["kg_mn"] for i in novos if i.get("kg_mn")}
+    if not a or set(a) != set(b):
+        return None
+    razoes = [b[k] / a[k] for k in a]
+    media = sum(razoes) / len(razoes)
+    if abs(media - 1) < 1e-3 or any(abs(r / media - 1) > 0.015 for r in razoes):
+        return None
+    return media
+
+
+def escalar_transicao(transicao: dict, fator: float, desde: date) -> dict:
+    """Ajuste de oferta no meio de uma troca gradual: a troca continua igual, com os dias que faltam × fator."""
+    plano = [e | {"itens": [{"alimento": i["alimento"], "kg_mn": arredondar_kg(i["kg_mn"] * fator)} for i in e["itens"]]}
+             if e["data"] >= desde.isoformat() else e for e in transicao["plano"]]
+    return transicao | {"plano": plano, "ajuste_oferta": {"fator": round(fator, 4), "desde": desde.isoformat()}}
+
+
+def proposta_ajuste(s: Session, ep) -> dict:
+    """Dieta proposta por um aviso que carrega `ajuste` (decidido pela regra): oferta ± x% ou proteína − x p.p.
+    Nada é gravado: a tela da dieta mostra a proposta para o usuário conferir e salvar."""
+    lote = s.get(Lote, ep.lote_id)
+    dieta = dieta_ativa(s, lote.id)
+    aj = ep.ajuste or {}
+    if not aj or dieta is None:
+        raise EntradaInvalida("este aviso não traz uma proposta de dieta")
+    cat = catalogo(s, lote.fazenda_id)
+    hoje = date.today()
+    base = dieta.itens
+    out = {"tipo": aj["tipo"], "dieta_versao": dieta.versao, "em_transicao": em_transicao(dieta, hoje), "nota": None}
+    if aj["tipo"] == "oferta":
+        pct = aj["pct"] * aj.get("sentido", 1)
+        itens = [{"alimento": i["alimento"], "kg_mn": arredondar_kg(i["kg_mn"] * (1 + pct / 100))} for i in base]
+        verbo = "Aumentar" if pct > 0 else "Diminuir"
+        out |= {"itens": itens, "motivo": f"{verbo} a oferta {abs(pct):g}% (aviso de cocho)",
+                "texto": f"{verbo} todos os alimentos em {abs(pct):g}%, na mesma proporção.",
+                "texto_produtor": f"{verbo} o trato em {abs(pct):g}%: cada alimento na mesma proporção."}
+        # junta os avisos da dieta: se a dieta com a nova oferta ainda tem problema (ex.: falta energia), aplica por
+        # cima a menor mudança que resolve tudo (mesmo PL e mesma verificação), em vez de propor só a oferta
+        aval = avaliar_lote(s, lote, itens)
+        if aval["fatos"].get("parecer.dieta", {}).get("valor") not in (None, "adequada"):
+            problemas = [a.get("titulo_produtor") or a["titulo"] for a in aval["alertas"]
+                         if a["status"] == "ativo" and a["nivel"] != "informativo"]
+            r = ajustar_dieta_lote(s, lote, itens)
+            if r["pl"]["status"] in ("otimo", "parcial") and r["pl"].get("itens"):
+                out |= {"itens": r["pl"]["itens"], "corrige": problemas, "pl_status": r["pl"]["status"],
+                        "motivo": f"{verbo} a oferta {abs(pct):g}% e corrigir a dieta (aviso de cocho + avisos da dieta)",
+                        "texto": f"{verbo} a oferta {abs(pct):g}% e, junto, a menor mudança que corrige: " + "; ".join(problemas) + ".",
+                        "texto_produtor": f"{verbo} o trato {abs(pct):g}% e já corrigir o resto da dieta: " + "; ".join(p.lower() for p in problemas) + "."}
+                if r["pl"]["status"] == "parcial":
+                    out["nota"] = "Com os alimentos da fazenda não dá para cobrir tudo: esta é a melhor dieta possível (veja o que falta na verificação)."
+        if out["em_transicao"] and "corrige" not in out:
+            out["nota"] = ("A troca de dieta em andamento continua igual: os dias que faltam também mudam "
+                           f"{abs(pct):g}%.")
+        elif out["em_transicao"]:
+            out["nota"] = ((out["nota"] + " ") if out["nota"] else "") + (
+                "A troca de dieta em andamento não se perde: ao salvar, a troca continua aos poucos a partir da mistura de hoje.")
+    else:   # proteina
+        comp = composicao_itens(base, precos_fazenda(s, lote.fazenda_id), cat)
+        teto = comp["pb_pct"] - aj["pp"]
+        r = ajustar_dieta_lote(s, lote, None, pb_teto=teto)
+        itens = r["pl"].get("itens") or []
+        # só vale se a proteína de fato baixar: com a PB já no mínimo do lote o PL não consegue (e até subiria a PB)
+        mudou = bool(r.get("mudancas")) and bool(itens) and \
+            composicao_itens(itens, precos_fazenda(s, lote.fazenda_id), cat)["pb_pct"] < comp["pb_pct"] - 0.05
+        if not mudou:
+            r["mudancas"] = []
+        out |= {"itens": itens if mudou else base, "mudancas": r.get("mudancas", []), "pl_status": r["pl"]["status"],
+                "motivo": "Ajuste da proteína (aviso de ureia do leite alta)",
+                "texto": f"Menor mudança na dieta com PB até {teto:.1f}% (hoje {comp['pb_pct']:.1f}%), sem descer abaixo do alvo do lote.",
+                "texto_produtor": f"Menor mudança que baixa a proteína da dieta (hoje {_br(comp['pb_pct'], 1)}%) sem faltar para as vacas."}
+        if not mudou:
+            out["nota"] = ("A proteína da dieta já está no mínimo que o lote precisa: não dá para baixar mais. "
+                           "Ureia do leite alta com proteína no limite costuma ser falta de energia: confira a energia no Resumo.")
+        if dieta.inicio >= ep.aberto_em:
+            out["nota"] = ((out["nota"] + " ") if out["nota"] else "") + (
+                f"O laudo é de {ep.aberto_em:%d/%m} e a dieta atual (v{dieta.versao}) começou em {dieta.inicio:%d/%m}: "
+                "confira no próximo laudo se a ureia já baixou antes de mudar de novo.")
+    return out
+
+
+def composicao_itens(itens: list[dict], precos: dict, cat: dict) -> dict:
+    from .calc.diet import composicao
+    return composicao(itens_dieta(itens, precos, cat))
 
 
 def itens_do_dia(dieta: Dieta | None, d: date) -> list[dict]:
@@ -618,7 +739,7 @@ def simular(s: Session, lote: Lote, itens: list[dict], leite: float | None = Non
     fazenda = s.get(Fazenda, lote.fazenda_id)
     dieta = dieta_ativa(s, lote.id)
     h = historico(s, lote.id)
-    fatos = fatos_lote(lote, date.today(), h)
+    fatos = fatos_lote(lote, date.today(), h, s)
     cat = catalogo(s, lote.fazenda_id)
     vigentes = precos_fazenda(s, lote.fazenda_id)
     vacas = vacas_em(h, lote, date.today())
@@ -689,8 +810,7 @@ def _fatos_economicos(s: Session, fazenda: Fazenda, dieta: Dieta | None, cat: di
         preco_leite += b["total"]
         if b["perda_vs_maximo"] and fatos.get("mon.litros_lote"):
             f["mon.bonificacao_perda_rs_mes"] = b["perda_vs_maximo"] * fatos["mon.litros_lote"] * 30
-            f["mon.bonificacao_detalhe"] = ", ".join(f"{p.upper()} {laudo[p]:g} → R$ {v:+.3f}/L"
-                                                    for p, v in b["por_parametro"].items())
+            f["mon.bonificacao_detalhe"] = _detalhe_bonificacao(laudo, b["por_parametro"], fazenda.bonificacao)
     f["mon.preco_leite_efetivo"] = preco_leite
     if dieta:
         comp = composicao(itens_dieta(dieta.itens, precos_fazenda(s, fazenda.id), cat))
@@ -704,6 +824,25 @@ def _fatos_economicos(s: Session, fazenda: Fazenda, dieta: Dieta | None, cat: di
                 f["mon.iofc"] = economics.iofc(lv, preco_leite, comp["custo_vaca_dia"])
                 f["mon.alimento_pct_receita"] = 100 * comp["custo_vaca_dia"] / receita
     return f
+
+
+NOME_BONIFICACAO = {"ccs": ("CCS", " mil"), "cbt": ("CBT", " mil"), "gordura": ("gordura", "%"), "proteina": ("proteína", "%")}
+
+
+def _br(v: float, casas: int) -> str:
+    return f"{v:,.{casas}f}".replace(",", "_").replace(".", ",").replace("_", ".")
+
+
+def _detalhe_bonificacao(laudo: dict, por_parametro: dict, tabela: dict) -> str:
+    """Itens do laudo que não estão na melhor faixa da tabela do laticínio, em português (vale para as duas visões)."""
+    partes = []
+    for p, rs in por_parametro.items():
+        melhor = max((float(f["rs_l"]) for f in tabela.get(p, [])), default=rs)
+        if rs < melhor:
+            nome, un = NOME_BONIFICACAO.get(p, (p, ""))
+            partes.append(f"{nome} {_br(laudo[p], 2 if un == '%' else 0)}{un} recebe R$ {_br(rs, 3)}/L, "
+                          f"a melhor faixa paga R$ {_br(melhor, 3)}/L")
+    return "; ".join(partes) or "todos os itens na melhor faixa"
 
 
 def reprocessar(s: Session, lote: Lote, inicio: date, fim: date):

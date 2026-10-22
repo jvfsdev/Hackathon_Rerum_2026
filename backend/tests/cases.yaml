@@ -327,3 +327,13 @@
   espera:
     alertas: [ACP-ACID]
     nao_disparadas: [ACP-ACID0]
+
+- id: N16
+  descricao: Cocho vazio em 3 leituras com 22 kg MS no cocho — consumo observado (22 × 1,05) vira o piso do CMS
+  testa: EXG-01V, EXG-01E
+  modulos: [classificacao, exigencias]
+  fatos: {lote.estado: lactacao, lote.del: 40, lote.grupo_genetico: holandes, lote.pv: 620, lote.leite: 30, lote.gordura: 3.6, lote.proteina: 3.1,
+          mon.dias_cocho_vazio: 3, mon.ms_ofertada_cocho: 22}
+  espera:
+    aprox: {exig.cms_observado: [23.1, 0.01], exig.cms: [23.1, 0.01]}
+    disparadas: [EXG-01V]
