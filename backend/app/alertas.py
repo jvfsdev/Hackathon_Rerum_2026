@@ -273,6 +273,14 @@ def registrar_acao(s: Session, alerta_id: int | None, lote_id: int, descricao: s
     s.commit()
 
 
+def ultima_acao(s: Session, ep: AlertaDB, so_dieta: bool = False) -> HistoricoAlerta | None:
+    """Última ação registrada pelo usuário neste episódio (opcionalmente só as que criaram uma dieta)."""
+    hs = [h for h in s.exec(select(HistoricoAlerta).where(HistoricoAlerta.alerta_id == ep.id,
+                                                          HistoricoAlerta.tipo == "acao_registrada")).all()
+          if not so_dieta or (h.ref or {}).get("dieta_id")]
+    return max(hs, key=lambda h: (h.data_hora, h.id)) if hs else None
+
+
 def historico_do(s: Session, alerta_id: int) -> list[HistoricoAlerta]:
     return s.exec(select(HistoricoAlerta).where(HistoricoAlerta.alerta_id == alerta_id)
                   .order_by(HistoricoAlerta.data_hora, HistoricoAlerta.id)).all()

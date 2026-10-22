@@ -252,6 +252,22 @@ def atualizar_lote(lote_id: int, dados: LoteIn):
         return lote
 
 
+@router.delete("/lotes/{lote_id}")
+def excluir_lote(lote_id: int):
+    """Exclui o lote e tudo o que é dele (dietas, registros, eventos, alertas e histórico, sessões do motor).
+    Estoque e preços são da fazenda e ficam; o consumo estimado passa a não contar este lote."""
+    from ..db.models import SessaoInferencia
+    with sessao() as s:
+        lote = _lote(s, lote_id)
+        for modelo in (HistoricoAlerta, AlertaDB, SessaoInferencia, Registro, Evento, Dieta):
+            for linha in s.exec(select(modelo).where(modelo.lote_id == lote_id)).all():
+                s.delete(linha)
+        s.flush()
+        s.delete(lote)
+        s.commit()
+        return {"excluido": lote_id}
+
+
 @router.get("/lotes/{lote_id}/dietas")
 def listar_dietas(lote_id: int):
     with sessao() as s:
@@ -517,12 +533,16 @@ def listar_alertas(lote_id: int | None = None, estado: str = "pendentes", dias: 
         if not incluir_suprimidos:
             q = q.where(AlertaDB.suprimido == False)  # noqa: E712
         eps = s.exec(q.order_by(AlertaDB.ultima_ocorrencia.desc(), AlertaDB.id.desc())).all()
-        return [_ep(a) for a in eps]
+        return [_ep(a, s) for a in eps]
 
 
-def _ep(a: AlertaDB) -> dict:
-    return a.model_dump() | {"data": a.ultima_ocorrencia, "status": "suprimido" if a.suprimido else "ativo",
-                             "destino": alertas.destino(a)}
+def _ep(a: AlertaDB, s=None) -> dict:
+    out = a.model_dump() | {"data": a.ultima_ocorrencia, "status": "suprimido" if a.suprimido else "ativo",
+                            "destino": alertas.destino(a)}
+    acao = alertas.ultima_acao(s, a) if s is not None and a.estado in ("aceito", "aberto") else None
+    if acao:      # ação já registrada: o aviso espera a condição sumir (a tela mostra isso em vez de pedir de novo)
+        out |= {"acao_em": acao.data_hora, "acao_descricao": acao.descricao}
+    return out
 
 
 @router.get("/alertas/{alerta_id}")
@@ -531,7 +551,7 @@ def obter_alerta(alerta_id: int):
         a = s.get(AlertaDB, alerta_id)
         if not a:
             raise HTTPException(404, "alerta não encontrado")
-        return _ep(a) | {"historico": alertas.historico_do(s, alerta_id)}
+        return _ep(a, s) | {"historico": alertas.historico_do(s, alerta_id)}
 
 
 @router.get("/alertas/{alerta_id}/proposta")

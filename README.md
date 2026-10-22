@@ -25,13 +25,13 @@ npm run dev                                 # http://localhost:5173
 
 No celular (mesma rede Wi-Fi): `npm run dev:rede` e abra `http://<ip-do-computador>:5173` — a página inicial vira o **modo campo** (registro rápido + avisos, funciona sem conexão e envia depois).
 
-Testes: `cd backend && .venv/bin/pytest -q`, com 479 testes, entre eles 37 casos de resultado conhecido em `backend/tests/cases.yaml` (os mesmos rodam na tela **Base de conhecimento**).
+Testes: `cd backend && .venv/bin/pytest -q`, com 481 testes, entre eles 37 casos de resultado conhecido em `backend/tests/cases.yaml` (os mesmos rodam na tela **Base de conhecimento**).
 
 Sem internet o sistema funciona por completo: o clima passa a ser digitado e os preços de referência ficam no último valor coletado. Para desligar a coleta diária de preços: `LEITE_SEM_COLETA=1`. Documentação interativa da API: `http://localhost:8000/docs`.
 
 ## Funcionalidades
 
-- **Lotes:** cadastro (ou a partir da consulta guiada), perfil e exigências com "como?".
+- **Lotes:** cadastro (ou a partir da consulta guiada), edição e exclusão, perfil e exigências com "como?".
 - **Dieta:** verificação com parecer e CF, sugestão de custo mínimo (PL) verificada pelas mesmas regras, editor, versões e restauração, quadrado de Pearson, DCAD no pré-parto.
 - **Acompanhamento:** produção × curva esperada com eventos no gráfico, cocho diário por escore 1–5, MS da silagem, ECC e fezes com escalas descritas, laudo do laticínio, economia (custo de concentrado, IOFC, bonificação), importação CSV.
 - **Alertas:** causa provável, ação sugerida, aceitar (leva à tela da ação) ou recusar com motivo, resolução automática explicada e histórico (também em linguagem do produtor).
@@ -67,6 +67,7 @@ Sem internet o sistema funciona por completo: o clima passa a ser digitado e os 
 - [docs/regras.md](docs/regras.md): regras de produção, parâmetros e alimentos (gerado da base).
 - [docs/processo-ia.md](docs/processo-ia.md): processo de desenvolvimento com IA.
 - [docs/plano.md](docs/plano.md): plano completo.
+- [docs/apresentacao/](docs/apresentacao/): slides da apresentação (`CochoCerto.pptx`, com notas do apresentador, e `CochoCerto.pdf`).
 - Referências de domínio: `dossie.md`, `dados.md`, `Inferências de dados leiteiros por lote.md`.
 
 ## Fontes de dados

@@ -597,6 +597,17 @@ def proposta_ajuste(s: Session, ep) -> dict:
     hoje = date.today()
     base = dieta.itens
     out = {"tipo": aj["tipo"], "dieta_versao": dieta.versao, "em_transicao": em_transicao(dieta, hoje), "nota": None}
+    # o aviso continua aberto até a condição sumir; se a dieta já foi ajustada por ele e ainda não há evidência nova
+    # (leituras de cocho com a dieta nova, laudo novo), não propõe de novo: senão cada clique somaria mais um ajuste
+    acao = alertas.ultima_acao(s, ep, so_dieta=True)
+    feita = s.get(Dieta, acao.ref["dieta_id"]) if acao else None
+    if feita is not None and not _evidencia_nova(s, lote, aj["tipo"], feita.inicio, hoje):
+        espera = ("as próximas leituras do cocho: o aviso fecha sozinho quando o cocho parar de amanhecer vazio, e só "
+                  "se continuar vazio com a dieta nova o sistema propõe outro ajuste") if aj["tipo"] == "oferta" else \
+                 "o próximo laudo do laticínio, que mostra se a ureia do leite baixou"
+        return out | {"ja_aplicado": True, "itens": base, "motivo": "",
+                      "texto": f"A dieta já foi ajustada por este aviso em {feita.inicio:%d/%m} (v{feita.versao}). Aguarde {espera}.",
+                      "texto_produtor": f"Você já ajustou a dieta por este aviso em {feita.inicio:%d/%m}. Agora é esperar {espera}."}
     if aj["tipo"] == "oferta":
         pct = aj["pct"] * aj.get("sentido", 1)
         itens = [{"alimento": i["alimento"], "kg_mn": arredondar_kg(i["kg_mn"] * (1 + pct / 100))} for i in base]
@@ -646,6 +657,22 @@ def proposta_ajuste(s: Session, ep) -> dict:
                 f"O laudo é de {ep.aberto_em:%d/%m} e a dieta atual (v{dieta.versao}) começou em {dieta.inicio:%d/%m}: "
                 "confira no próximo laudo se a ureia já baixou antes de mudar de novo.")
     return out
+
+
+def _evidencia_nova(s: Session, lote: Lote, tipo: str, desde: date, hoje: date) -> bool:
+    """Há dado medido DEPOIS da dieta ajustada que ainda sustenta o aviso? Oferta: leituras seguidas de cocho vazio
+    posteriores ao início da dieta (a leitura da manhã mostra o trato da véspera). Proteína: laudo novo."""
+    h = historico(s, lote.id)
+    if tipo == "oferta":
+        from .monitor.fatos import leituras_cocho
+        vazio = 0
+        for l in reversed(leituras_cocho(h, hoje, kb().params, dias=10)):
+            if l["data"] > desde and l["vazio"] and (hoje - l["data"]).days == vazio:
+                vazio += 1
+            else:
+                break
+        return vazio >= kb().params["cocho_vazio_dias"]["valor"]
+    return any(d > desde for ind in ("laudo_nul", "laudo_ureia") for d, _ in h.serie(ind, hoje))
 
 
 def composicao_itens(itens: list[dict], precos: dict, cat: dict) -> dict:

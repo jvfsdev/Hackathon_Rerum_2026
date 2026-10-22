@@ -14,6 +14,7 @@ export interface Alerta {
   titulo_produtor?: string; causa_produtor?: string; acao_produtor?: string; problema?: string; tambem?: string[]
   contexto?: { fato: string; valor: any }[]
   resolucao_produtor?: string | null
+  acao_em?: string | null; acao_descricao?: string | null
   ajuste?: { tipo: 'oferta' | 'proteina'; pct?: number; sentido?: number; pp?: number } | null
 }
 export interface ItemHistorico {

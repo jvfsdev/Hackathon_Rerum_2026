@@ -87,6 +87,8 @@ chave `problema`: viram um alerta só (o mais grave, citando os demais) e um ún
   da dieta abre com a proposta (`GET /alertas/{id}/proposta`, `services.proposta_ajuste`). A de cocho junta os avisos da
   dieta: se a dieta com a nova oferta ainda tem problema, aplica o ajuste mínimo do PL por cima. Ajuste de oferta no meio
   de uma troca gradual escala os dias que faltam; outra mudança replaneja a troca a partir da mistura do dia.
+  A proposta não se repete: depois de aplicada, só volta se houver dado novo que ainda sustente o aviso (cocho vazio
+  com a dieta nova, laudo novo); até lá o aviso mostra a ação registrada e espera a condição sumir.
 - Cada passo do histórico e a resolução têm também texto do produtor (`descricao_produtor`, `resolucao_produtor`).
 
 ## Motor de inferência (`backend/app/engine/`)

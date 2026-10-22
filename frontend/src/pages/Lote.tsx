@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, NavLink, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom'
+import { Link, NavLink, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { CartesianGrid, ComposedChart, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, certeza, comEpisodios, dataBR, fmt, numero, OPCOES, reais, rotulo, tecnico, textoAlerta, UNIDADES, type Alerta, type Alimento, type Dieta, type ItemDieta, type ItemHistorico, type Lote, type Resultado, hora, NOME_INDICADOR, porDia, valorIndicador, type Registro, mudou, paraCampo, hojeLocal, diasAtras } from '../api'
 import LoteForm from '../components/LoteForm'
@@ -16,6 +16,11 @@ export default function LotePagina() {
   const [info, setInfo] = useState<{ lote: Lote; fatos: Record<string, any>; dieta: Dieta | null } | null>(null)
   const [erro, setErro] = useState('')
   const [editando, setEditando] = useState(false)
+  const navegar = useNavigate()
+  const excluir = async () => {
+    if (!info || !window.confirm(`Excluir "${info.lote.nome}"? Somem também as dietas, os registros, os eventos e os avisos deste lote. Não dá para desfazer.`)) return
+    try { await api.del(`/lotes/${info.lote.id}`); navegar('/') } catch (e: any) { setErro(e.message) }
+  }
   const recarregar = useCallback(() => { api.get<any>(`/lotes/${id}`).then(setInfo).catch((e) => setErro(e.message)) }, [id])
   useEffect(recarregar, [recarregar])
   if (erro) return <Erro msg={erro} />
@@ -34,6 +39,10 @@ export default function LotePagina() {
         acoes={<button className="btn-secundario" onClick={() => setEditando(true)}><Icone nome="lapis" />Editar lote</button>} />
       <Gaveta aberta={editando} onFechar={() => setEditando(false)} titulo={`Editar ${lote.nome}`}>
         <LoteForm lote={lote} fatos={fatos} onSalvo={() => { setEditando(false); recarregar() }} />
+        <div className="mt-6 border-t border-stone-200 pt-4">
+          <p className="text-sm text-stone-600">Lote vendido, desfeito ou criado por engano? Excluir apaga também as dietas, os registros, os eventos e os avisos dele.</p>
+          <button id="excluir-lote" className="mt-2 rounded-lg px-3 py-2 text-sm font-semibold text-critico ring-1 ring-red-200 hover:bg-red-50" onClick={excluir}>Excluir lote</button>
+        </div>
       </Gaveta>
       <nav className="-mx-4 -mt-1 flex overflow-x-auto border-b border-stone-300/70 px-4 sm:mx-0 sm:px-0" aria-label="Seções do lote">
         <NavLink end to="" className={aba}>{tecnico() ? 'Perfil e exigências' : 'Resumo'}</NavLink>
@@ -409,7 +418,8 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
     if (!alerta?.id || !alerta.ajuste || !dietaAtiva) { setProposta(null); return }
     api.get<any>(`/alertas/${alerta.id}/proposta`).then((p) => {
       setProposta(p)
-      carregarNoEditor(p.itens, tecnico() ? 'Proposta do aviso' : 'Proposta do aviso (já ajustada)', 'ajuste', p.motivo)
+      // dieta já ajustada por este aviso e sem dado novo: não aplica de novo (senão cada clique somaria mais um ajuste)
+      if (!p.ja_aplicado) carregarNoEditor(p.itens, tecnico() ? 'Proposta do aviso' : 'Proposta do aviso (já ajustada)', 'ajuste', p.motivo)
     }).catch(() => setProposta(null))
   }, [alerta?.id, dietaAtiva?.versao])  // eslint-disable-line react-hooks/exhaustive-deps
   // veio do "o que precisaria mudar" ou do simulador com uma dieta pronta para revisar
@@ -450,7 +460,7 @@ function AbaDieta({ lote, dietaAtiva, onSalvo }: { lote: Lote; dietaAtiva: Dieta
       <BannerAcao alerta={alerta} onCancelar={concluir} />
       {proposta && alerta && (
         <div className="rounded-lg bg-white p-3 text-sm ring-1 ring-campo-100">
-          <p className="font-medium text-stone-900">{tecnico() ? proposta.texto : proposta.texto_produtor} O editor abaixo já está com a proposta: confira e salve.</p>
+          <p className="font-medium text-stone-900">{tecnico() ? proposta.texto : proposta.texto_produtor}{proposta.ja_aplicado ? '' : ' O editor abaixo já está com a proposta: confira e salve.'}</p>
           {proposta.nota && <p className="mt-1 text-stone-600">{proposta.nota}</p>}
         </div>
       )}

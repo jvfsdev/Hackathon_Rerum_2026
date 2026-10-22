@@ -86,6 +86,9 @@ cd frontend && npm install && npm run dev   # UI em :5173  (npm run dev:rede par
   no alerta; `services.proposta_ajuste` monta a dieta e a tela da dieta abre com ela ao aceitar. Ajuste de oferta no meio de
   uma troca gradual escala os dias que faltam (`services.escalar_transicao`); outra mudança parte da mistura do dia.
   O aviso de cocho junta os avisos da dieta: se a dieta com a nova oferta ainda tem problema, entra o ajuste mínimo por cima.
+  A proposta não se repete: com dieta já salva pelo aviso e sem dado novo depois dela (leituras de cocho, laudo), devolve
+  `ja_aplicado` em vez de somar outro ajuste (`services._evidencia_nova`).
+- **Excluir lote** (`DELETE /lotes/{id}`) apaga dietas, registros, eventos, alertas, histórico e sessões do lote.
 - **Medição vence a previsão:** cocho vazio (`mon.dias_cocho_vazio`, `mon.ms_ofertada_cocho`, calculados em
   `services.fatos_lote` quando recebe a sessão) vira piso do consumo (EXG-01V). Fluxos com sessão passam `s` para `fatos_lote`.
 - **Movimentação de vacas:** evento `movimentacao` com `vacas` (+ entrada, − saída) e `outro_lote_id` atualiza o nº de vacas

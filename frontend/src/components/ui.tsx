@@ -361,12 +361,18 @@ export function AlertaAcoes({ alerta, onMudou }: { alerta: Alerta; onMudou?: (a:
     <div className="mt-2">
       <div className="flex flex-wrap items-center gap-2">
         {alerta.estado === 'aceito' ? (
-          <button className="btn-primario px-3 py-1.5" onClick={() => alerta.destino && navegar(alerta.destino)}>Registrar a ação</button>
+          <button className={alerta.acao_em ? 'btn-secundario px-3 py-1.5' : 'btn-primario px-3 py-1.5'} onClick={() => alerta.destino && navegar(alerta.destino)}>
+            {alerta.acao_em ? 'Registrar outra ação' : 'Registrar a ação'}</button>
         ) : (
           <button className="btn-primario px-3 py-1.5" onClick={aceitar}>{alerta.estado === 'recusado' ? 'Aceitar agora' : 'Aceitar e registrar ação'}</button>
         )}
         {alerta.estado !== 'recusado' && !recusando && <button className="btn-secundario px-3 py-1.5" onClick={() => setRecusando(true)}>Recusar</button>}
       </div>
+      {alerta.acao_em && (
+        <p className="mt-2 rounded-lg bg-campo-50 px-2 py-1.5 text-sm text-campo-900">
+          Ação registrada em {dataBR(alerta.acao_em)}{tecnico() && alerta.acao_descricao ? `: ${alerta.acao_descricao}` : ''}. O aviso fecha sozinho quando a condição deixar de aparecer nos próximos dados.
+        </p>
+      )}
       {recusando && (
         <div className="mt-2 flex flex-wrap gap-2">
           <input autoFocus className="input max-w-md flex-1" placeholder="Motivo da recusa (obrigatório)" value={motivo}

@@ -325,3 +325,40 @@ def test_cocho_vazio_junta_os_avisos_da_dieta_numa_proposta_so(sessao_memoria):
     assert r["fatos"]["exig.cms"]["valor"] >= fatos["mon.ms_ofertada_cocho"]   # medição é o piso do consumo
     if p.get("corrige"):                                      # havia outros problemas: a proposta os resolve junto
         assert r["fatos"]["parecer.dieta"]["valor"] in ("adequada", "ajustar") and "VER-01" not in regras
+
+
+def test_proposta_do_aviso_nao_se_repete_depois_de_aplicada(sessao_memoria, monkeypatch):
+    """Salvar a dieta proposta pelo aviso de cocho e reabrir não soma outro +5%: só propõe de novo se o cocho
+    continuar vazio COM a dieta nova (leituras posteriores a ela)."""
+    from app.api import fazendas
+    from app.api.schemas import DietaIn, ItemDieta
+    from app.db.models import Registro
+    s = sessao_memoria
+    lote, _ = lote_sintetico(s, extra={(i, "escore_cocho"): 1 for i in range(37, 40)})
+    monkeypatch.setattr(fazendas, "sessao", lambda: _Mesma(s))
+    ep = _episodio(s, lote, {"tipo": "oferta", "pct": 5.0})
+    p1 = services.proposta_ajuste(s, ep)
+    assert not p1.get("ja_aplicado")
+    fazendas.nova_dieta(lote.id, DietaIn(itens=[ItemDieta(**i) for i in p1["itens"]], motivo=p1["motivo"], alerta_id=ep.id))
+    p2 = services.proposta_ajuste(s, ep)
+    assert p2["ja_aplicado"] and p2["itens"] == services.dieta_ativa(s, lote.id).itens   # não aumenta de novo
+    a = fazendas.obter_alerta(ep.id)
+    assert a["acao_em"]                                       # a tela mostra que a ação já foi registrada
+    for k in (1, 2):                                          # cocho continua vazio com a dieta nova
+        s.add(Registro(lote_id=lote.id, data=date.today() + timedelta(days=k), indicador="escore_cocho", valor=1))
+    s.commit()
+    assert not services._evidencia_nova(s, lote, "oferta", date.today(), date.today())    # hoje ainda sem leitura nova
+    assert services._evidencia_nova(s, lote, "oferta", date.today(), date.today() + timedelta(days=2))
+
+
+def test_excluir_lote_apaga_o_que_e_dele(sessao_memoria, monkeypatch):
+    from app.api import fazendas
+    from app.db.models import Lote, Registro
+    s = sessao_memoria
+    lote, _ = lote_sintetico(s)
+    monkeypatch.setattr(fazendas, "sessao", lambda: _Mesma(s))
+    services.monitorar(s, lote, date.today())
+    fazendas.excluir_lote(lote.id)
+    assert s.get(Lote, lote.id) is None
+    for modelo in (Registro, Dieta, Evento, AlertaDB, HistoricoAlerta):
+        assert not s.exec(select(modelo).where(modelo.lote_id == lote.id)).first()
