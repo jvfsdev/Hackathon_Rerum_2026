@@ -65,14 +65,15 @@ def composicao(relatorio: dict, cqbal_id: int) -> dict:
 def main(pasta: Path):
     arq = KB / "foods.yaml"
     texto = arq.read_text(encoding="utf-8")
-    cabecalho = "".join(l for l in texto.splitlines(keepends=True) if l.startswith("#"))
+    cabecalho = "".join(l for l in texto.splitlines(keepends=True) if l.startswith("#") and not l.startswith("# Composição: CQBAL"))
     alimentos = yaml.safe_load(texto)
     por_id = {a["id"]: a for a in alimentos}
     for aid, cid in MAPA.items():
         rel = json.loads((pasta / f"rel{cid}.json").read_text(encoding="utf-8"))
         novo = composicao(rel, cid)
-        if aid == "ureia":                             # NNP puro: não tem minerais (permite calcular a DCAD)
-            novo |= {m: 0.0 for m in ("ca", "p", "mg", "k", "na", "cl", "s")} | {"pb": por_id["ureia"]["pb"]}
+        if aid == "ureia":                             # NNP puro: não tem fibra, gordura, energia nem minerais (permite a DCAD)
+            novo |= {m: 0.0 for m in ("ca", "p", "mg", "k", "na", "cl", "s")} | {"fdn": 0, "ndt": 0, "ee": 0}
+            novo["fonte"] += "; FDN/EE/NDT e minerais = 0 por definição (NNP puro)"
         if aid not in por_id:
             por_id[aid] = {"id": aid, **NOVOS[aid]}
             alimentos.append(por_id[aid])

@@ -293,8 +293,8 @@ def test_laudos_respeitam_idade_e_quantidade(sessao_memoria):
 
 def test_resposta_ao_concentrado_desconta_a_curva(sessao_memoria):
     s = sessao_memoria
-    extra = {(i, "concentrado_kg_vaca"): 4.5 for i in range(30, 40)}
-    lote, _ = lote_sintetico(s, del0=200, extra=extra, eventos=[(30, "mudanca_concentrado")])
+    extra = {(i, "concentrado_kg_vaca"): 4.5 for i in range(30, 37)}      # hoje = 6º dia após a mudança (janela 5–7)
+    lote, _ = lote_sintetico(s, dias=37, del0=200, extra=extra, eventos=[(30, "mudanca_concentrado")])
     out = services.monitorar(s, lote, date.today())
     assert abs(out["fatos"]["mon.resposta_marginal"]["valor"]) < 0.1
 

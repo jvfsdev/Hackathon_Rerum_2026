@@ -128,8 +128,8 @@
     - {fato: lote.fracao_primiparas, op: ">", valor: 0}
   entao:
     - concluir: {fato: perfil.crescimento, valor: true}
-  fonte: "RBZ (primíparas perdem mais peso e ainda crescem)"
-  forca: B
+  fonte: "NRC 1989 (primíparas ainda crescem: +20% de mantença na 1ª lactação)"
+  forca: C
 
 - id: CLS-08
   versao: 2
@@ -210,7 +210,7 @@
     - {fato: lote.ur, op: existe}
   entao:
     - calcular: {fato: clima.itu, funcao: itu, args: {temp: $lote.temp, ur: $lote.ur}}
-  fonte: "IFSULDEMINAS"
+  fonte: "Thom 1959 / NRC 1971 (fórmula do ITU); Embrapa COT42"
   forca: B
 
 - id: CLS-ITUL
@@ -222,8 +222,8 @@
     - {fato: lote.grupo_genetico, op: in, valor: "@params.grupos_zebuinos"}
   entao:
     - concluir: {fato: perfil.itu_limiar, valor: "@params.itu_limiar_zebuino"}
-  fonte: "LUME UFRGS; Embrapa (ITU crítico de mestiços)"
-  forca: B
+  fonte: "LUME UFRGS (em Girolando não se achou limiar claro); Embrapa (ITU crítico de mestiços)"
+  forca: C
 
 - id: CLS-10
   versao: 2
@@ -244,6 +244,7 @@
         acao: "Garantir sombra, água à vontade e tratos nas horas mais frescas; acompanhar as sobras (consumo pode ficar abaixo do previsto)."
         titulo_produtor: "Calor incomodando as vacas"
         causa_produtor: "Com esse calor e umidade as vacas comem e produzem menos."
+        acao_produtor: "Sombra e água à vontade, trato nas horas mais frescas; veja se está sobrando comida."
   fonte: "Embrapa COT42; Negri 2021; LUME UFRGS"
   forca: B
 

@@ -71,8 +71,8 @@
     - {fato: mon.residuo, op: "<", valor: "@params.residuo_queda_atual"}
   entao:
     - concluir: {fato: hipotese.queda_sustentada, valor: true}
-  fonte: "Frontiers in Genetics 2022 (perturbação de lactação)"
-  forca: B
+  fonte: "Frontiers in Genetics 2022 (perturbação de lactação, definida por vaca com ≥10 dias); adaptada ao lote (D)"
+  forca: C
 
 - id: ACP-D03
   versao: 1
@@ -120,8 +120,8 @@
         titulo_produtor: "O leite está caindo há vários dias: {mon.litros_vaca:.1f} L por vaca"
         causa_produtor: "Hoje o lote está {mon.residuo:+.0%} em relação ao normal para esta fase, e a queda não é de um dia só."
         acao_produtor: "Veja a silagem, o calor, vacas doentes e o que mudou na semana."
-  fonte: "Frontiers in Genetics 2022; de Mol 2012 (persistência)"
-  forca: B
+  fonte: "Frontiers in Genetics 2022; de Mol 2012 (persistência); adaptada ao lote (D)"
+  forca: C
 
 - id: ACP-08
   versao: 1
@@ -254,10 +254,10 @@
         nivel: atencao
         categoria: economia
         titulo: "Alimentação consome {mon.alimento_pct_receita:.0f}% da receita (IOFC R$ {mon.iofc:.2f}/vaca/dia)"
-        causa: "Com a alimentação acima de ~60% da receita, a margem sobre o alimento (IOFC) fica baixa."
+        causa: "Com a alimentação acima de ~{@params.alimento_pct_receita_max}% da receita, a margem sobre o alimento (IOFC) fica baixa."
         acao: "Rever preços, sobras e a dieta (a sugestão de custo mínimo pode baixar o custo)."
         titulo_produtor: "A comida está levando {mon.alimento_pct_receita:.0f}% do dinheiro do leite"
-        causa_produtor: "Sobram R$ {mon.iofc:.2f} por vaca por dia depois de pagar a comida; acima de 60% a margem fica apertada."
+        causa_produtor: "Sobram R$ {mon.iofc:.2f} por vaca por dia depois de pagar a comida; acima de {@params.alimento_pct_receita_max}% da receita a margem fica apertada."
         acao_produtor: "Confira preços e sobras e peça a sugestão de dieta mais barata."
   fonte: "Penn State (IOFC)"
   forca: C
@@ -283,14 +283,15 @@
   prioridade: 55
   cf: 0.6
   se:
-    - {fato: lote.del, op: entre, valor: [150, 225]}
+    - {fato: lote.del, op: entre, valor: "@params.ea_del_faixa"}
+    - {fato: lote.grupo_genetico, op: nao_in, valor: "@params.grupos_zebuinos"}   # a referência é de Holandesas
     - {fato: mon.ea, op: "<", valor: "@params.ea_min_meio"}
   entao:
     - alerta:
         nivel: atencao
         categoria: dieta
         titulo: "Eficiência alimentar baixa: {mon.ea:.2f} kg de leite corrigido por kg de MS"
-        causa: "Abaixo de 1,3 no meio da lactação a dieta rende pouco leite por kg consumido (referência de Holandesas)."
+        causa: "Abaixo de {@params.ea_min_meio} no meio da lactação a dieta rende pouco leite por kg consumido (referência de Holandesas)."
         acao: "Conferir digestibilidade do volumoso, sobras e balanceamento; comparar com o histórico do próprio lote."
         titulo_produtor: "As vacas estão rendendo pouco leite para o que comem"
         causa_produtor: "Cada kg de comida seca está virando só {mon.ea:.2f} kg de leite."
@@ -312,7 +313,7 @@
         nivel: atencao
         categoria: dieta
         titulo: "Eficiência {mon.ea:.2f} no início da lactação: perda de peso excessiva"
-        causa: "EA acima de 2,0 no início indica leite produzido à custa de reserva corporal, não mérito da dieta."
+        causa: "EA acima de {@params.ea_max_inicio} no início indica leite produzido à custa de reserva corporal, não mérito da dieta."
         acao: "Elevar a densidade energética e acompanhar o ECC."
         titulo_produtor: "As recém-paridas estão tirando leite do próprio corpo"
         causa_produtor: "Estão produzindo muito para o que comem: estão emagrecendo."
@@ -331,8 +332,8 @@
     - {fato: mon.sobras_min3, op: existe}
   entao:
     - calcular: {fato: meta.sobras, funcao: faixa, args: {chave: $perfil.fase, tabela: "@params.sobras_faixas"}}
-  fonte: "eXtension (feed bunk management)"
-  forca: B
+  fonte: "Inferências (adaptado de eXtension, feed bunk management)"
+  forca: C
 
 - id: ACP-S03
   versao: 1
@@ -349,12 +350,12 @@
         categoria: cocho
         titulo: "Sobras baixas: {mon.sobras_texto}; meta {meta.sobras.min:.0f}–{meta.sobras.max:.0f}% (escore 3)"
         causa: "O lote está comendo tudo; o consumo pode estar limitado pela oferta."
-        acao: "Aumentar a oferta em 2–3% e esperar 3 dias antes de novo ajuste."
+        acao: "Aumentar a oferta em 2–3% e esperar {@params.sobras_dias} dias antes de novo ajuste."
         titulo_produtor: "As vacas estão limpando o cocho: {mon.sobras_texto}"
         causa_produtor: "O lote come tudo; pode estar faltando comida."
-        acao_produtor: "Aumente o trato em 2–3% e espere 3 dias antes de mexer de novo."
-  fonte: "eXtension; SDSU; Inferências (ajustar só após 3 dias fora da meta)"
-  forca: B
+        acao_produtor: "Aumente o trato em 2–3% e espere {@params.sobras_dias} dias antes de mexer de novo."
+  fonte: "Inferências (adaptado de eXtension; ajustar só após 3 dias fora da meta)"
+  forca: C
 
 - id: ACP-S04
   versao: 1
@@ -375,8 +376,8 @@
         titulo_produtor: "Está sobrando muita comida no cocho: {mon.sobras_texto}"
         causa_produtor: "A oferta está maior que o consumo, ou as vacas estão escolhendo o que comem."
         acao_produtor: "Diminua o trato em 2–3% e veja se sobra só a parte grossa."
-  fonte: "eXtension; SDSU; Dossiê ACP-07"
-  forca: B
+  fonte: "Inferências (adaptado de eXtension); Dossiê ACP-07"
+  forca: C
 
 - id: ACP-06
   versao: 1
@@ -394,9 +395,10 @@
         categoria: cocho
         titulo: "Cocho vazio há {mon.dias_cocho_vazio} leituras"
         causa: "Consumo possivelmente limitado num lote que precisa comer o máximo."
-        acao: "Aumentar a oferta ~5% e empurrar o trato mais vezes ao dia."
+        acao: "Aumentar a oferta ~{@params.sobras_ajuste_pct}% e empurrar o trato mais vezes ao dia."
+        titulo_produtor: "O cocho amanheceu vazio em {mon.dias_cocho_vazio} leituras seguidas"
         causa_produtor: "Vacas recém-paridas ou de alta produção precisam comer o máximo."
-        acao_produtor: "Aumente o trato uns 5% e empurre a comida mais vezes por dia."
+        acao_produtor: "Aumente o trato uns {@params.sobras_ajuste_pct}% e empurre a comida mais vezes por dia."
   fonte: "Dossiê ACP-06; DeVries 2023"
   forca: C
 
@@ -416,9 +418,10 @@
         categoria: cocho
         titulo: "Cocho vazio há {mon.dias_cocho_vazio} leituras"
         causa: "Oferta abaixo do consumo."
-        acao: "Aumentar a oferta ~5%."
+        acao: "Aumentar a oferta ~{@params.sobras_ajuste_pct}%."
+        titulo_produtor: "O cocho amanheceu vazio em {mon.dias_cocho_vazio} leituras seguidas"
         causa_produtor: "A comida não está dando para o lote."
-        acao_produtor: "Aumente o trato uns 5%."
+        acao_produtor: "Aumente o trato uns {@params.sobras_ajuste_pct}%."
   fonte: "Dossiê ACP-06"
   forca: C
 
@@ -438,11 +441,11 @@
         problema: cocho_alto
         titulo: "Rejeição da dieta nova: {mon.sobras_texto} ({mon.dias_dieta_nova} dia(s) após a troca)"
         causa: "Sobras acima da faixa durante a adaptação indicam que o lote estranhou a dieta (palatabilidade, mistura)."
-        acao: "Manter a etapa atual da transição por mais 2 dias antes de avançar; conferir mistura e seleção."
+        acao: "Manter a etapa atual da transição por mais {@params.transicao_extensao_dias} dias antes de avançar; conferir mistura e seleção."
         titulo_produtor: "As vacas estão estranhando a dieta nova: {mon.sobras_texto}"
         causa_produtor: "Está sobrando comida desde a troca da dieta."
-        acao_produtor: "Segure a mistura de hoje por mais 2 dias antes de avançar na troca e veja se a mistura está boa."
-  fonte: "Penn State Extension (adaptação a nova dieta); eXtension (leitura de cocho)"
+        acao_produtor: "Segure a mistura de hoje por mais {@params.transicao_extensao_dias} dias antes de avançar na troca e veja se a mistura está boa."
+  fonte: "Extensão (adaptação gradual à dieta nova: Dairy Herd/Purdue); eXtension (leitura de cocho)"
   forca: C
 
 - id: ACP-TR2

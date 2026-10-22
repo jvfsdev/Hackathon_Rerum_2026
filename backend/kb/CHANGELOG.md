@@ -1,5 +1,26 @@
 # Histórico da base de conhecimento
 
+## 1.7.0 — 21/10/2026
+Auditoria de todos os valores (10 subagentes, cada valor contra a fonte citada). Nenhum valor de composição ou equação
+era inventado; correções:
+- **Força e fonte** alinhadas ao que a fonte sustenta: corrida de 5 dias (D, adaptada de ≥10 d por vaca), ITU 72
+  (Ravagnolo, ⚠ NV; Negri achou 74), secagem aos 220 d (C), DCAD de alerta 0 (D), MS 5 p.p. (D), sobras por fase (C),
+  queda de gordura (D), validade do laudo (D), 417 Mcal/ponto de ECC (C: é energia de perda), VER-01/02, VER-15I, CLS-ITUL,
+  CLS-07, EXG-01F/04/06A–C/07, FOR-20, ACP-D02/D04/S02/S03/S03A/S04/SEC/M03/M05/M06B, PRV-02, META-04, TRN-01/02/09.
+- **Transição de dieta:** `transicao_dias_volumoso` 5 → 7 (extensão: 7–14 d) e `transicao_passo_conc` 1,0 → 0,5 kg MS/dia
+  (NFACC: 0,5–0,7 kg/dia).
+- **ACP-M06B:** CCS não suspende a coleta (só a CBT/CPP, IN 77); o limite de 500 mil é da IN 76, não do laticínio.
+- **Acidose:** G:P baixa sozinha vira informativo (ACP-ACID0); atenção só com 2ª evidência (fezes: ACP-04; ruminação:
+  ACP-S05R). ACP-S05 não conclui acidose com calor ou troca de volumoso recente.
+- **ACP-EA1:** a referência de 1,3 kg ECM/kg MS é de Holandesas: não vale para Gir, Girolando e mestiças.
+- **Sem número escondido:** textos usam `{@params.x}`; parâmetros novos para janelas e limites que estavam no código
+  (`mad_janela_dias`, `sigma_piso`, `ewma_z_cap`, `resposta_marginal_dias` = 5–7 d como nas Inferências, `ccs_tendencia_fator`
+  = +25% em 3 meses, `cocho_vazio_sobra_pct`, `custo_conc_*`, `silo_novo_dias`, `sobras_dias`, `sobras_ajuste_pct`,
+  `ecc_validade_dias`, `ruminacao_dias`, `laudo_mg3_dias`, `transicao_extensao_dias`, `ea_del_faixa`, `atividade_ondulado`,
+  `pl_margem_dcad`, `tolerancia_inclusao_pct`) e para os valores padrão da consulta guiada (`padrao_*`).
+- Perda de ECC medida em `dias_mobilizacao` (5 semanas), como diz a ACP-05. Ureia com a PB do CQBAL (281,87).
+- Casos N13–N15 (acidose com uma e duas evidências; ruminação com calor).
+
 ## 1.6.1 — 21/10/2026
 - ACP-01 e ACP-01R (NUL alto) compartilham o problema `nul_alto`: um aviso só, o mais grave (caso T8 ajustado).
 - Meta-regras do acompanhamento (ex.: META-01 "mastite primeiro") passam a valer também para os avisos da verificação

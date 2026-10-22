@@ -22,6 +22,7 @@ grupos_zebuinos: {valor: [girolando, gir, mestica], unidade: lista, fonte: "BR-L
 
 # --- Exigências ---
 k_mantenca: {valor: 0.08, unidade: "Mcal/kg PV^0,75", fonte: "NRC 2001 (NASEM 2021 usa 0,10)", forca: B, editavel: true, descricao: "Coeficiente de mantença — flag 0,08 ou 0,10"}
+atividade_ondulado: {valor: 0.003, unidade: "Mcal/kg PV", fonte: "Escolha de engenharia (metade do acréscimo de terreno acidentado do NRC 2001, 0,006)", forca: D, editavel: true, descricao: "Energia extra de pastejo em relevo ondulado"}
 peso_bezerro_kg: {valor: 44, unidade: kg, fonte: "Calibrado na tabela NRC 2001 (Drackley 2021)", forca: B, editavel: true, descricao: "Peso do bezerro ao nascer para exigência de gestação"}
 acrescimo_primiparas: {valor: 0.20, unidade: fração, fonte: "NRC 1989 (+20% de mantença na 1ª lactação)", forca: D, editavel: true, descricao: "Acréscimo de crescimento das primíparas"}
 teto_fdn_pct_pv: {valor: 1.25, unidade: "% PV", fonte: "Mertens via Epagri", forca: B, editavel: true, descricao: "Consumo máximo de FDN (enchimento)"}
@@ -30,11 +31,11 @@ cms_pct_pv_min: {valor: 2.5, unidade: "% PV", fonte: "Dossiê (checagem de sanid
 cms_pct_pv_max: {valor: 4.0, unidade: "% PV", fonte: "Dossiê (checagem de sanidade)", forca: C, editavel: true, descricao: "CMS de lactação acima disso: conferir dados"}
 pv_ref_ecc: {valor: 650, unidade: kg, fonte: "Penn State (valor de 417 Mcal é para vaca de ~650 kg)", forca: B, editavel: true, descricao: "Peso de referência para escalar a energia por ponto de ECC"}
 ecc_mobilizacao_aceitavel: {valor: 0.5, unidade: pontos, fonte: "OMAFRA (perda de 0,5–0,75 ponto no início é aceitável)", forca: B, editavel: true, descricao: "Perda de ECC aceitável no pós-parto (energia que pode vir da reserva)"}
-dias_mobilizacao: {valor: 35, unidade: dias, fonte: "Dossiê ACP-05 (5 primeiras semanas)", forca: B, editavel: true, descricao: "Período em que a mobilização aceitável acontece"}
-ecc_max_fases: {valor: {recem_parida: 3.75, inicio: 3.25, meio: 3.5, final: 3.75, seca: 3.75, pre_parto: 3.75}, unidade: "1-5", fonte: "USC; Embrapa/IFRO (parto 3,25–3,75; pico 2,5–3,0; meio 2,75–3,25; final 3,0–3,75) com 0,25 de tolerância", forca: B, editavel: true, descricao: "ECC máximo por fase"}
+dias_mobilizacao: {valor: 35, unidade: dias, fonte: "Escolha de engenharia: 5 semanas do Dossiê ACP-05; OMAFRA situa a perda do parto até ~30 DEL", forca: C, editavel: true, descricao: "Período em que a mobilização aceitável acontece"}
+ecc_max_fases: {valor: {recem_parida: 3.75, inicio: 3.25, meio: 3.5, final: 3.75, seca: 3.75, pre_parto: 3.75}, unidade: "1-5", fonte: "USC; Embrapa/IFRO (parto 3,25–3,75; pico 2,5–3,0; meio 2,75–3,25; final 3,0–3,75): teto da faixa, com 0,25 de tolerância no pico e no meio (faixas estreitas)", forca: B, editavel: true, descricao: "ECC máximo por fase"}
 fdnd_ref: {valor: 50, unidade: "% da FDN", fonte: "Escolha de engenharia (FDND típica de silagem de milho)", forca: D, editavel: true, descricao: "FDND de referência do volumoso (sem ajuste de consumo)"}
 cms_por_ponto_fdnd: {valor: 0.17, unidade: "kg MS/ponto", fonte: "Oba & Allen 1999", forca: B, editavel: true, descricao: "Variação do CMS por ponto de digestibilidade da FDN"}
-mcal_por_ponto_ecc: {valor: 417, unidade: Mcal, fonte: "Penn State", forca: B, editavel: true, descricao: "ELl por ponto de ECC (vaca ~650 kg)"}
+mcal_por_ponto_ecc: {valor: 417, unidade: Mcal, fonte: "Penn State/NRC 2001 (energia liberada ao PERDER 1 ponto, vaca ~650 kg com ECC 4); usada também para recuperar ECC, que custa mais (aproximação, Dossiê T17)", forca: C, editavel: true, descricao: "ELl por ponto de ECC (vaca ~650 kg)"}
 dias_recuperacao_ecc: {valor: 100, unidade: dias, fonte: "Dossiê T17", forca: D, editavel: true, descricao: "Prazo para levar o ECC à meta"}
 ecc_min_inicio: {valor: 2.5, unidade: "1-5", fonte: "USC; Embrapa/IFRO (pico 2,5–3,0)", forca: B, editavel: true, descricao: "ECC mínimo no início/pico"}
 ecc_meta_inicio: {valor: 2.75, unidade: "1-5", fonte: "USC; Embrapa/IFRO", forca: B, editavel: true, descricao: "ECC alvo no início/pico"}
@@ -43,7 +44,7 @@ ecc_meta_meio: {valor: 3.0, unidade: "1-5", fonte: "USC", forca: B, editavel: tr
 ecc_min_final: {valor: 3.0, unidade: "1-5", fonte: "USC (final 3,0–3,75)", forca: B, editavel: true, descricao: "ECC mínimo no final da lactação"}
 ecc_meta_final: {valor: 3.25, unidade: "1-5", fonte: "USC", forca: B, editavel: true, descricao: "ECC alvo no final da lactação"}
 eficiencia_pm: {valor: 0.67, unidade: fração, fonte: "NRC 2001 via AgModel (⚠ NV)", forca: C, editavel: true, descricao: "Eficiência PM → proteína do leite"}
-pb_tabela_holandes: {valor: [[10, 13.0], [27, 14.5], [55, 18.3]], unidade: "kg leite → % PB", fonte: "MSD Vet Manual (ponto 10 kg: D)", forca: B, editavel: true, descricao: "PB alvo por produção — Holandês/Jersey"}
+pb_tabela_holandes: {valor: [[10, 13.0], [27, 14.5], [55, 18.3]], unidade: "kg leite → % PB", fonte: "MSD Vet Manual (ponto 10 kg: D)", forca: B, editavel: true, descricao: "PB alvo por produção — Holandês (Jersey usa a tabela de raças pequenas)"}
 pb_tabela_mestico: {valor: [[8, 12.0], [18, 15.0], [36, 19.0]], unidade: "kg leite → % PB", fonte: "MSD Vet Manual raças pequenas (ponto 8 kg: D)", forca: B, editavel: true, descricao: "PB alvo por produção — mestiças/zebuínas"}
 pb_preparto: {valor: 14.0, unidade: "% MS", fonte: "Dossiê (pré-parto 13–15%)", forca: C, editavel: true, descricao: "PB alvo pré-parto"}
 pb_seca: {valor: 12.0, unidade: "% MS", fonte: "Prática de campo", forca: D, editavel: true, descricao: "PB alvo vacas secas"}
@@ -69,19 +70,24 @@ leite_max_cana: {valor: 15, unidade: kg, fonte: "Dossiê VER-07 (a validar)", fo
 # --- Formulação (PL) ---
 pl_fator_ms_min: {valor: 0.95, unidade: fração, fonte: "Inferências (CMS − 5%)", forca: D, editavel: true, descricao: "MS mínima do PL / CMS (precisa ficar acima de fator_oferta_min)"}
 pl_margem: {valor: 0.01, unidade: fração, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Margem de segurança do PL em todo limite, para a dieta arredondada continuar aprovada pela verificação"}
+pl_margem_dcad: {valor: 5, unidade: "mEq/kg MS", fonte: "Escolha de engenharia (a margem fracionária não serve para limite em 0)", forca: D, editavel: true, descricao: "Margem do PL na DCAD do pré-parto"}
+tolerancia_inclusao_pct: {valor: 0.5, unidade: "p.p. da MS", fonte: "Escolha de engenharia (arredondamento dos kg MN)", forca: D, editavel: true, descricao: "Folga sobre o limite de inclusão do alimento antes de acusar excesso"}
 
 # --- Acompanhamento diário ---
 shewhart_z: {valor: -3.0, unidade: sigma, fonte: "SPC padrão", forca: D, editavel: true, descricao: "Queda de um dia"}
-corrida_dias_min: {valor: 5, unidade: dias, fonte: "Frontiers Genet 2022 (adaptado ao lote)", forca: B, editavel: true, descricao: "Dias seguidos abaixo do esperado"}
+corrida_dias_min: {valor: 5, unidade: dias, fonte: "Escolha de engenharia adaptada de Frontiers Genet 2022 (lá: ≥10 dias, por vaca)", forca: D, editavel: true, descricao: "Dias seguidos abaixo do esperado"}
 residuo_queda_atual: {valor: -0.03, unidade: fração, fonte: "Escolha de engenharia (evita alerta com o lote já recuperado)", forca: D, editavel: true, descricao: "Resíduo de hoje precisa estar abaixo disso para manter a queda sustentada"}
 corrida_residuo_min: {valor: -0.02, unidade: fração, fonte: "Escolha de engenharia (ruído de medição não conta como dia abaixo)", forca: D, editavel: true, descricao: "Resíduo abaixo disso conta como dia abaixo do esperado na corrida"}
 corrida_janela: {valor: 14, unidade: dias, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "A corrida olha no máximo estes dias para trás"}
 calibracao_dias_min: {valor: 7, unidade: dias, fonte: "Inferências (ajustar a escala nas primeiras 2–4 semanas)", forca: D, editavel: true, descricao: "Dias válidos mínimos para calibrar a curva antes de emitir alertas de produção"}
 residuo_baixo: {valor: -0.05, unidade: fração, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Produção 5% abaixo do esperado (usado com NUL baixo)"}
-corrida_queda_min: {valor: -0.10, unidade: fração, fonte: "Frontiers Genet 2022", forca: B, editavel: true, descricao: "Ao menos um dia abaixo de −10%"}
+corrida_queda_min: {valor: -0.10, unidade: fração, fonte: "Frontiers Genet 2022 (definição por vaca, aplicada ao lote)", forca: C, editavel: true, descricao: "Ao menos um dia abaixo de −10%"}
 ewma_lambda: {valor: 0.25, unidade: "", fonte: "Archiv Tierzucht 2009 (⚠ NV)", forca: C, editavel: true, descricao: "Suavização do EWMA"}
 ewma_L: {valor: 2.75, unidade: sigma, fonte: "Archiv Tierzucht 2009 (⚠ NV)", forca: C, editavel: true, descricao: "Largura do limite do EWMA"}
-itu_limiar_holandes: {valor: 72, unidade: ITU, fonte: "Negri 2021 (72–74)", forca: B, editavel: true, descricao: "Limiar de perda de leite — Holandês/Jersey"}
+ewma_z_cap: {valor: 3.5, unidade: sigma, fonte: "Escolha de engenharia (um dia anômalo não cruza o limite do EWMA sozinho)", forca: D, editavel: true, descricao: "Limite de cada z que entra no EWMA"}
+mad_janela_dias: {valor: 45, unidade: dias, fonte: "Inferências (MAD de 30–60 dias)", forca: C, editavel: true, descricao: "Dias anteriores usados no desvio robusto do resíduo"}
+sigma_piso: {valor: 0.02, unidade: fração, fonte: "Escolha de engenharia (evita dividir por desvio ~0)", forca: D, editavel: true, descricao: "Desvio mínimo do resíduo de produção"}
+itu_limiar_holandes: {valor: 72, unidade: ITU, fonte: "Ravagnolo 2000 (EUA, ⚠ NV); Negri 2021 encontrou 74 em Holandesas de MG (conflito: escolhido o mais conservador)", forca: C, editavel: true, descricao: "Limiar de perda de leite — Holandês/Jersey"}
 itu_limiar_zebuino: {valor: 76, unidade: ITU, fonte: "LUME UFRGS (sem limiar claro em Girolando)", forca: C, editavel: true, descricao: "Limiar de perda de leite — Girolando/mestiças"}
 perda_itu_holandes: {valor: 0.2, unidade: "kg/unidade ITU", fonte: "Ravagnolo 2000 (⚠ NV)", forca: C, editavel: true, descricao: "Perda de leite por unidade de ITU acima do limiar"}
 perda_itu_zebuino: {valor: 0.04, unidade: "kg/unidade ITU", fonte: "LUME UFRGS", forca: B, editavel: true, descricao: "Perda de leite por unidade de ITU — Girolando"}
@@ -90,18 +96,22 @@ janela_troca_volumoso: {valor: 7, unidade: dias, fonte: "Inferências (degrau 1�
 janela_supressao_h: {valor: 48, unidade: horas, fonte: "UBC/Farmwest (−8,5% por 1–2 d)", forca: B, editavel: true, descricao: "Supressão de alertas após movimentação/correção de MS"}
 litros_por_kg_conc_min: {valor: 2.0, unidade: "L/kg", fonte: "Inferências (C/D)", forca: D, editavel: true, descricao: "Eficiência mínima do concentrado"}
 custo_conc_litro_tolerancia: {valor: 1.10, unidade: fração, fonte: "Inferências (mediana 30 d + 10%)", forca: D, editavel: true, descricao: "Custo de concentrado/L acima da mediana"}
+custo_conc_janela_dias: {valor: 30, unidade: dias, fonte: "Inferências (mediana de 30 d)", forca: D, editavel: true, descricao: "Janela da mediana do custo de concentrado por litro"}
+custo_conc_min_dias: {valor: 10, unidade: dias, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Dias mínimos na janela para comparar o custo de concentrado"}
+resposta_marginal_dias: {valor: [5, 7], unidade: dias, fonte: "Inferências (ΔL/Δkg nos 5–7 dias seguintes à mudança)", forca: C, editavel: true, descricao: "Dias após a mudança de concentrado em que a resposta marginal é medida"}
+silo_novo_dias: {valor: 7, unidade: dias, fonte: "Escolha de engenharia (mesma janela de janela_troca_volumoso)", forca: D, editavel: true, descricao: "Dias em que um silo recém-aberto conta como novo"}
 
 resolucao_dias: {valor: {acompanhamento_diario: 2, acompanhamento_semanal: 4, acompanhamento_mensal: 1, classificacao: 2, meta: 2, verificacao: 0, exigencias: 0}, unidade: dias, fonte: "Escolha de engenharia (evita fechar e reabrir o mesmo problema por oscilação)", forca: D, editavel: true, descricao: "Dias seguidos sem a condição para considerar o alerta resolvido, por módulo"}
 
 # --- Gestação, secagem e pré-parto (datas previstas) ---
-dias_gestacao_secagem: {valor: 220, unidade: dias, fonte: "Inferências nº 36 (secar 60 d antes do parto previsto)", forca: A, editavel: true, descricao: "Gestação a partir da qual o lote em lactação deve ser programado para secagem"}
+dias_gestacao_secagem: {valor: 220, unidade: dias, fonte: "Embrapa/Inferências (período seco de 50–60 d; 280 − 60)", forca: C, editavel: true, descricao: "Gestação a partir da qual o lote em lactação deve ser programado para secagem"}
 aviso_gestacao_ate: {valor: 197, unidade: dias, fonte: "Escolha de engenharia (aviso durante 1 semana após os 190 d)", forca: D, editavel: true, descricao: "Último dia de gestação em que o aviso de entrada no terço final aparece"}
 
-dcad_alerta_preparto: {valor: 0, unidade: "mEq/kg MS", fonte: "Santos et al. 2019 (meta-análise: +200 → −100 mEq/kg reduz febre do leite e RP em multíparas)", forca: A, editavel: true, descricao: "DCAD do pré-parto acima disso (com multíparas) gera alerta"}
+dcad_alerta_preparto: {valor: 0, unidade: "mEq/kg MS", fonte: "Escolha de engenharia derivada de Santos et al. 2019 (meta-análise: +200 → −100 mEq/kg reduz febre do leite e RP em multíparas; o corte em 0 não é da meta-análise)", forca: D, editavel: true, descricao: "DCAD do pré-parto acima disso (com multíparas) gera alerta"}
 dcad_meta_preparto: {valor: -100, unidade: "mEq/kg MS", fonte: "Santos et al. 2019", forca: A, editavel: true, descricao: "DCAD-alvo do pré-parto para multíparas"}
 
 # --- Pasto (altura na régua) ---
-alturas_pasto: {valor: {mombaca: {entrada: 90, saida_min: 30}, tanzania: {entrada: 70, saida_min: 25}, decumbens: {media: 25}, marandu: {media: 25}}, unidade: cm, fonte: "Embrapa (Lopes; Gomide 2011) — dados de novilhos de corte", forca: C, editavel: true, descricao: "Metas de altura por forrageira (rotacionado: entrada/saída; contínuo: média)"}
+alturas_pasto: {valor: {mombaca: {entrada: 90, saida_min: 30}, tanzania: {entrada: 70, saida_min: 25}, decumbens: {media: 25}, marandu: {media: 25}}, unidade: cm, fonte: "Embrapa (Lopes: Mombaça/Tanzânia; Gomide 2011: decumbens; Embrapa Gado de Corte: Marandu 15–30 cm em lotação contínua, média 25 adotada) — dados de novilhos de corte", forca: C, editavel: true, descricao: "Metas de altura por forrageira (rotacionado: entrada/saída; contínuo: média)"}
 altura_tolerancia: {valor: 0.15, unidade: fração, fonte: "Inferências nº 15 (10–15% acima da meta)", forca: D, editavel: true, descricao: "Tolerância sobre a meta de altura"}
 distancia_aumento: {valor: 0.5, unidade: km, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Aumento de caminhada que pode explicar perda de ECC em pasto"}
 
@@ -109,32 +119,40 @@ distancia_aumento: {valor: 0.5, unidade: km, fonte: "Escolha de engenharia", for
 alimento_pct_receita_max: {valor: 60, unidade: "% da receita", fonte: "Penn State (alimento ≥ 60% da receita = IOFC baixo)", forca: C, editavel: true, descricao: "Custo de alimentação acima disso é alerta"}
 ea_min_meio: {valor: 1.3, unidade: "kg ECM/kg MS", fonte: "eXtension (Holandesas, 150–225 DEL; grupos-problema < 1,3)", forca: C, editavel: true, descricao: "Eficiência alimentar mínima no meio da lactação"}
 ea_max_inicio: {valor: 2.0, unidade: "kg ECM/kg MS", fonte: "eXtension (> 2,0 no início indica perda excessiva de peso)", forca: C, editavel: true, descricao: "Eficiência alimentar acima disso no início = mobilização excessiva"}
+ea_del_faixa: {valor: [150, 225], unidade: dias, fonte: "eXtension (referência de eficiência alimentar para Holandesas com 150–225 DEL)", forca: C, editavel: true, descricao: "DEL em que a eficiência mínima do meio da lactação vale"}
 
 # --- Acompanhamento semanal ---
 ms_delta_recalcular: {valor: 2.0, unidade: "p.p.", fonte: "Heurística de campo (C)", forca: C, editavel: true, descricao: "Mudança de MS que exige recalcular kg MN"}
 ms_leituras_confirmacao: {valor: 2, unidade: leituras, fonte: "Inferências (confirmar em 2 leituras)", forca: C, editavel: true, descricao: "Leituras seguidas fora da referência para confirmar mudança de MS"}
-ms_delta_reformular: {valor: 5.0, unidade: "p.p.", fonte: "OSU Buckeye Dairy News", forca: B, editavel: true, descricao: "Mudança de MS que exige reformular"}
+ms_delta_reformular: {valor: 5.0, unidade: "p.p.", fonte: "Inferências (regra de implementação, D); OSU Buckeye Dairy News só para o caráter qualitativo (silo ou corte novo pede reformular)", forca: D, editavel: true, descricao: "Mudança de MS que exige reformular"}
 escore_cocho_pct: {valor: {1: 0.0, 2: 0.5, 3: 3.0, 4: 7.5, 5: 12.0}, unidade: "escore → % de sobra", fonte: "Inferências (1 = vazio há horas; 2 = <1%; 3 = 2–4%, meta; 4 = 5–10%; 5 = >10% ou intocado) — escolha de engenharia", forca: D, editavel: true, descricao: "Conversão da leitura de cocho (1–5) em % de sobra equivalente"}
-sobras_faixas: {valor: {recem_parida: [3, 5], inicio: [2, 4], meio: [2, 4], final: [1, 3], pre_parto: [2, 4], seca: [1, 3]}, unidade: "% oferta", fonte: "eXtension; SDSU", forca: B, editavel: true, descricao: "Faixa-alvo de sobras por fase"}
+sobras_faixas: {valor: {recem_parida: [3, 5], inicio: [2, 4], meio: [2, 4], final: [1, 3], pre_parto: [2, 4], seca: [1, 3]}, unidade: "% oferta", fonte: "Inferências (adaptado de eXtension: recém-paridas 3–5%, alta produção 1–5%, final 0,5–3%); pré-parto e seca: escolha de engenharia", forca: C, editavel: true, descricao: "Faixa-alvo de sobras por fase"}
+sobras_dias: {valor: 3, unidade: dias, fonte: "Inferências (esperar 3 dias fora da meta antes de mexer)", forca: C, editavel: true, descricao: "Leituras de cocho que entram na média móvel de sobras"}
+sobras_ajuste_pct: {valor: 5, unidade: "% da oferta", fonte: "Dossiê ACP-06 (ajuste a validar); Inferências (±2–3% por vez com sobras fora da faixa)", forca: D, editavel: true, descricao: "Aumento de oferta sugerido com cocho vazio"}
+cocho_vazio_sobra_pct: {valor: 0.5, unidade: "% da oferta", fonte: "Escolha de engenharia (equivale ao escore 2 de escore_cocho_pct)", forca: D, editavel: true, descricao: "Sobra pesada igual ou abaixo disto conta como cocho vazio"}
 cocho_vazio_dias: {valor: 2, unidade: dias, fonte: "Dossiê ACP-06", forca: C, editavel: true, descricao: "Leituras seguidas com cocho vazio"}
-ecc_perda_severa: {valor: 1.0, unidade: pontos, fonte: "Dossiê ACP-05 (5 semanas)", forca: B, editavel: true, descricao: "Perda de ECC = BEN severo"}
+ecc_perda_severa: {valor: 1.0, unidade: pontos, fonte: "Dossiê ACP-05 (>1 ponto em 5 semanas)", forca: B, editavel: true, descricao: "Perda de ECC = BEN severo"}
 ecc_perda_atencao: {valor: 0.5, unidade: pontos, fonte: "OMAFRA (0,5–0,75)", forca: B, editavel: true, descricao: "Perda de ECC que merece atenção"}
 fezes_acidose_max: {valor: 2, unidade: "1-5", fonte: "Dossiê ACP-04", forca: C, editavel: true, descricao: "Fezes fluidas reforçam suspeita de acidose"}
+ecc_validade_dias: {valor: 42, unidade: dias, fonte: "Escolha de engenharia (escore lido a cada 1–6 semanas)", forca: D, editavel: true, descricao: "Leitura de ECC mais antiga que isso não vale como ECC atual do lote"}
 ruminacao_queda: {valor: 30, unidade: "min/d", fonte: "Coerente com HIS, não validado", forca: D, editavel: true, descricao: "Queda da ruminação média do lote"}
+ruminacao_dias: {valor: 10, unidade: dias, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Janela da ruminação média (os últimos 3 dias contra os anteriores)"}
 
 # --- Acompanhamento mensal (laudo) ---
 nul_min: {valor: 8, unidade: "mg/dL", fonte: "Embrapa Pedroso 2011 (8–16)", forca: B, editavel: true, descricao: "NUL baixo (só alerta se produção/proteína também baixas)"}
 nul_max: {valor: 16, unidade: "mg/dL", fonte: "Embrapa (8–16); Penn State (10–14); conflito", forca: B, editavel: true, descricao: "NUL alto: excesso de PB ou falta de energia"}
-nul_reprodutivo: {valor: 19.5, unidade: "mg/dL", fonte: "Raboisson 2017 (meta-análise)", forca: A, editavel: true, descricao: "NUL com chance de prenhez −43%"}
+nul_reprodutivo: {valor: 19.5, unidade: "mg/dL", fonte: "Raboisson 2017 (meta-análise)", forca: A, editavel: true, descricao: "NUL a partir do qual a chance de prenhez cai (OR 0,57)"}
 gp_sara_max: {valor: 1.0, unidade: razão, fonte: "Dossiê ACP-03; UNH 2025", forca: C, editavel: true, descricao: "G:P abaixo disso sugere acidose"}
 gp_ben_del_max: {valor: 40, unidade: dias, fonte: "Penn State (≤40 DEL)", forca: B, editavel: true, descricao: "Janela de DEL em que G:P alta indica BEN/cetose"}
 gp_ben_min: {valor: 1.4, unidade: razão, fonte: "Penn State (≤40 DEL)", forca: B, editavel: true, descricao: "G:P acima disso em recém-paridas sugere BEN/cetose"}
-gordura_queda_pp: {valor: -0.3, unidade: "p.p.", fonte: "eXtension (0,2–0,3)", forca: C, editavel: true, descricao: "Queda de gordura vs linha de base"}
+gordura_queda_pp: {valor: -0.3, unidade: "p.p.", fonte: "Inferências, regra MFD-1 (queda de 0,2–0,3 p.p., D); mecanismo: eXtension", forca: D, editavel: true, descricao: "Queda de gordura vs linha de base"}
 proteina_estavel_pp: {valor: 0.1, unidade: "p.p.", fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Variação de proteína considerada estável"}
 crioscopia_faixa: {valor: [-0.555, -0.530], unidade: "°H", fonte: "IN 76/2018", forca: A, editavel: true, descricao: "Índice crioscópico normal do leite"}
 lactose_min: {valor: 4.3, unidade: "%", fonte: "IN 76/2018", forca: A, editavel: true, descricao: "Lactose mínima"}
 ccs_tendencia_min: {valor: 200, unidade: "mil cél/mL", fonte: "eXtension (200 mil = 0% de perda)", forca: B, editavel: true, descricao: "CCS só conta como 'subindo' acima deste valor"}
-laudo_validade_dias: {valor: 35, unidade: dias, fonte: "Laudo mensal (IN 76/77)", forca: A, editavel: true, descricao: "Laudo mais antigo que isso não vale como dado atual"}
+ccs_tendencia_fator: {valor: 1.25, unidade: razão, fonte: "Inferências nº 19 (+25%, ≥0,3 log₂, em 3 meses; D)", forca: D, editavel: true, descricao: "CCS atual / CCS de ~3 meses atrás acima disto = subindo"}
+laudo_mg3_dias: {valor: 100, unidade: dias, fonte: "IN 76/2018 (média geométrica trimestral) + folga", forca: D, editavel: true, descricao: "Janela dos laudos da média geométrica de 3 meses e da tendência da CCS"}
+laudo_validade_dias: {valor: 35, unidade: dias, fonte: "Escolha de engenharia (amostragem mensal da IN 76 + folga de 5 dias)", forca: D, editavel: true, descricao: "Laudo mais antigo que isso não vale como dado atual"}
 laudo_base_dias: {valor: 120, unidade: dias, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Laudos usados como linha de base para variação de gordura/proteína"}
 ccs_regulatorio: {valor: 500, unidade: "mil cél/mL", fonte: "IN 76/2018", forca: A, editavel: true, descricao: "CCS máxima (média geométrica 3 m)"}
 ccs_pre_regulatorio: {valor: 400, unidade: "mil cél/mL", fonte: "Inferências", forca: D, editavel: true, descricao: "Faixa pré-regulatória"}
@@ -145,15 +163,16 @@ ajuste_peso_alimento_novo: {valor: 3, unidade: "peso", fonte: "Escolha de engenh
 sensibilidade_variacao_meta: {valor: 0.05, unidade: "fração", fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Quanto cada meta é afrouxada para medir quanto ela custa na dieta"}
 
 # --- Transição de dieta ---
-transicao_dias_volumoso: {valor: 5, unidade: dias, fonte: "Penn State Extension (adaptação ruminal a novo volumoso: 4–7 dias)", forca: C, editavel: true, descricao: "Dias de mistura quando o volumoso principal muda"}
+transicao_dias_volumoso: {valor: 7, unidade: dias, fonte: "Extensão (7–14 dias para silagem nova: Dairy Herd/Purdue; AgProud) — escolhido o mínimo", forca: C, editavel: true, descricao: "Dias de mistura quando o volumoso principal muda"}
 transicao_dias_padrao: {valor: 3, unidade: dias, fonte: "Escolha de engenharia (troca gradual em 3 etapas)", forca: D, editavel: true, descricao: "Dias de mistura para mudança grande de dieta sem troca de volumoso"}
 transicao_mudanca_min: {valor: 15, unidade: "% da MS", fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Mudança da dieta (em % da MS) a partir da qual a troca é gradual"}
 transicao_volumoso_min: {valor: 30, unidade: "% do volumoso", fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Fração do volumoso trocada que conta como troca de volumoso"}
-transicao_passo_conc: {valor: 1.0, unidade: "kg MS/vaca/dia", fonte: "Penn State; NRC 2001 (aumentar concentrado no máximo 0,5–1 kg/dia)", forca: C, editavel: true, descricao: "Aumento máximo de concentrado por dia na transição"}
+transicao_passo_conc: {valor: 0.5, unidade: "kg MS/vaca/dia", fonte: "NFACC, Código de Práticas para bovinos leiteiros (0,5–0,7 kg/dia); Manitoba Agriculture (~1 lb/dia)", forca: C, editavel: true, descricao: "Aumento máximo de concentrado por dia na transição"}
 transicao_observacao_dias: {valor: 7, unidade: dias, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Dias após o fim da transição em que o lote continua em observação de adaptação"}
+transicao_extensao_dias: {valor: 2, unidade: dias, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Dias a mais na etapa atual quando o lote não se adapta à mistura"}
 
 # --- Trato (vagão misturador) ---
-trato_ordem: {valor: [volumoso_seco, concentrado, mineral, ureia, volumoso_umido], unidade: "categorias", fonte: "Penn State Extension, TMR mixing (feno/seco primeiro, grãos e minerais, silagem por último)", forca: C, editavel: true, descricao: "Ordem de carregamento do vagão misturador"}
+trato_ordem: {valor: [volumoso_seco, concentrado, mineral, ureia, volumoso_umido], unidade: "categorias", fonte: "Penn State (silagem por último, misturar 3–5 min); extensão (feno longo primeiro). A ordem varia com o misturador: siga o fabricante", forca: C, editavel: true, descricao: "Ordem de carregamento do vagão misturador"}
 trato_ms_seco: {valor: 80, unidade: "% MS", fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Volumoso com MS acima disto é carregado como seco (feno, palha)"}
 
 # --- Estoque ---
@@ -176,3 +195,11 @@ prev_queda_alerta: {valor: -10, unidade: "%", fonte: "Escolha de engenharia", fo
 prev_sobra_energia_l: {valor: 2, unidade: "L/vaca", fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Leite permitido pela energia acima do projetado que sugere baratear a dieta"}
 prev_queda_receita_fazenda: {valor: -15, unidade: "%", fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Queda da receita da fazenda no horizonte que gera aviso"}
 
+
+# --- Valores padrão da consulta guiada (resposta "não sei") ---
+padrao_del: {valor: 150, unidade: dias, fonte: "Escolha de engenharia (meio da lactação de 305 d)", forca: D, editavel: true, descricao: "DEL usado quando o produtor não sabe"}
+padrao_gordura: {valor: 3.5, unidade: "%", fonte: "Escolha de engenharia (valor típico de laudo; o laudo do laticínio substitui)", forca: D, editavel: true, descricao: "Gordura do leite usada quando o produtor não sabe"}
+padrao_proteina: {valor: 3.2, unidade: "%", fonte: "Escolha de engenharia (valor típico de laudo; o laudo do laticínio substitui)", forca: D, editavel: true, descricao: "Proteína do leite usada quando o produtor não sabe"}
+padrao_dias_gestacao: {valor: 0, unidade: dias, fonte: "Escolha de engenharia (sem informação, o lote é tratado como vazio; a gestação só pesa após 190 d)", forca: D, editavel: true, descricao: "Dias de gestação usados quando o produtor não sabe"}
+padrao_fracao_primiparas: {valor: 0.3, unidade: fração, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Fração de primíparas usada quando o produtor não sabe"}
+padrao_distancia_km: {valor: 1.0, unidade: km, fonte: "Escolha de engenharia", forca: D, editavel: true, descricao: "Caminhada diária usada quando o produtor não sabe"}

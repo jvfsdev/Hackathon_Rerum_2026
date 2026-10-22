@@ -74,7 +74,7 @@ def _modelo(alimentos: list[dict], r: dict, ignorar: tuple[str, ...] = (), metas
     # VER-15: DCAD do pré-parto (linear: média ponderada da DCAD de cada alimento). Só quando todos têm Na/K/Cl/S,
     # a mesma condição em que a verificação consegue calculá-la.
     if r.get("dcad_max") is not None and all(all(a.get(m) is not None for m in ("na", "k", "cl", "s")) for a in alimentos):
-        folga = 5.0   # mEq/kg de margem para a dieta arredondada continuar abaixo do limite
+        folga = r.get("dcad_folga", 0.0)   # @params.pl_margem_dcad: a dieta arredondada continua abaixo do limite
         grupo("dcad", [pulp.lpSum((dcad_meq_kg(a["na"], a["k"], a["cl"], a["s"]) - (r["dcad_max"] - folga)) * x[a["id"]]
                                   for a in alimentos) <= 0])
     if r.get("cana_max_pct_volumoso") is not None:   # FOR-05: cana não pode ser o único volumoso

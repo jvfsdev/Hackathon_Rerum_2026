@@ -301,3 +301,29 @@
   espera:
     disparadas: [EXG-07]
     nao_disparadas: [VER-01]
+
+- id: N13
+  descricao: Só a G:P baixa (indicador fraco) — acidose fica informativa, sem alerta de atenção
+  testa: ACP-03, ACP-ACID0
+  modulos: [acompanhamento_mensal, acompanhamento_semanal, meta]
+  fatos: {laudo.gordura: 2.9, laudo.proteina: 3.3}
+  espera:
+    alertas: [ACP-ACID0]
+    nao_disparadas: [ACP-ACID]
+
+- id: N14
+  descricao: Ruminação em queda com calor — o calor explica, não conclui acidose
+  testa: ACP-S05
+  modulos: [acompanhamento_semanal, acompanhamento_mensal, meta]
+  fatos: {mon.ruminacao_queda: 45, mon.itu_2d: 80, mon.itu_limiar: 76}
+  espera:
+    nao_disparadas: [ACP-S05, ACP-ACID, ACP-ACID0]
+
+- id: N15
+  descricao: Ruminação em queda junto com G:P baixa — duas evidências, alerta de atenção
+  testa: ACP-S05R, ACP-ACID
+  modulos: [acompanhamento_semanal, acompanhamento_mensal, meta]
+  fatos: {mon.ruminacao_queda: 45, laudo.gordura: 2.9, laudo.proteina: 3.3}
+  espera:
+    alertas: [ACP-ACID]
+    nao_disparadas: [ACP-ACID0]

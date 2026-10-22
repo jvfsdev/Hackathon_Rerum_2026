@@ -9,7 +9,7 @@ from .engine.engine import Motor, Resultado
 from .engine.explain import como
 from .engine.rules_loader import BaseConhecimento, carregar
 from .engine.working_memory import MemoriaTrabalho
-from .monitor.fatos import HistoricoLote, del_em, fatos_monitoramento, serie_esperado
+from .monitor.fatos import HistoricoLote, del_em, fatos_monitoramento, parametros_itu, serie_esperado
 from .optimizer import lp
 
 _KB: BaseConhecimento | None = None
@@ -61,7 +61,7 @@ def fatos_lote(lote: Lote, d: date | None = None, h: HistoricoLote | None = None
             v = h.valor(ind, d)
             if v is not None:
                 f[f"lote.{ind}"] = v
-        ecc = h.serie("ecc", d, 42)
+        ecc = h.serie("ecc", d, kb().params["ecc_validade_dias"]["valor"])
         if ecc:
             f["lote.ecc"] = ecc[-1][1]
         for ind in ("gordura", "proteina"):
@@ -384,7 +384,7 @@ def formular(fatos: dict, alimentos_ids: list[str], precos: dict | None = None, 
                   "cana_max_pct_volumoso": v("pl.cana_max_pct_volumoso"), "excluir_pastejo": v("pl.excluir_pastejo"),
                   "margem": base.params["pl_margem"]["valor"], "fator_ms_min": base.params["pl_fator_ms_min"]["valor"],
                   "teto_fibra_aplica": v("exig.cms_equacao") is not None, "ell_max": v("pl.ell_max"),
-                  "dcad_max": v("pl.dcad_max")}
+                  "dcad_max": v("pl.dcad_max"), "dcad_folga": base.params["pl_margem_dcad"]["valor"]}
     alimentos = [alimento_com_preco(a, precos, cat) for a in alimentos_ids]
     excluidos = [a["nome"] for a in alimentos if restricoes["excluir_pastejo"] and a.get("pastejo")]
     wm.declarar("pl.alimentos_excluidos", excluidos, origem="sistema")
@@ -726,4 +726,11 @@ def serie_lote(s: Session, lote: Lote, ate: date | None = None) -> dict:
                 "laudo_proteina", "laudo_lactose", "laudo_ccs", "laudo_cbt", "temp", "ur", "vacas"):
         indicadores[ind] = [{"data": d.isoformat(), "valor": v} for d, v in h.serie(ind, ate, 60)]
     eventos = [{"data": e.data_hora.isoformat(), "tipo": e.tipo, "descricao": e.descricao} for e in h.eventos]
-    return {"producao": [p | {"data": p["data"].isoformat()} for p in pontos], "indicadores": indicadores, "eventos": eventos}
+    # linhas de referência dos gráficos: as mesmas que as regras usam (params.yaml + classificação do lote hoje)
+    prm = kb().params
+    fase = Motor(kb(), ["classificacao"]).executar(memoria(fatos_lote(lote, ate, h), origem="sistema")).wm.valor("perfil.fase")
+    referencias = {"itu_limiar": parametros_itu(lote, prm)[0], "sobras": prm["sobras_faixas"]["valor"].get(fase),
+                   "nul_max": prm["nul_max"]["valor"], "nul_reprodutivo": prm["nul_reprodutivo"]["valor"],
+                   "lactose_min": prm["lactose_min"]["valor"], "ccs_regulatorio": prm["ccs_regulatorio"]["valor"]}
+    return {"producao": [p | {"data": p["data"].isoformat()} for p in pontos], "indicadores": indicadores, "eventos": eventos,
+            "referencias": referencias}

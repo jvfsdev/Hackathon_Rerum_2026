@@ -44,8 +44,8 @@
         titulo_produtor: "O volumoso mudou muito: refaça a dieta"
         causa_produtor: "Silo novo ou mudança grande muda a qualidade, não só a umidade."
         acao_produtor: "Mande analisar o volumoso novo e peça uma nova sugestão de dieta."
-  fonte: "OSU Buckeye Dairy News"
-  forca: B
+  fonte: "OSU Buckeye Dairy News (silo ou corte novo pede reformular); limiar de 5 p.p.: Inferências (D)"
+  forca: C
 
 - id: ACP-05
   versao: 1
@@ -63,10 +63,10 @@
         nivel: critico
         categoria: dieta
         titulo: "Balanço energético negativo severo: perdeu {mon.ecc_perda:.2f} ponto(s) de ECC"
-        causa: "Perda acima de 1 ponto nas primeiras semanas atrasa a 1ª inseminação e aumenta doenças."
+        causa: "Perda acima de {@params.ecc_perda_severa} ponto nas primeiras semanas atrasa a 1ª inseminação e aumenta doenças."
         acao: "Elevar a densidade energética, garantir acesso ao cocho; conferir a dieta de pré-parto."
         titulo_produtor: "Vacas emagrecendo muito no pós-parto: perderam {mon.ecc_perda:.2f} ponto de escore"
-        causa_produtor: "Perder mais de 1 ponto logo após o parto atrasa o cio e aumenta doenças."
+        causa_produtor: "Perder mais de {@params.ecc_perda_severa} ponto logo após o parto atrasa o cio e aumenta doenças."
         acao_produtor: "Dieta mais forte e cocho sempre com comida; reveja a dieta do pré-parto."
   fonte: "Dossiê ACP-05; Carvalho et al. 2014"
   forca: B
@@ -97,14 +97,35 @@
 - id: ACP-S05
   versao: 1
   modulo: acompanhamento_semanal
-  descricao: Ruminação média do lote caiu — falta de fibra efetiva, troca de dieta ou calor
+  descricao: Ruminação média do lote caiu sem calor nem troca de dieta recente — suspeita de falta de fibra efetiva
   prioridade: 60
   cf: 0.5
   se:
     - {fato: mon.ruminacao_queda, op: ">=", valor: "@params.ruminacao_queda"}
+    - qualquer:                                   # calor também derruba a ruminação (Inferências: ITU máx ≥ 76–77)
+        - {fato: mon.itu_2d, op: ausente}
+        - {fato: mon.itu_2d, op: "<=", valor: "$mon.itu_limiar"}
+    - qualquer:                                   # troca de volumoso recente também
+        - {fato: mon.dias_desde_troca_volumoso, op: ausente}
+        - {fato: mon.dias_desde_troca_volumoso, op: ">", valor: "@params.janela_troca_volumoso"}
   entao:
     - concluir: {fato: hipotese.acidose, valor: true}
   fonte: "Paudyal 2018 (queda coletiva = causa coletiva)"
+  forca: C
+
+- id: ACP-S05R
+  versao: 1
+  modulo: acompanhamento_semanal
+  descricao: Ruminação em queda junto com G:P baixa reforça a suspeita de acidose
+  prioridade: 60
+  cf: 0.6
+  se:
+    - {fato: mon.ruminacao_queda, op: ">=", valor: "@params.ruminacao_queda"}
+    - {fato: laudo.gp, op: "<", valor: "@params.gp_sara_max"}
+  entao:
+    - concluir: {fato: hipotese.acidose, valor: true}
+    - concluir: {fato: hipotese.acidose_reforcada, valor: true}
+  fonte: "Paudyal 2018; Dossiê ACP-03"
   forca: C
 
 - id: ACP-12
@@ -120,10 +141,10 @@
         nivel: atencao
         categoria: dieta
         titulo: "Gestação chegou a {perfil.dias_gestacao:.0f} dias: exigências aumentaram"
-        causa: "A partir de 190 dias a gestação soma energia e proteína metabolizável à exigência do lote."
+        causa: "A partir de {@params.gestacao_dias_exigencia} dias a gestação soma energia e proteína metabolizável à exigência do lote."
         acao: "Rever a dieta (verificar ou sugerir custo mínimo) para incluir a exigência de gestação."
         titulo_produtor: "Vacas com {perfil.dias_gestacao:.0f} dias de prenhez: precisam de mais comida"
-        causa_produtor: "A partir de 190 dias de prenhez o bezerro passa a exigir energia e proteína."
+        causa_produtor: "A partir de {@params.gestacao_dias_exigencia} dias de prenhez o bezerro passa a exigir energia e proteína."
         acao_produtor: "Confira a dieta (ou peça uma sugestão) para incluir essa necessidade."
   fonte: "NRC 2001 via AgModel; Dossiê ACP-12"
   forca: B
@@ -147,8 +168,8 @@
         titulo_produtor: "Hora de programar a secagem: parto previsto em ~{mon.dias_para_parto_previsto:.0f} dias"
         causa_produtor: "A vaca precisa de 50 a 60 dias seca antes do parto."
         acao_produtor: "Seque as vacas e passe para o lote de secas, com dieta de vaca seca."
-  fonte: "Inferências nº 36; Embrapa Doc 286 (período seco 50–60 d)"
-  forca: A
+  fonte: "Embrapa Doc 286 (período seco 50–60 d); Inferências"
+  forca: C
 
 - id: ACP-PRE
   versao: 1
@@ -163,10 +184,10 @@
         nivel: atencao
         categoria: dieta
         titulo: "Lote no pré-parto ({lote.dias_para_parto:.0f} dias para o parto)"
-        causa: "Nas 3 semanas antes do parto a dieta de transição reduz febre do leite, retenção de placenta e metrite."
-        acao: "Dieta de pré-parto (PB ~14%, CMS 1,8–2% do PV). DCAD negativa (−100 mEq/kg) só para as multíparas; para novilhas não há evidência."
+        causa: "Nos {@params.preparto_dias} dias antes do parto a dieta de transição reduz febre do leite, retenção de placenta e metrite."
+        acao: "Dieta de pré-parto (PB ~{@params.pb_preparto}%, CMS ~{@params.cms_preparto_pct_pv}% do PV). DCAD negativa ({@params.dcad_meta_preparto} mEq/kg) só para as multíparas; para novilhas não há evidência."
         titulo_produtor: "Lote no pré-parto: faltam {lote.dias_para_parto:.0f} dias para parir"
-        causa_produtor: "A dieta das 3 semanas antes do parto evita febre do leite, retenção de placenta e infecção."
+        causa_produtor: "A dieta dos {@params.preparto_dias} dias antes do parto evita febre do leite, retenção de placenta e infecção."
         acao_produtor: "Use a dieta de pré-parto. Dieta aniônica só para vacas que já pariram antes; para novilhas, não."
   fonte: "Santos et al. 2019 (meta-análise); Inferências nº 36"
   forca: A

@@ -34,7 +34,7 @@ FAIXAS = {
     "laudo_ureia": (0, 90), "laudo_ccs": (1, 10000), "laudo_cbt": (1, 100000), "laudo_crioscopia": (-0.7, -0.4),
     "trato_kg": (0, 500000),
 }
-LITROS_VACA_MAX = 80        # acima disso por vaca/dia é erro de digitação (recorde mundial ≈ 75 L/dia em vaca individual)
+LITROS_VACA_MAX = 80        # média de LOTE acima disso por vaca/dia é erro de digitação (só recordistas individuais passam disso)
 
 
 def problema_valor(indicador: str, valor: float) -> str | None:

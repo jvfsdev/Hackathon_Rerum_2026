@@ -50,7 +50,7 @@
   entao:
     - concluir: {fato: pl.pb_min, valor: $exig.pb_pct_alvo}
     - calcular: {fato: pl.pb_max, funcao: produto, args: {a: $exig.pb_pct_alvo, b: "@params.fator_pb_max"}}
-  fonte: "MSD Vet Manual"
+  fonte: "MSD Vet Manual (PB alvo); teto de PB: escolha de engenharia"
   forca: D
 
 - id: FOR-04
@@ -141,10 +141,10 @@
         categoria: formulacao
         titulo: "Proteína fora da faixa com os alimentos escolhidos"
         causa: "Não é possível chegar a {pl.pb_min:.1f}–{pl.pb_max:.1f}% de PB."
-        acao: "Incluir fonte proteica (farelo de soja, caroço de algodão) ou ureia (até 1% da MS)."
+        acao: "Incluir fonte proteica (farelo de soja, caroço de algodão) ou ureia (até {@params.ureia_max}% da MS)."
         titulo_produtor: "Com esses alimentos a proteína não fica certa"
         causa_produtor: "Não dá para acertar a proteína só com o que foi marcado."
-        acao_produtor: "Inclua farelo de soja, caroço de algodão ou ureia (no máximo 1% da comida seca)."
+        acao_produtor: "Inclua farelo de soja, caroço de algodão ou ureia (no máximo {@params.ureia_max}% da comida seca)."
   fonte: "Dossiê (diagnóstico de inviabilidade)"
   forca: D
 
@@ -182,7 +182,7 @@
         nivel: critico
         categoria: formulacao
         titulo: "Volumoso muito fibroso limita o consumo"
-        causa: "A FDN necessária ultrapassa o teto de {pl.fdn_max_kg:.1f} kg/dia (1,25% do PV)."
+        causa: "A FDN necessária ultrapassa o teto de {pl.fdn_max_kg:.1f} kg/dia ({@params.teto_fdn_pct_pv}% do PV)."
         acao: "Usar volumoso mais digestível (silagem de milho) ou mais concentrado."
         titulo_produtor: "O volumoso é fibroso demais: a vaca enche a barriga antes de comer o necessário"
         causa_produtor: "Fibra demais limita quanto a vaca consegue comer."
@@ -205,7 +205,7 @@
         nivel: critico
         categoria: formulacao
         titulo: "Limites de CNF ou gordura impedem a solução"
-        causa: "Para atingir a energia seria preciso passar do CNF máximo ou de 6% de gordura."
+        causa: "Para atingir a energia seria preciso passar do CNF máximo ou de {@params.ee_max}% de gordura."
         acao: "Incluir volumoso de melhor qualidade ou fontes de energia fibrosas (polpa cítrica, farelo de trigo)."
         titulo_produtor: "Não dá para chegar na energia sem passar do limite de grão ou gordura"
         causa_produtor: "Para chegar na energia, a dieta teria grão ou gordura demais."
@@ -333,5 +333,5 @@
         titulo_produtor: "Dieta mais barata que atende o lote: R$ {pl.custo:.2f} por vaca/dia"
         causa_produtor: "Atende energia, proteína, fibra e os limites de cada alimento."
         acao_produtor: "Confira e aceite para ela virar a dieta do lote."
-  fonte: "Programação linear (PuLP + HiGHS)"
-  forca: B
+  fonte: "Programação linear (PuLP + HiGHS): ferramenta, não evidência"
+  forca: D

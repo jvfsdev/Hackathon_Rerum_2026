@@ -247,27 +247,37 @@ function ResultadoTecnico({ r, linkDieta }: { r: Resultado; linkDieta?: string }
 }
 
 function Comparacao({ r }: { r: Resultado }) {
+  const [prm, setPrm] = useState<Record<string, any> | null>(null)
+  useEffect(() => { api.get<Record<string, any>>('/kb/parametros').then(setPrm) }, [])
   const v = (f: string) => r.fatos[f]?.valor
   const t = tecnico()
-  const linhas = [
-    { nome: t ? 'Energia (ELl)' : 'Energia', oferta: v('ver.ell_consumida'), alvo: v('exig.ell_total'), un: t ? 'Mcal' : 'Mcal', tipo: 'min', tol: v('meta.fator_energia_min') ?? 0.95 },
-    { nome: t ? 'Proteína bruta' : 'Proteína', oferta: v('dieta.pb_pct'), alvo: v('exig.pb_pct_alvo'), un: '%', tipo: 'min', tol: 0.95 },
-    { nome: t ? 'Matéria seca' : 'Quantidade de comida', oferta: v('dieta.ms_kg'), alvo: v('exig.cms'), un: 'kg', tipo: 'faixa' },
-    { nome: t ? 'FDN' : 'Fibra', oferta: v('dieta.fdn_pct'), alvo: v('meta.fdn_min'), un: '%', tipo: 'min', tol: 1 },
-    { nome: t ? 'FDN de forragem' : 'Fibra do volumoso', oferta: v('dieta.fdnf_pct'), alvo: v('meta.fdnf_min'), un: '%', tipo: 'min', tol: 1 },
+  if (!prm) return null
+  const P = (nome: string) => prm[nome].valor as number      // as mesmas tolerâncias das regras VER (params.yaml)
+  type Linha = { nome: string; oferta: any; alvo: any; un: string; tipo: 'min' | 'max' | 'faixa' | 'dcad'; min?: number; max?: number }
+  const linhas = ([
+    { nome: t ? 'Energia (ELl)' : 'Energia', oferta: v('ver.ell_consumida'), alvo: v('exig.ell_total'), un: 'Mcal', tipo: 'faixa',
+      min: v('meta.fator_energia_min') ?? P('fator_energia_min'), max: P('fator_energia_max') },
+    { nome: t ? 'Proteína bruta' : 'Proteína', oferta: v('dieta.pb_pct'), alvo: v('exig.pb_pct_alvo'), un: '%', tipo: 'faixa',
+      min: P('fator_pb_min'), max: P('fator_pb_max') },
+    { nome: t ? 'Matéria seca' : 'Quantidade de comida', oferta: v('dieta.ms_kg'), alvo: v('exig.cms'), un: 'kg', tipo: 'faixa',
+      min: P('fator_oferta_min'), max: P('fator_oferta_max') },
+    { nome: t ? 'FDN' : 'Fibra', oferta: v('dieta.fdn_pct'), alvo: v('meta.fdn_min'), un: '%', tipo: 'min', min: 1 },
+    { nome: t ? 'FDN de forragem' : 'Fibra do volumoso', oferta: v('dieta.fdnf_pct'), alvo: v('meta.fdnf_min'), un: '%', tipo: 'min', min: 1 },
     { nome: t ? 'CNF' : 'Amido e açúcares', oferta: v('dieta.cnf_pct'), alvo: v('meta.cnf_max'), un: '%', tipo: 'max' },
     { nome: t ? 'Gordura (EE)' : 'Gordura', oferta: v('dieta.ee_pct'), alvo: v('meta.ee_max'), un: '%', tipo: 'max' },
     { nome: 'Ureia', oferta: v('dieta.ureia_pct'), alvo: v('meta.ureia_max'), un: '%', tipo: 'max' },
     ...(r.fatos['perfil.fase']?.valor === 'pre_parto' && v('dieta.dcad_meq_kg') !== undefined
-      ? [{ nome: 'DCAD (pré-parto)', oferta: v('dieta.dcad_meq_kg'), alvo: 0, un: 'mEq/kg', tipo: 'dcad' }] : []),
-  ].filter((l) => l.oferta !== undefined && l.alvo !== undefined)
+      ? [{ nome: 'DCAD (pré-parto)', oferta: v('dieta.dcad_meq_kg'), alvo: P('dcad_alerta_preparto'), un: 'mEq/kg', tipo: 'dcad' }] : []),
+  ] as Linha[]).filter((l) => l.oferta !== undefined && l.alvo !== undefined)
+  const soPrimiparas = (v('lote.fracao_primiparas') ?? 0) >= 1     // DCAD negativa só vale para multíparas (VER-15)
   return (
     <Painel titulo={t ? 'Oferta × exigência' : 'A dieta item por item'} subtitulo={t ? `Dieta: ${fmt(v('dieta.ms_kg'))} kg MS · R$ ${fmt(v('dieta.custo_vaca_dia'))}/vaca/dia · ${fmt(v('dieta.forragem_pct'))}% de volumoso na MS`
       : `Barra verde: dentro do certo. Amarela: falta ou passou. O traço escuro é o necessário. ${fmt(v('dieta.forragem_pct'))}% da comida é volumoso.`}>
       <div className="space-y-2">
         {linhas.map((l) => {
           const razao = l.tipo === 'dcad' ? (l.oferta + 300) / 300 : l.oferta / l.alvo
-          const ok = l.tipo === 'dcad' ? l.oferta <= 0 : l.tipo === 'min' ? razao >= (l.tol ?? 1) : l.tipo === 'max' ? l.oferta <= l.alvo : razao >= 0.9 && razao <= 1.05
+          const ok = l.tipo === 'dcad' ? soPrimiparas || l.oferta <= l.alvo : l.tipo === 'min' ? razao >= (l.min ?? 1)
+            : l.tipo === 'max' ? l.oferta <= l.alvo : razao >= (l.min ?? 0) && razao <= (l.max ?? Infinity)
           const largura = Math.max(0, Math.min(100, (razao / 1.5) * 100))
           return (
             <div key={l.nome} className="grid grid-cols-[110px_1fr_auto] items-center gap-3 text-sm sm:grid-cols-[150px_1fr_200px]">
@@ -279,7 +289,7 @@ function Comparacao({ r }: { r: Resultado }) {
               <span className="num text-right text-xs text-stone-700">
                 {t ? <>{fmt(l.oferta)} {l.tipo === 'max' || l.tipo === 'dcad' ? '≤' : l.tipo === 'min' ? '≥' : '≈'} {fmt(l.alvo)} {l.un} {ok ? '✓' : '⚠'}</>
                   : ok ? <span className="text-campo-700">ok</span>
-                  : <span className="font-medium text-atencao">{l.tipo === 'max' || l.tipo === 'dcad' ? 'passou do limite' : razao < 1 ? 'falta' : 'sobra'}</span>}
+                  : <span className="font-medium text-atencao">{l.tipo === 'max' || l.tipo === 'dcad' ? 'passou do limite' : razao < (l.min ?? 1) ? 'falta' : 'sobra'}</span>}
               </span>
             </div>
           )
@@ -699,6 +709,7 @@ function AbaAcompanhamento({ loteId }: { loteId: number }) {
     return [...porDia.entries()].map(([dia, eventos], i) => ({ n: i + 1, dia, eventos }))
   }, [s])
   if (!s) return <Carregando texto="Carregando séries…" />
+  const ref = s.referencias      // linhas de referência = os mesmos parâmetros que as regras usam
   const mini = (ind: string, titulo: string, un: string, refs: { y: number; rotulo: string }[] = []) => {
     const d = s.indicadores[ind]?.map((p: any) => ({ dia: dataCurta(p.data), valor: p.valor })) ?? []
     if (!d.length) return null
@@ -732,7 +743,7 @@ function AbaAcompanhamento({ loteId }: { loteId: number }) {
               <YAxis yAxisId="itu" orientation="right" tick={{ fontSize: 11 }} domain={[60, 90]} />
               <Tooltip content={<BalaoProducao grupos={grupos} />} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <ReferenceLine yAxisId="itu" y={72} stroke="#fca5a5" strokeDasharray="2 4" />
+              <ReferenceLine yAxisId="itu" y={ref.itu_limiar} stroke="#fca5a5" strokeDasharray="2 4" />
               {grupos.map((g) => (
                 <ReferenceLine key={g.dia} yAxisId="l" x={g.dia} stroke={destaque === g.n ? '#24552f' : '#646f60'}
                   strokeWidth={destaque === g.n ? 2.5 : 1} strokeDasharray={destaque === g.n ? undefined : '3 3'}
@@ -767,14 +778,14 @@ function AbaAcompanhamento({ loteId }: { loteId: number }) {
       </Painel>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {mini('escore_cocho', 'Leitura de cocho', 'escore 1–5 (meta 3)', [{ y: 3, rotulo: 'meta' }])}
-        {mini('sobras_pct', 'Sobras pesadas', '% da oferta', [{ y: 2, rotulo: 'mín.' }])}
+        {mini('sobras_pct', 'Sobras pesadas', '% da oferta', ref.sobras ? [{ y: ref.sobras[0], rotulo: 'mín.' }, { y: ref.sobras[1], rotulo: 'máx.' }] : [])}
         {mini('ms_silagem', 'MS da silagem', '% (micro-ondas)')}
         {mini('ecc', 'Escore de condição corporal', '1 a 5')}
         {mini('concentrado_kg_vaca', 'Concentrado', 'kg/vaca/dia')}
-        {mini('laudo_nul', 'NUL (laudo)', 'mg/dL', [{ y: 16, rotulo: 'alto' }, { y: 19.5, rotulo: 'reprodução' }])}
+        {mini('laudo_nul', 'NUL (laudo)', 'mg/dL', [{ y: ref.nul_max, rotulo: 'alto' }, { y: ref.nul_reprodutivo, rotulo: 'reprodução' }])}
         {mini('laudo_gordura', 'Gordura (laudo)', '%')}
-        {mini('laudo_lactose', 'Lactose (laudo)', '%', [{ y: 4.3, rotulo: 'IN 76' }])}
-        {mini('laudo_ccs', 'CCS (laudo)', 'mil cél/mL', [{ y: 500, rotulo: 'IN 76' }])}
+        {mini('laudo_lactose', 'Lactose (laudo)', '%', [{ y: ref.lactose_min, rotulo: 'IN 76' }])}
+        {mini('laudo_ccs', 'CCS (laudo)', 'mil cél/mL', [{ y: ref.ccs_regulatorio, rotulo: 'IN 76' }])}
       </div>
     </div>
   )

@@ -45,5 +45,5 @@
     - {fato: mon.horas_desde_correcao_ms, op: "<=", valor: "@params.janela_supressao_h"}
   entao:
     - suprimir: {categorias: [producao], motivo: "dieta corrigida pela MS há {mon.horas_desde_correcao_ms:.0f} h: aguardar resposta"}
-  fonte: "Inferências"
+  fonte: "Escolha de engenharia (análoga à supressão de 48 h após reagrupamento, Inferências nº 9)"
   forca: D

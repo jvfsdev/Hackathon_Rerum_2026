@@ -27,5 +27,5 @@ def ureia_para_nul(ureia_mg_dl: float) -> float:
 
 
 def ndt_para_ell(ndt_pct: float) -> float:
-    """NDT (% MS) → ELl (Mcal/kg MS), NRC 2001 Eq. 2-3."""
+    """NDT (% MS) → ELl (Mcal/kg MS): conversão linear do NRC 1989 (desconto fixo de 8%; o NRC 2001 passa por ED/EM)."""
     return 0.0245 * ndt_pct - 0.12

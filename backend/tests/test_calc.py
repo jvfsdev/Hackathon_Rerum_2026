@@ -36,6 +36,7 @@ def test_energia_leite_e_mantenca():
 
 def test_gestacao_bate_tabela_nrc():
     # Tabela NRC 2001 (Drackley 2021): 2,7 / 3,4 / 3,8 Mcal e 199 / 306 / 357 g aos 200 / 250 / 275 d
+    # (com bezerro de 44 kg a equação dá 204 g aos 200 d; por isso só 250 e 275 d são conferidos)
     assert energy.gestacao(250, 44) == approx(3.4, abs=0.05)
     assert protein.pm_gestacao(250, 44) == approx(306, abs=3)
     assert energy.gestacao(275, 44) == approx(3.8, abs=0.1)
@@ -43,8 +44,8 @@ def test_gestacao_bate_tabela_nrc():
 
 
 def test_atividade_pastejo_valores_tabelados():
-    assert energy.atividade_pastejo(450, 0.4, "plano") == approx(0.6, abs=0.05)
-    assert energy.atividade_pastejo(635, 3.2, "acidentado") == approx(5.5, abs=0.05)
+    assert energy.atividade_pastejo(450, 0.4, "plano", 0.003) == approx(0.6, abs=0.05)
+    assert energy.atividade_pastejo(635, 3.2, "acidentado", 0.003) == approx(5.5, abs=0.05)
 
 
 def test_ajuste_ecc():

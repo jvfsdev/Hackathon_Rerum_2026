@@ -25,14 +25,14 @@ def crescimento_primiparas(mantenca_mcal: float, fracao_primiparas: float, acres
     return mantenca_mcal * acrescimo * fracao_primiparas
 
 
-def atividade_pastejo(pv: float, distancia_km: float, relevo: str) -> float:
+def atividade_pastejo(pv: float, distancia_km: float, relevo: str, ondulado: float) -> float:
     """NRC 2001: 0,00045·PV·km + 0,0012·PV; terreno acidentado soma 0,006·PV.
 
     Reproduz os valores tabelados (450 kg, plano, 0,4 km ≈ 0,6 Mcal; 635 kg, acidentado, 3,2 km ≈ 5,5 Mcal).
-    Ondulado usa metade do acréscimo de acidentado (escolha de engenharia).
+    Ondulado: acréscimo `ondulado` por kg de PV (@params.atividade_ondulado, escolha de engenharia).
     """
     base = 0.00045 * pv * distancia_km + 0.0012 * pv
-    extra = {"plano": 0.0, "ondulado": 0.003, "acidentado": 0.006}.get(relevo, 0.0)
+    extra = {"plano": 0.0, "ondulado": ondulado, "acidentado": 0.006}.get(relevo, 0.0)
     return base + extra * pv
 
 

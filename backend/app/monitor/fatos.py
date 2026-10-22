@@ -133,7 +133,8 @@ def leituras_cocho(h: HistoricoLote, d: date, params, dias: int = 10) -> list[di
         else:
             esc = int(round(escores[dia]))
             pct = tabela.get(esc, tabela[3])
-        out.append({"data": dia, "pct": pct, "escore": esc, "vazio": esc == 1 if esc is not None else pct <= 0.5})
+        out.append({"data": dia, "pct": pct, "escore": esc,
+                    "vazio": esc == 1 if esc is not None else pct <= params["cocho_vazio_sobra_pct"]["valor"]})
     return out
 
 
@@ -156,9 +157,9 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
     if pontos and pontos[-1]["data"] == d:
         uteis = [p for p in pontos if not p["transicao"]]          # transição não entra nos detectores
         res = [p["residuo"] for p in uteis]
-        z = series.padronizar(res) if res else [0.0]
+        z = series.padronizar(res, params["mad_janela_dias"]["valor"], params["sigma_piso"]["valor"]) if res else [0.0]
         lam, L = params["ewma_lambda"]["valor"], params["ewma_L"]["valor"]
-        ew = series.ewma(z, lam)
+        ew = series.ewma(z, lam, params["ewma_z_cap"]["valor"])
         dias, pior = series.corrida_abaixo([(p["data"], p["residuo"]) for p in uteis], d,
                                            params["corrida_residuo_min"]["valor"], params["corrida_janela"]["valor"])
         hoje = pontos[-1]
@@ -184,9 +185,10 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
         f["mon.litros_por_kg_conc"] = lv_hoje / conc
         custo = economics.custo_concentrado_por_litro(conc, fazenda.preco_concentrado, lv_hoje)
         hist = [economics.custo_concentrado_por_litro(c, fazenda.preco_concentrado, litros_vaca(h, dd))
-                for dd, c in h.serie("concentrado_kg_vaca", d - timedelta(days=1), 30) if litros_vaca(h, dd)]
+                for dd, c in h.serie("concentrado_kg_vaca", d - timedelta(days=1), params["custo_conc_janela_dias"]["valor"])
+                if litros_vaca(h, dd)]
         f["mon.custo_conc_litro"] = custo
-        if len(hist) >= 10:
+        if len(hist) >= params["custo_conc_min_dias"]["valor"]:
             ref = statistics.median(hist)
             f["mon.custo_conc_litro_ref"] = ref
             f["mon.custo_conc_razao"] = custo / ref
@@ -194,7 +196,8 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
     ev = h.ultimo_evento("mudanca_concentrado", fim_do_dia)
     if ev and pontos:
         dias_ev = (d - ev.data_hora.date()).days
-        if 5 <= dias_ev <= 14:
+        dias_min, dias_max = params["resposta_marginal_dias"]["valor"]
+        if dias_min <= dias_ev <= dias_max:
             desvio = {p["data"]: p["observado"] - p["esperado"] for p in pontos if not p["transicao"]}  # L/vaca acima da curva
             antes = [ev.data_hora.date() - timedelta(days=i) for i in range(1, 6)]
             depois = [d - timedelta(days=i) for i in range(3)]
@@ -224,7 +227,7 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
     if ev and (d - ev.data_hora.date()).days <= 30:
         f["mon.dias_desde_troca_volumoso"] = (d - ev.data_hora.date()).days
     ev = h.ultimo_evento("silo_novo", fim_do_dia)
-    if ev and (d - ev.data_hora.date()).days <= 7:
+    if ev and (d - ev.data_hora.date()).days <= params["silo_novo_dias"]["valor"]:
         f["mon.silo_novo"] = True
 
     # --- semanal: MS da silagem
@@ -251,11 +254,12 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
 
     # --- diário: leitura de cocho (escore 1–5) ou sobras pesadas (%); no mesmo dia, a pesagem prevalece
     leituras = leituras_cocho(h, d, params, dias=10)
-    recentes = [l for l in leituras if l["data"] > d - timedelta(days=3)]
+    n_sobras = params["sobras_dias"]["valor"]
+    recentes = [l for l in leituras if l["data"] > d - timedelta(days=n_sobras)]
     if recentes:
         pct = sum(l["pct"] for l in recentes) / len(recentes)
         f["mon.sobras_mm3"] = pct
-        if len(recentes) >= 3:      # "3 dias fora da meta" (Inferências): menor e maior leitura dos 3 dias
+        if len(recentes) >= n_sobras:      # "3 dias fora da meta" (Inferências): menor e maior leitura dos dias
             f["mon.sobras_min3"] = min(l["pct"] for l in recentes)
             f["mon.sobras_max3"] = max(l["pct"] for l in recentes)
         escores = [l["escore"] for l in recentes if l["escore"] is not None]
@@ -273,7 +277,8 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
             f["mon.dias_cocho_vazio"] = vazio
 
     # --- semanal: ECC, fezes, ruminação
-    ecc = [v for _, v in h.serie("ecc", d, 42)]
+    # "perda > 1 ponto em 5 semanas": leituras com até dias_mobilizacao entre a primeira e a última
+    ecc = [v for _, v in h.serie("ecc", d, params["dias_mobilizacao"]["valor"] + 1)]
     if len(ecc) >= 2:
         # mediana de 3 nos pontos internos: uma leitura isolada fora da curva não vira "perda de ECC",
         # mas as pontas ficam como medidas (senão uma tendência real de queda é achatada)
@@ -291,7 +296,7 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
         pts = h.serie(ind, d, 7)
         if pts:
             f[f"mon.{ind}"] = pts[-1][1]
-    rum = h.serie("ruminacao", d, 10)
+    rum = h.serie("ruminacao", d, params["ruminacao_dias"]["valor"])
     if len(rum) >= 6:
         f["mon.ruminacao_queda"] = sum(v for _, v in rum[:-3]) / len(rum[:-3]) - sum(v for _, v in rum[-3:]) / 3
 
@@ -308,12 +313,13 @@ def fatos_monitoramento(lote, fazenda, dieta, h: HistoricoLote, params, alimento
             delta = pts[-1][1] - sum(base) / len(base)
             f[fato] = abs(delta) if fato.endswith("_abs") else delta
     for ind in ("ccs", "cbt"):
-        pts = h.serie(f"laudo_{ind}", d, 100)          # ~3 meses
+        pts = h.serie(f"laudo_{ind}", d, params["laudo_mg3_dias"]["valor"])          # ~3 meses
         if f"laudo.{ind}" not in f:
             continue
         if len(pts) >= 3:                               # IN 76: média geométrica de 3 meses exige 3 amostras
             f[f"laudo.{ind}_mg3"] = economics.media_geometrica([v for _, v in pts[-3:]])
-        if ind == "ccs" and len(pts) >= 2 and pts[-1][1] >= 1.2 * pts[-2][1] \
+        # tendência: CCS atual contra a mais antiga da janela de ~3 meses (Inferências nº 19)
+        if ind == "ccs" and len(pts) >= 2 and pts[-1][1] >= params["ccs_tendencia_fator"]["valor"] * pts[0][1] \
                 and pts[-1][1] >= params["ccs_tendencia_min"]["valor"]:
             f["laudo.ccs_tendencia"] = "subindo"
     return f

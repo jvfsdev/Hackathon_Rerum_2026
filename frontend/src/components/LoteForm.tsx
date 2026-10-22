@@ -15,8 +15,8 @@ const s = (v: any) => (v === null || v === undefined ? '' : String(Math.round(Nu
 export function valoresIniciais(lote?: Lote, fatos?: Record<string, any>): ValoresLote {
   return {
     nome: lote?.nome ?? '', finalidade: lote?.finalidade ?? '', estado: lote?.estado ?? 'lactacao', sistema: lote?.sistema ?? 'confinado',
-    grupo_genetico: lote?.grupo_genetico ?? 'girolando', n_vacas: s(lote?.n_vacas ?? 20), pv: s(lote?.pv ?? 500),
-    del_ref: s(fatos?.['lote.del'] ?? lote?.del_ref ?? 100), dias_para_parto_ref: s(fatos?.['lote.dias_para_parto'] ?? lote?.dias_para_parto_ref),
+    grupo_genetico: lote?.grupo_genetico ?? 'girolando', n_vacas: s(lote?.n_vacas), pv: s(lote?.pv),   // sem padrão: peso vivo não tem valor seguro (perguntas.yaml)
+    del_ref: s(fatos?.['lote.del'] ?? lote?.del_ref), dias_para_parto_ref: s(fatos?.['lote.dias_para_parto'] ?? lote?.dias_para_parto_ref),
     dias_gestacao_ref: s(fatos?.['lote.dias_gestacao'] ?? lote?.dias_gestacao_ref ?? 0), fracao_primiparas: s(lote?.fracao_primiparas ?? 0.3),
     ecc: s(lote?.ecc), distancia_km: s(lote?.distancia_km), relevo: lote?.relevo ?? 'plano', forrageira: lote?.forrageira ?? '', leite: s(fatos?.['lote.leite'] ?? lote?.leite),
     gordura: s(lote?.gordura ?? 3.5), proteina: s(lote?.proteina ?? 3.2),

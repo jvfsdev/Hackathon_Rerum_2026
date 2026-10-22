@@ -36,6 +36,12 @@ def carregar(diretorio: Path = KB_DIR) -> BaseConhecimento:
     params = yaml.safe_load((diretorio / "params.yaml").read_text(encoding="utf-8"))
     alimentos = {a["id"]: a for a in yaml.safe_load((diretorio / "foods.yaml").read_text(encoding="utf-8"))}
     perguntas = yaml.safe_load((diretorio / "perguntas.yaml").read_text(encoding="utf-8"))
+    for fato, p in perguntas.items():      # padrao: "@params.x" → valor do parâmetro (o "não sei" também tem fonte)
+        ref = p.get("padrao")
+        if isinstance(ref, str) and ref.startswith("@params."):
+            if ref[8:] not in params:
+                raise ValueError(f"pergunta {fato}: parâmetro inexistente {ref}")
+            p["padrao"], p["padrao_param"] = params[ref[8:]]["valor"], ref[8:]
     regras = []
     for arq in sorted((diretorio / "rules").glob("*.yaml")):
         for r in yaml.safe_load(arq.read_text(encoding="utf-8")) or []:

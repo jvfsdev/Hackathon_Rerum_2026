@@ -7,8 +7,8 @@
   se:
     - {fato: dieta.itens, op: existe}
   entao:
-    - calcular: {fato: dieta, funcao: composicao_dieta, args: {itens: $dieta.itens}}
-  fonte: "Conversão MN→MS; ELl = 0,0245·NDT − 0,12 (NRC 2001 Eq. 2-3)"
+    - calcular: {fato: dieta, funcao: composicao_dieta, args: {itens: $dieta.itens, tolerancia_inclusao: "@params.tolerancia_inclusao_pct"}}
+  fonte: "Conversão MN→MS; ELl = 0,0245·NDT − 0,12 (NRC 1989, conversão linear)"
   forca: B
 
 - id: EXG-01A
@@ -99,8 +99,8 @@
     - {fato: exig.cms_equacao, op: existe}
   entao:
     - calcular: {fato: exig.cms_ajuste_fdnd, funcao: ajuste_fdnd, args: {fdnd: $dieta.fdnd_forragem, ref: "@params.fdnd_ref", kg_por_ponto: "@params.cms_por_ponto_fdnd"}}
-  fonte: "Oba & Allen 1999; Dossiê EXG-09"
-  forca: B
+  fonte: "Oba & Allen 1999 (0,17 kg por ponto); Dossiê EXG-09; FDND de referência: escolha de engenharia"
+  forca: C
 
 - id: EXG-01E
   versao: 1
@@ -220,7 +220,7 @@
     - calcular:
         fato: exig.ell_atividade
         funcao: ell_atividade
-        args: {pv: $lote.pv, distancia: "$lote.distancia_km|1.0", relevo: "$lote.relevo|plano"}
+        args: {pv: $lote.pv, distancia: "$lote.distancia_km|@params.padrao_distancia_km", relevo: "$lote.relevo|plano", ondulado: "@params.atividade_ondulado"}
   fonte: "NRC 2001 via eOrganic (reproduz valores tabelados)"
   forca: B
 
@@ -238,8 +238,8 @@
         fato: exig.ell_ecc
         funcao: ell_ajuste_ecc
         args: {ecc: $lote.ecc, meta: "@params.ecc_meta_meio", dias: "@params.dias_recuperacao_ecc", mcal_por_ponto: "@params.mcal_por_ponto_ecc", pv: $lote.pv, pv_ref: "@params.pv_ref_ecc"}
-  fonte: "Penn State (417 Mcal por ponto de ECC numa vaca de ~650 kg; escalado pelo PV)"
-  forca: B
+  fonte: "Penn State/NRC 2001 (417 Mcal liberados ao perder 1 ponto de ECC, vaca ~650 kg; usado também para recuperar, aproximação do Dossiê T17; escalado pelo PV)"
+  forca: C
 
 - id: EXG-06B
   versao: 2
@@ -255,8 +255,8 @@
         fato: exig.ell_ecc
         funcao: ell_ajuste_ecc
         args: {ecc: $lote.ecc, meta: "@params.ecc_meta_final", dias: "@params.dias_recuperacao_ecc", mcal_por_ponto: "@params.mcal_por_ponto_ecc", pv: $lote.pv, pv_ref: "@params.pv_ref_ecc"}
-  fonte: "Penn State (417 Mcal por ponto de ECC numa vaca de ~650 kg; escalado pelo PV)"
-  forca: B
+  fonte: "Penn State/NRC 2001 (417 Mcal liberados ao perder 1 ponto de ECC, vaca ~650 kg; usado também para recuperar, aproximação do Dossiê T17; escalado pelo PV)"
+  forca: C
 
 - id: EXG-06C
   versao: 2
@@ -272,8 +272,8 @@
         fato: exig.ell_ecc
         funcao: ell_ajuste_ecc
         args: {ecc: $lote.ecc, meta: "@params.ecc_meta_inicio", dias: "@params.dias_recuperacao_ecc", mcal_por_ponto: "@params.mcal_por_ponto_ecc", pv: $lote.pv, pv_ref: "@params.pv_ref_ecc"}
-  fonte: "Penn State (417 Mcal por ponto de ECC numa vaca de ~650 kg; escalado pelo PV)"
-  forca: B
+  fonte: "Penn State/NRC 2001 (417 Mcal liberados ao perder 1 ponto de ECC, vaca ~650 kg; usado também para recuperar, aproximação do Dossiê T17; escalado pelo PV)"
+  forca: C
 
 - id: EXG-07
   versao: 2
@@ -290,8 +290,8 @@
         fato: meta.fator_energia_min
         funcao: fator_mobilizacao
         args: {ell_total: $exig.ell_total, mcal_por_ponto: "@params.mcal_por_ponto_ecc", pv: $lote.pv, pv_ref: "@params.pv_ref_ecc", perda_aceitavel: "@params.ecc_mobilizacao_aceitavel", dias: "@params.dias_mobilizacao"}
-  fonte: "Penn State (417 Mcal/ponto); OMAFRA (perda aceitável 0,5–0,75 ponto); Dossiê ACP-05 (5 semanas)"
-  forca: B
+  fonte: "Penn State (417 Mcal/ponto); OMAFRA (perda aceitável 0,5–0,75 ponto, do parto até ~30 DEL); prazo de 5 semanas: escolha de engenharia"
+  forca: C
 
 - id: EXG-02Z
   versao: 2
@@ -391,8 +391,8 @@
     - concluir: {fato: meta.fdnf_min, valor: "@params.fdnf_min"}
     - concluir: {fato: meta.ee_max, valor: "@params.ee_max"}
     - concluir: {fato: meta.ureia_max, valor: "@params.ureia_max"}
-  fonte: "NRC 2001; Cultivar; Semadesc-MS"
-  forca: B
+  fonte: "NRC 2001 (fibra); Cultivar (EE, C); Semadesc-MS (ureia)"
+  forca: C
 
 - id: EXG-04B
   versao: 1

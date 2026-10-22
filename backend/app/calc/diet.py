@@ -27,7 +27,7 @@ def dcad_meq_kg(na: float, k: float, cl: float, s: float) -> float:
     return ((na / 0.023 + k / 0.039) - (cl / 0.0355 + s / 0.016)) * 10
 
 
-def composicao(itens: list[dict]) -> dict:
+def composicao(itens: list[dict], tolerancia_inclusao: float = 0.0) -> dict:
     """itens: [{"alimento": {...}, "kg_mn": float}]. Teores em % da MS; ELl total em Mcal/dia."""
     ms_total = pb = fdn = fdnf = cnf = ee = ndt = ell = ureia = custo = forragem = mineral = 0.0
     volumosos = set()
@@ -91,7 +91,7 @@ def composicao(itens: list[dict]) -> dict:
         "mineral_kg_ms": mineral,
         "inclusao_excedida": sorted(
             aid for aid, kg in kg_ms_por_alimento.items()
-            if _limite(itens, aid) is not None and 100 * kg / ms_total > _limite(itens, aid) + 0.5),
+            if _limite(itens, aid) is not None and 100 * kg / ms_total > _limite(itens, aid) + tolerancia_inclusao),
     }
 
 

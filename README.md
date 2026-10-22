@@ -4,7 +4,7 @@ Hackathon UFJF 2026 (XXVIII Semana da Computação · RERUM), **Tema T2 — Diet
 
 Orienta e acompanha **lotes** de vacas leiteiras: classifica o lote, calcula exigências, verifica a dieta, sugere a dieta de **custo mínimo** e acompanha o dia a dia (produção × curva esperada, cocho, silagem, ECC, laudo do laticínio). Os alertas vêm com causa provável, ação sugerida e explicação **"por quê?/como?"**.
 
-Quem decide é a **base de conhecimento (153 regras de produção com fator de certeza)** + **motor de inferência próprio** (encadeamento progressivo e regressivo, resolução de conflito, CF estilo MYCIN). Não há LLM no sistema: as decisões são determinísticas e auditáveis.
+Quem decide é a **base de conhecimento (172 regras de produção com fator de certeza)** + **motor de inferência próprio** (encadeamento progressivo e regressivo, resolução de conflito, CF estilo MYCIN). Não há LLM no sistema: as decisões são determinísticas e auditáveis.
 
 ## Rodar (localhost)
 
@@ -25,7 +25,7 @@ npm run dev                                 # http://localhost:5173
 
 No celular (mesma rede Wi-Fi): `npm run dev:rede` e abra `http://<ip-do-computador>:5173` — a página inicial vira o **modo campo** (registro rápido + avisos, funciona sem conexão e envia depois).
 
-Testes: `cd backend && .venv/bin/pytest -q`, com 466 testes, entre eles 33 casos de resultado conhecido em `backend/tests/cases.yaml` (os mesmos rodam na tela **Base de conhecimento**).
+Testes: `cd backend && .venv/bin/pytest -q`, com 471 testes, entre eles 36 casos de resultado conhecido em `backend/tests/cases.yaml` (os mesmos rodam na tela **Base de conhecimento**).
 
 Sem internet o sistema funciona por completo: o clima passa a ser digitado e os preços de referência ficam no último valor coletado. Para desligar a coleta diária de preços: `LEITE_SEM_COLETA=1`. Documentação interativa da API: `http://localhost:8000/docs`.
 

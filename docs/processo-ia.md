@@ -74,6 +74,14 @@ Agente usado: **Claude Code** (Anthropic), no VS Code. A IA ajudou a pesquisar, 
     produtor (padrão) e uma visão técnica. Tudo continua decidido pelas regras: transição (módulo T) e estoque (módulo E)
     viraram regras novas; ajuste mínimo e sensibilidade usam o mesmo PL, com o mesmo contrato de verificação (base 1.5.0).
 
+17. **Auditoria de cada valor (21/10).** Dez subagentes conferiram, em paralelo e só lendo, cada número do sistema contra
+    a fonte citada (documentos de referência e literatura na web): parâmetros, alimentos (baixados de novo, ao vivo, do
+    CQBAL: bateram 100%), equações, regras, constantes no código, textos, frontend e seed. Nenhum valor de composição ou
+    equação era inventado; os achados foram força de evidência maior que a da fonte, fontes erradas ou vagas, números
+    escritos à mão em textos e código (agora `{@params.x}` e parâmetros novos), duas recomendações de transição de dieta
+    fora da literatura (5 → 7 dias; 1,0 → 0,5 kg/dia), uma afirmação errada sobre a IN 77 (CCS não suspende a coleta) e
+    incoerências do seed (dietas sem energia para o leite produzido, NUL subindo com proteína em falta). Base 1.7.0.
+
 ## O que os testes pegaram
 
 - Casos que o agente escreveu com expectativa errada: perda por CCS interpolada linearmente em vez de em escala logarítmica, e soma da MS da dieta. Foi corrigida a expectativa, não o código, e o motivo ficou registrado.
@@ -100,6 +108,7 @@ Agente usado: **Claude Code** (Anthropic), no VS Code. A IA ajudou a pesquisar, 
 - "Um integrante encontrou o CQBAL 4.0, lá parece ter informações valiosas, usamos ele já?" (etapa 13)
 - "Sem implementar nada ainda, sugira ideias de coisas novas… implemente 1, 2, 5, 6, 7, 8, 9 e 10; o sistema está muito técnico, o fazendeiro precisa de linguagem clara." (etapa 16)
 - "Analise novamente, veja se cumprimos os requisitos da Hackathon e se o sistema está correto e completo." (etapa 15)
+- "Designe um exército de subagentes para verificar cada valor do sistema, incluindo do seed; nenhum valor pode ser inventado." (etapa 17)
 
 ## O que aprendemos com o processo
 

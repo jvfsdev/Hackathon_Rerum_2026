@@ -18,7 +18,7 @@ def sigma_robusto(valores: list[float]) -> float:
     return 1.4826 * statistics.median(abs(v - med) for v in valores)
 
 
-def padronizar(residuos: list[float], janela: int = 45, piso: float = 0.02) -> list[float]:
+def padronizar(residuos: list[float], janela: int, piso: float) -> list[float]:
     """Resíduo padronizado de cada dia usando o sigma robusto dos dias anteriores (piso evita dividir por ~0)."""
     z = []
     for i, r in enumerate(residuos):
@@ -28,7 +28,7 @@ def padronizar(residuos: list[float], janela: int = 45, piso: float = 0.02) -> l
     return z
 
 
-def ewma(valores: list[float], lam: float, limite_z: float = 3.5) -> list[float]:
+def ewma(valores: list[float], lam: float, limite_z: float) -> list[float]:
     """EWMA sobre a série padronizada. Cada z é limitado a ±limite_z para um único dia anômalo (erro de registro)
     não cruzar o limite sozinho — dia isolado é papel do Shewhart (ACP-D01), não de queda sustentada."""
     out, atual = [], 0.0
@@ -41,15 +41,6 @@ def ewma(valores: list[float], lam: float, limite_z: float = 3.5) -> list[float]
 def limite_ewma(lam: float, L: float) -> float:
     """Limite assintótico do EWMA para série padronizada."""
     return L * (lam / (2 - lam)) ** 0.5
-
-
-def cusum_negativo(z: list[float], k: float) -> list[float]:
-    """CUSUM unilateral para quedas sobre série padronizada."""
-    out, s = [], 0.0
-    for v in z:
-        s = max(0.0, s - v - k)
-        out.append(s)
-    return out
 
 
 def corrida_abaixo(pontos: list[tuple], ate, limiar: float = -0.02, janela: int = 14) -> tuple[int, float]:

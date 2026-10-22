@@ -64,7 +64,7 @@ def projetar_lote(s: Session, lote: Lote, dias: int = 30, hoje: date | None = No
     k = ajustar_k(lote, h, p, hoje) if lote.estado == "lactacao" else None
     pontos = serie_esperado(lote, h, p, hoje) if k else []
     residuos = [pt["residuo"] for pt in pontos if not pt["transicao"]]
-    sigma = max(series.sigma_robusto(residuos), 0.02) if len(residuos) >= 7 else p["prev_sigma_padrao"]["valor"]
+    sigma = max(series.sigma_robusto(residuos), p["sigma_piso"]["valor"]) if len(residuos) >= 7 else p["prev_sigma_padrao"]["valor"]
     # o lote segue na distância atual da curva (mediana dos últimos 7 dias úteis): uma queda em curso não some sozinha
     desvio = statistics.median(residuos[-7:]) if len(residuos) >= 3 else 0.0
     base_plana = None

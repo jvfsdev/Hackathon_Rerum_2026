@@ -21,9 +21,13 @@ POBRE = [{"alimento": "silagem_milho", "kg_mn": 30}, {"alimento": "milho_moido",
 
 # ------------------------------------------------------------------ linguagem do produtor
 def test_todo_alerta_tem_texto_do_produtor_e_numeros_no_padrao_brasileiro():
-    sem = [r["id"] for r in KB.regras for a in r.get("entao", []) if "alerta" in a
-           and not a["alerta"].get("titulo_produtor") and r["id"] not in ("ACP-06", "ACP-06B", "VER-12", "ACP-D00")]
+    sem = [r["id"] for r in KB.regras for a in r.get("entao", []) if "alerta" in a and r["id"] != "ACP-D00"   # lembrete
+           and not all(a["alerta"].get(k) for k in ("titulo_produtor", "causa_produtor", "acao_produtor"))]
     assert sem == []
+    assert [f for f, p in KB.perguntas.items() if not p.get("texto_produtor") or not p.get("ajuda_produtor")] == []
+    # o "não sei" também tem fonte: os valores padrão das perguntas vêm de params.yaml
+    assert [f for f, p in KB.perguntas.items() if isinstance(p.get("padrao"), (int, float)) and "padrao_param" not in p] == []
+    assert KB.perguntas["lote.del"]["padrao"] == KB.params["padrao_del"]["valor"]
     r = services.avaliar(LOTE, POBRE)
     ver01 = next(a for a in r["alertas"] if a["regra"] == "VER-01")
     assert "%" in ver01["titulo_produtor"] and "Mcal" not in ver01["titulo_produtor"]

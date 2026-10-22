@@ -73,8 +73,8 @@
         titulo_produtor: "A comida não dá a energia que o lote precisa ({ver.razao_energia:.0%} do necessário)"
         causa_produtor: "Sem energia suficiente as vacas emagrecem e produzem menos."
         acao_produtor: "Aumente milho ou polpa, use um volumoso melhor ou peça a sugestão de dieta."
-  fonte: "Dossiê VER-01; NRC 2001"
-  forca: B
+  fonte: "Dossiê VER-01; NRC 2001 (conceito); limiar de 0,95: escolha de engenharia"
+  forca: C
 
 - id: VER-02
   versao: 1
@@ -91,12 +91,12 @@
         categoria: dieta
         titulo: "Déficit proteico: PB {dieta.pb_pct:.1f}% contra alvo de {exig.pb_pct_alvo:.1f}%"
         causa: "Proteína abaixo do necessário para a produção do lote."
-        acao: "Incluir fonte proteica (farelo de soja, caroço de algodão) ou ureia até 1% da MS."
+        acao: "Incluir fonte proteica (farelo de soja, caroço de algodão) ou ureia até {@params.ureia_max}% da MS."
         titulo_produtor: "Falta proteína na dieta"
         causa_produtor: "A proteína está abaixo do que o lote precisa para produzir."
-        acao_produtor: "Inclua farelo de soja ou caroço de algodão, ou ureia (no máximo 1% da comida seca)."
-  fonte: "Dossiê VER-02; MSD Vet Manual"
-  forca: B
+        acao_produtor: "Inclua farelo de soja ou caroço de algodão, ou ureia (no máximo {@params.ureia_max}% da comida seca)."
+  fonte: "Dossiê VER-02 (lá sobre PM; aqui simplificado para a razão de PB); MSD Vet Manual; limiar de 0,95: escolha de engenharia"
+  forca: C
 
 - id: VER-02B
   versao: 1
@@ -214,10 +214,10 @@
         categoria: dieta
         titulo: "Ureia acima do limite: {dieta.ureia_pct:.2f}% da MS (máx. {meta.ureia_max}%)"
         causa: "Excesso de ureia pode intoxicar os animais."
-        acao: "Reduzir a ureia para no máximo 1% da MS, sempre misturada ao volumoso ou concentrado."
+        acao: "Reduzir a ureia para no máximo {@params.ureia_max}% da MS, sempre misturada ao volumoso ou concentrado."
         titulo_produtor: "Ureia acima do limite: pode intoxicar"
         causa_produtor: "Ureia demais é veneno para a vaca."
-        acao_produtor: "Ureia no máximo 1% da comida seca, sempre bem misturada."
+        acao_produtor: "Ureia no máximo {@params.ureia_max}% da comida seca, sempre bem misturada."
   fonte: "Semadesc-MS"
   forca: B
 
@@ -235,7 +235,7 @@
         nivel: atencao
         categoria: dieta
         titulo: "Gordura excessiva: EE {dieta.ee_pct:.1f}% da MS"
-        causa: "Acima de ~6% a gordura prejudica a fermentação ruminal e pode derrubar a gordura do leite."
+        causa: "Acima de ~{@params.ee_max}% a gordura prejudica a fermentação ruminal e pode derrubar a gordura do leite."
         acao: "Reduzir caroço de algodão ou outras fontes de gordura."
         titulo_produtor: "Gordura demais na dieta"
         causa_produtor: "Gordura em excesso atrapalha o rúmen e derruba a gordura do leite."
@@ -306,6 +306,7 @@
         acao: "Associar silagem ou capim de melhor qualidade para lotes acima de {@params.leite_max_cana} kg."
         titulo_produtor: "Só cana como volumoso para {lote.leite:.0f} L por vaca"
         causa_produtor: "A fibra da cana é dura de digerir e limita o consumo."
+        acao_produtor: "Junte silagem ou capim melhor na dieta para vacas acima de {@params.leite_max_cana} L."
   fonte: "Semadesc-MS"
   forca: C
 
@@ -324,10 +325,10 @@
         nivel: informativo
         categoria: dados
         titulo: "Consumo previsto incomum ({perfil.cms_pct_pv:.1f}% do PV)"
-        causa: "Consumo de vacas em lactação raramente sai de 2,5–4% do peso vivo."
+        causa: "Consumo de vacas em lactação raramente sai de {@params.cms_pct_pv_min}–{@params.cms_pct_pv_max}% do peso vivo."
         acao: "Conferir peso vivo, produção e DEL informados."
         titulo_produtor: "Consumo previsto fora do comum"
-        causa_produtor: "Vaca em lactação costuma comer entre 2,5% e 4% do peso."
+        causa_produtor: "Vaca em lactação costuma comer entre {@params.cms_pct_pv_min}% e {@params.cms_pct_pv_max}% do peso."
         acao_produtor: "Confira peso, leite e dias de lactação no cadastro."
   fonte: "Dossiê"
   forca: C
@@ -392,6 +393,7 @@
         titulo: "Alimento acima do limite de inclusão: {dieta.inclusao_excedida}"
         causa: "Cada alimento tem um teto prático na MS (ex.: caroço de algodão 15%, polpa cítrica 30%)."
         acao: "Reduzir esse alimento e completar com outro de função parecida."
+        titulo_produtor: "Tem alimento passando do máximo seguro: {dieta.inclusao_excedida}"
         causa_produtor: "Cada alimento tem um máximo seguro na dieta."
         acao_produtor: "Diminua esse alimento e complete com outro parecido."
   fonte: "Limites de inclusão de foods.yaml"
@@ -506,8 +508,8 @@
         titulo_produtor: "Não dá para conferir a dieta aniônica do pré-parto"
         causa_produtor: "Faltam os minerais de algum alimento."
         acao_produtor: "Informe os minerais dos insumos (análise ou rótulo)."
-  fonte: "Santos et al. 2019"
-  forca: A
+  fonte: "Escolha de engenharia (completude dos dados para a DCAD de Santos et al. 2019)"
+  forca: D
 
 - id: VER-90
   versao: 1

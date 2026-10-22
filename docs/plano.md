@@ -224,7 +224,7 @@ docs/                        processo-ia.md, arquitetura.md, regras.md (gerado d
 - **params.yaml**: cada limiar com `valor, unidade, fonte, forca, editavel`. Conflitos de literatura (NUL, G:P, ITU por raça, mantença 0,08 vs 0,10) viram parâmetros/flags, com a escolha padrão justificada.
 - **Versionamento**: `kb_version` semântico no topo; `CHANGELOG.md`; cada sessão grava a versão usada; suíte de casos roda por versão.
 
-### 5.2 Módulos de regras (≈70 regras)
+### 5.2 Módulos de regras (≈70 regras no planejamento; a base final tem 172)
 
 | Módulo | Regras | Papel |
 |---|---|---|

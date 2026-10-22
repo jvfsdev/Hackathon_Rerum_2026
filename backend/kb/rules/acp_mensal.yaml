@@ -61,7 +61,7 @@
         nivel: critico
         categoria: reproducao
         titulo: "NUL {laudo.nul:.1f} mg/dL: risco reprodutivo"
-        causa: "Acima de ~19,5 mg/dL a chance de prenhez cai cerca de 43% (OR 0,57)."
+        causa: "Acima de ~{@params.nul_reprodutivo} mg/dL a chance de prenhez cai cerca de 43% (OR 0,57)."
         acao: "Ajustar a relação proteína:energia antes da estação de inseminação."
         titulo_produtor: "Ureia do leite muito alta ({laudo.nul:.1f}): atrapalha a vaca emprenhar"
         causa_produtor: "Com a ureia do leite nesse nível, a chance de prenhez cai quase pela metade."
@@ -86,10 +86,10 @@
         categoria: dieta_queda
         titulo: "NUL baixo ({laudo.nul:.1f} mg/dL) com produção abaixo do esperado"
         causa: "Proteína degradável pode estar limitando a produção."
-        acao: "Rever a proteína degradável (farelo de soja, ureia até 1% da MS)."
+        acao: "Rever a proteína degradável (farelo de soja, ureia até {@params.ureia_max}% da MS)."
         titulo_produtor: "Ureia do leite baixa e o leite abaixo do normal"
         causa_produtor: "Pode estar faltando proteína para produzir mais."
-        acao_produtor: "Reveja o farelo de soja ou a ureia da dieta (ureia no máximo 1% da comida seca)."
+        acao_produtor: "Reveja o farelo de soja ou a ureia da dieta (ureia no máximo {@params.ureia_max}% da comida seca)."
   fonte: "Magalhães UFV 2003; Meyer et al. 2006 (alvo único de NUL não vale)"
   forca: B
 
@@ -117,28 +117,54 @@
     - {fato: mon.fezes, op: "<=", valor: "@params.fezes_acidose_max"}
   entao:
     - concluir: {fato: hipotese.acidose, valor: true}
+    - concluir: {fato: hipotese.acidose_reforcada, valor: true}
   fonte: "Dossiê ACP-04"
   forca: C
 
 - id: ACP-ACID
-  versao: 1
+  versao: 2
   modulo: acompanhamento_mensal
-  descricao: Alerta de acidose subaguda com o CF combinado das evidências
+  descricao: Alerta de acidose subaguda com o CF combinado das evidências (G:P confirmada por fezes ou ruminação)
   prioridade: 40
   se:
     - {fato: hipotese.acidose, op: "=", valor: true}
+    - {fato: hipotese.acidose_reforcada, op: "=", valor: true}
   entao:
     - alerta:
         nivel: atencao
         categoria: dieta
+        problema: acidose
         cf_de: hipotese.acidose
         titulo: "Suspeita de acidose ruminal subaguda"
-        causa: "Evidências combinadas (G:P do leite, fezes, ruminação) apontam pouca fibra efetiva."
+        causa: "Mais de uma evidência (veja o \"como\": G:P do leite, fezes, ruminação) aponta pouca fibra efetiva."
         acao: "Aumentar fibra efetiva (FDNfe), reduzir amido rápido e checar o tamanho de partícula."
         titulo_produtor: "Sinais de acidose (rúmen azedo)"
-        causa_produtor: "A gordura do leite, as fezes e a ruminação indicam pouca fibra para o rúmen."
+        causa_produtor: "Mais de um sinal (leite, fezes ou ruminação) indica pouca fibra para o rúmen."
         acao_produtor: "Mais volumoso, picado no tamanho certo, e menos milho ou grão fino."
   fonte: "Dossiê; MYCIN (combinação de CFs)"
+  forca: C
+
+- id: ACP-ACID0
+  versao: 1
+  modulo: acompanhamento_mensal
+  descricao: Só a G:P baixa (indicador fraco) — acidose fica como informação até outra evidência confirmar
+  prioridade: 40
+  se:
+    - {fato: hipotese.acidose, op: "=", valor: true}
+    - {fato: hipotese.acidose_reforcada, op: ausente}
+  entao:
+    - alerta:
+        nivel: informativo
+        categoria: dieta
+        problema: acidose
+        cf_de: hipotese.acidose
+        titulo: "G:P baixa: possível acidose (indicador fraco sozinho)"
+        causa: "Só a relação gordura:proteína do leite aponta acidose; sem fezes ou ruminação para confirmar."
+        acao: "Avaliar escore de fezes e tamanho de partícula antes de mexer na dieta."
+        titulo_produtor: "O leite sugere pouca fibra, mas ainda falta confirmar"
+        causa_produtor: "A gordura do leite está baixa perto da proteína; isso sozinho não fecha o diagnóstico."
+        acao_produtor: "Olhe as fezes (moles demais?) e se as vacas estão ruminando antes de mudar a comida."
+  fonte: "Inferências (G:P baixa sozinha é indicador fraco: informativo)"
   forca: C
 
 - id: ACP-M03
@@ -161,8 +187,8 @@
         titulo_produtor: "Recém-paridas gastando gordura do corpo (risco de cetose)"
         causa_produtor: "Gordura do leite alta em relação à proteína é sinal de que estão usando a reserva do corpo."
         acao_produtor: "Dieta mais forte, cocho sempre com comida e teste de cetose em algumas vacas."
-  fonte: "Penn State (cetose subclínica)"
-  forca: B
+  fonte: "Penn State (cetose subclínica: >40% das vacas com ≤40 DEL e G:P > 1,4), aplicado à G:P média do lote"
+  forca: C
 
 - id: ACP-M04
   versao: 1
@@ -204,13 +230,13 @@
         nivel: critico
         categoria: qualidade
         titulo: "Mastite primeiro: lactose {laudo.lactose:.2f}% com CCS subindo"
-        causa: "Lactose e ESD baixos com CCS em alta são sinal de mastite, não de dieta."
+        causa: "Lactose baixa com CCS em alta é sinal de mastite, não de dieta."
         acao: "CMT/caneca no lote, cultura das vacas suspeitas e revisão da rotina de ordenha. Não mudar a dieta agora."
         titulo_produtor: "Cuide primeiro da mastite"
         causa_produtor: "O laudo (lactose {laudo.lactose:.2f}% e CCS subindo) indica mastite, não problema de comida."
         acao_produtor: "Teste da caneca ou CMT, cultura das vacas suspeitas e revisão da ordenha. Não mude a dieta agora."
-  fonte: "IN 76/2018; Inferências"
-  forca: A
+  fonte: "IN 76/2018 (lactose mínima 4,3%); Inferências (lactose baixa + CCS alta = mastite, C)"
+  forca: C
 
 - id: ACP-M06
   versao: 1
@@ -225,10 +251,10 @@
     - alerta:
         nivel: critico
         categoria: qualidade
-        titulo: "CCS {laudo.ccs_mg3:.0f} mil acima do limite da IN 76 (500 mil)"
+        titulo: "CCS {laudo.ccs_mg3:.0f} mil acima do limite da IN 76 ({@params.ccs_regulatorio} mil)"
         causa: "Mastite subclínica custa ~{mon.perda_ccs.pct:.0f}% da produção: ≈ R$ {mon.perda_ccs.rs_mes:.0f}/mês neste lote."
         acao: "Checklist de mastite: pré e pós-dipping, linha de ordenha, tratamento na secagem, descarte de crônicas."
-        titulo_produtor: "CCS {laudo.ccs_mg3:.0f} mil: acima do limite do laticínio (500 mil)"
+        titulo_produtor: "CCS {laudo.ccs_mg3:.0f} mil: acima do limite da lei ({@params.ccs_regulatorio} mil)"
         causa_produtor: "A mastite escondida custa cerca de R$ {mon.perda_ccs.rs_mes:.0f} por mês neste lote."
         acao_produtor: "Pré e pós-dipping, máquina de ordenha, tratamento na secagem e descarte das vacas crônicas."
   fonte: "IN 76/2018; eXtension (perdas por CCS)"
@@ -248,13 +274,13 @@
         nivel: atencao
         categoria: qualidade
         titulo: "CCS {laudo.ccs_mg3:.0f} mil: perto do limite regulatório"
-        causa: "Três meses acima de 500 mil suspendem a coleta."
+        causa: "Acima de {@params.ccs_regulatorio} mil (média geométrica de 3 meses) o leite fica fora da IN 76 e a bonificação cai."
         acao: "Rever rotina de ordenha e identificar vacas com CCS alta."
         titulo_produtor: "CCS {laudo.ccs_mg3:.0f} mil: chegando perto do limite"
-        causa_produtor: "Três meses acima de 500 mil e o laticínio pode suspender a coleta."
+        causa_produtor: "Passando de {@params.ccs_regulatorio} mil o leite fica fora do padrão da lei e a bonificação cai."
         acao_produtor: "Revise a ordenha e descubra quais vacas estão com CCS alta."
-  fonte: "IN 76/2018"
-  forca: A
+  fonte: "IN 76/2018 (limite de 500 mil); faixa de alerta a partir de 400 mil: Inferências (D)"
+  forca: C
 
 - id: ACP-M07
   versao: 1
@@ -268,7 +294,7 @@
     - alerta:
         nivel: critico
         categoria: qualidade
-        titulo: "CBT {laudo.cbt_mg3:.0f} mil UFC/mL acima do limite (300 mil)"
+        titulo: "CBT {laudo.cbt_mg3:.0f} mil UFC/mL acima do limite ({@params.cbt_regulatorio} mil)"
         causa: "CBT alta indica higiene de ordenha, resfriamento ou limpeza do equipamento."
         acao: "Checklist de ordenha e tanque (≤ 4 °C em até 3 h); não mexer na dieta."
         titulo_produtor: "Bactérias no leite (CBT {laudo.cbt_mg3:.0f} mil) acima do limite"

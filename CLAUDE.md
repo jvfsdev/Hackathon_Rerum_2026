@@ -84,6 +84,7 @@ cd frontend && npm install && npm run dev   # UI em :5173  (npm run dev:rede par
   `services.itens_do_dia` (trato e estoque usam isso).
 - Ajuste mínimo e sensibilidade usam o MESMO modelo do PL (`lp._modelo`) só trocando o objetivo: o contrato com a verificação vale para eles.
 - Pergunta sem valor padrão seguro (peso vivo, temperatura) não tem `padrao`; se for dispensável, é `opcional: true` ("não sei" pula as regras que dependem dela).
+  O `padrao` das demais é `"@params.padrao_x"` (o "não sei" também tem fonte e força em `params.yaml`).
 - Mudou regra ou parâmetro: suba `kb_version`, anote em `kb/CHANGELOG.md` e adicione ou ajuste o caso em `tests/cases.yaml`.
 - Valores ⚠ NV ou conflitantes (ver a última seção de `Inferências...md`) viram parâmetro com força explícita, nunca constante escondida.
 

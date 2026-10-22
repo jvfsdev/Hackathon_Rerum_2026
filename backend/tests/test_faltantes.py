@@ -93,10 +93,13 @@ def test_crioscopia(crio, espera):
 
 def test_iofc_e_eficiencia_alimentar():
     assert "ACP-D08" in alertas(rodar({"mon.alimento_pct_receita": 65, "mon.iofc": 8.0}, DIA))
-    meio = {"lote.estado": "lactacao", "lote.del": 180, "lote.gordura": 3.5, "lote.proteina": 3.1, "mon.cms_medido": 20}
+    meio = {"lote.estado": "lactacao", "lote.del": 180, "lote.gordura": 3.5, "lote.proteina": 3.1, "mon.cms_medido": 20,
+            "lote.grupo_genetico": "holandes"}
     r = rodar(meio | {"mon.litros_vaca": 20}, DIA)
     assert r.wm.valor("mon.ea") == approx(0.99, abs=0.01) and "ACP-EA1" in alertas(r)
     assert "ACP-EA1" not in alertas(rodar(meio | {"mon.litros_vaca": 30}, DIA))
+    # a referência de 1,3 é de Holandesas: não vale para Girolando
+    assert "ACP-EA1" not in alertas(rodar(meio | {"mon.litros_vaca": 20, "lote.grupo_genetico": "girolando"}, DIA))
     inicio = meio | {"lote.del": 40, "mon.cms_medido": 12, "mon.litros_vaca": 30}
     assert "ACP-EA2" in alertas(rodar(inicio, DIA))
 

@@ -11,7 +11,7 @@
   entao:
     - concluir: {fato: transicao.dias_volumoso, valor: "@params.transicao_dias_volumoso"}
     - concluir: {fato: transicao.motivo_volumoso, valor: true}
-  fonte: "Penn State Extension (adaptação ruminal a novo volumoso)"
+  fonte: "Extensão (adaptação a silagem nova em 7–14 dias: Dairy Herd/Purdue; AgProud)"
   forca: C
 
 - id: TRN-02
@@ -24,7 +24,7 @@
     - {fato: transicao.concentrado_delta_kg, op: ">", valor: "@params.transicao_passo_conc"}
   entao:
     - calcular: {fato: transicao.dias_concentrado, funcao: dias_transicao_conc, args: {delta_kg: $transicao.concentrado_delta_kg, passo_kg: "@params.transicao_passo_conc"}}
-  fonte: "NRC 2001; Penn State (aumentar o concentrado no máximo 0,5–1 kg por dia)"
+  fonte: "NFACC, Código de Práticas para bovinos leiteiros (0,5–0,7 kg/dia); Manitoba Agriculture (~1 lb/dia)"
   forca: C
 
 - id: TRN-03
@@ -61,5 +61,5 @@
         titulo_produtor: "Faça a troca de dieta aos poucos, em {transicao.dias} dias"
         causa_produtor: "Mudar a comida de uma vez desarranja o rúmen: as vacas comem menos e o leite cai."
         acao_produtor: "Siga o plano dia a dia (a planilha de trato já mostra a mistura do dia) e olhe cocho, fezes e leite."
-  fonte: "Penn State Extension; NRC 2001"
+  fonte: "Extensão (troca gradual de dieta: Dairy Herd/Purdue; NFACC)"
   forca: C

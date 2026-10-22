@@ -18,7 +18,7 @@ class LoteIn(BaseModel):
     sistema: str = "confinado"
     grupo_genetico: str = "girolando"
     n_vacas: int = 20
-    pv: float = 500
+    pv: float                  # sem padrão: peso vivo entra em quase toda equação e não há valor seguro
     del_ref: float | None = None
     dias_para_parto_ref: float | None = None
     dias_gestacao_ref: float | None = 0
