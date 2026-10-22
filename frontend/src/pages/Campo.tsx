@@ -2,60 +2,64 @@
  * fila no aparelho e é enviado quando a API volta a responder. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, dataBR, ErroApi, hora, mudou, paraCampo, NOME_INDICADOR, numero, peso, porDia, textoAlerta, valorIndicador, type Alerta, type Lote, type Registro } from '../api'
+import { api, dataBR, hora, mudou, paraCampo, NOME_INDICADOR, numero, peso, porDia, textoAlerta, valorIndicador, type Alerta, type Lote, type Registro, hojeLocal, diasAtras } from '../api'
+import { CHAVE_FILA, configurarFila, descartarRecusado, enviarOuGuardar, lerFila, lerJSON, gravarJSON, lerRecusados, reenviarRecusado, semConexao, sincronizarFila, type Pendente, type Recusado } from '../lib/fila'
 import { EscalaEscore } from '../components/Escala'
 import { CampoLitros, type ModoLitros } from '../components/Litros'
 import { AlertaCorpo, BORDA_NIVEL, Brinco, Icone, NivelBadge } from '../components/ui'
 
-// ------------------------------------------------------------------ fila offline (localStorage)
-interface Pendente { id: string; caminho: string; corpo: any; descricao: string; criado: string }
-const CHAVE_FILA = 'campo_fila'
+// ------------------------------------------------------------------ fila offline (regras em src/lib/fila.ts)
 const CHAVE_LOTES = 'campo_lotes'
+const CHAVE_FAIXAS = 'campo_faixas'
+const avisarFila = () => window.dispatchEvent(new Event('campo-fila'))
+configurarFila({ post: (c, b) => api.post(c, b), aoMudar: avisarFila })
 
-function lerJSON<T>(chave: string, padrao: T): T {
-  try { return JSON.parse(localStorage.getItem(chave) ?? '') as T } catch { return padrao }
-}
-function gravarJSON(chave: string, valor: unknown) {
-  try { localStorage.setItem(chave, JSON.stringify(valor)) } catch { /* armazenamento indisponível */ }
-}
-/** Falha de rede (fetch não completou) ou API inalcançável: o registro vai para a fila do aparelho. */
-const semConexao = (e: any) => e instanceof TypeError || (e instanceof ErroApi && e.semConexao)
-
-/** Envia já; se a API não responder, guarda na fila do aparelho. */
-async function enviarOuEnfileirar(caminho: string, corpo: any, descricao: string): Promise<{ enviado: boolean; resposta?: any }> {
-  try {
-    return { enviado: true, resposta: await api.post(caminho, corpo) }
-  } catch (e: any) {
-    if (!semConexao(e)) throw e
-    const fila = lerJSON<Pendente[]>(CHAVE_FILA, [])
-    fila.push({ id: `${Date.now()}-${Math.random()}`, caminho, corpo, descricao, criado: new Date().toISOString() })
-    gravarJSON(CHAVE_FILA, fila)
-    return { enviado: false }
+/** Mesma checagem de faixa do servidor (guardada no aparelho), para avisar na hora mesmo sem conexão. */
+function problemaLocal(corpo: any): string | null {
+  const { faixas, litros_vaca_max } = lerJSON<{ faixas: Record<string, [number, number]>; litros_vaca_max: number }>(CHAVE_FAIXAS, { faixas: {}, litros_vaca_max: 80 })
+  for (const [ind, v] of Object.entries<number>(corpo.valores ?? {})) {
+    const somando = (corpo.somar ?? []).includes(ind)
+    if (somando && v <= 0) return `${NOME_INDICADOR[ind] ?? ind}: informe um valor maior que zero`
+    const f = faixas[ind]
+    if (!somando && f && (v < f[0] || v > f[1])) return `${NOME_INDICADOR[ind] ?? ind} = ${v.toLocaleString('pt-BR')} está fora do possível (${f[0].toLocaleString('pt-BR')} a ${f[1].toLocaleString('pt-BR')})`
+    if (ind === 'vacas' && !Number.isInteger(v)) return 'O nº de vacas precisa ser inteiro'
   }
+  const { litros, vacas } = corpo.valores ?? {}
+  if (litros && vacas && !(corpo.somar ?? []).includes('litros') && litros / vacas > litros_vaca_max)
+    return `${litros.toLocaleString('pt-BR')} L para ${vacas} vacas dá ${Math.round(litros / vacas)} L por vaca: confira os números`
+  return null
+}
+
+async function enviarOuEnfileirar(caminho: string, corpo: any, descricao: string) {
+  const problema = problemaLocal(corpo)
+  if (problema) throw new Error(problema)
+  return enviarOuGuardar(caminho, corpo, descricao)
 }
 
 function useFila() {
-  const [fila, setFila] = useState<Pendente[]>(() => lerJSON(CHAVE_FILA, []))
+  const [fila, setFila] = useState<Pendente[]>(lerFila)
+  const [recusados, setRecusados] = useState<Recusado[]>(lerRecusados)
   const [enviando, setEnviando] = useState(false)
+  const recarregar = useCallback(() => { setFila(lerFila()); setRecusados(lerRecusados()) }, [])
   const sincronizar = useCallback(async () => {
-    const atual = lerJSON<Pendente[]>(CHAVE_FILA, [])
-    if (!atual.length) { setFila([]); return }
     setEnviando(true)
-    const restantes: Pendente[] = []
-    for (const p of atual) {     // em ordem: registros retroativos reprocessam os dias seguintes
-      try { await api.post(p.caminho, p.corpo) } catch (e: any) { if (semConexao(e)) restantes.push(p) }
-    }
-    gravarJSON(CHAVE_FILA, restantes)
-    setFila(restantes)
-    setEnviando(false)
-  }, [])
+    try { await sincronizarFila() } finally { setEnviando(false); recarregar() }
+  }, [recarregar])
   useEffect(() => {
+    api.get('/modelos/faixas').then((f) => gravarJSON(CHAVE_FAIXAS, f)).catch(() => {})
     sincronizar()
     window.addEventListener('online', sincronizar)
+    window.addEventListener('campo-fila', recarregar)
+    window.addEventListener('storage', recarregar)          // outra aba do mesmo aparelho
     const t = setInterval(sincronizar, 60_000)
-    return () => { window.removeEventListener('online', sincronizar); clearInterval(t) }
-  }, [sincronizar])
-  return { fila, enviando, sincronizar, recarregar: () => setFila(lerJSON(CHAVE_FILA, [])) }
+    return () => {
+      window.removeEventListener('online', sincronizar); window.removeEventListener('campo-fila', recarregar)
+      window.removeEventListener('storage', recarregar); clearInterval(t)
+    }
+  }, [sincronizar, recarregar])
+  const reenviar = (r: Recusado) => { reenviarRecusado(r.id); sincronizar() }
+  const descartar = (r: Recusado) => { descartarRecusado(r.id); recarregar() }
+  return { fila, recusados, enviando, sincronizar, recarregar, reenviar, descartar }
 }
 
 // ------------------------------------------------------------------ layout
@@ -87,6 +91,22 @@ export default function CampoPagina() {
         <div className="flex items-center justify-between gap-2 border-b border-brinco/60 bg-brinco-claro px-4 py-2.5 text-sm text-stone-800">
           <span>{fila.fila.length} registro(s) guardado(s) no aparelho, aguardando conexão.</span>
           <button className="font-semibold underline" onClick={fila.sincronizar} disabled={fila.enviando}>{fila.enviando ? 'enviando…' : 'enviar agora'}</button>
+        </div>
+      )}
+      {fila.recusados.length > 0 && (
+        <div className="border-b border-red-200 bg-red-50 px-4 py-2.5 text-sm text-stone-800">
+          <p className="font-semibold text-critico">{fila.recusados.length} registro(s) guardado(s) no aparelho foram recusados pelo sistema. Confira:</p>
+          {fila.recusados.map((r) => (
+            <div key={r.id} className="mt-2 rounded-lg bg-white p-2 ring-1 ring-red-100">
+              <p className="font-medium">{r.descricao}</p>
+              <p className="text-xs text-stone-600">{Object.entries(r.corpo.valores ?? {}).map(([k, x]) => `${NOME_INDICADOR[k] ?? k} ${valorIndicador(k, x as number)}`).join(' · ') || r.corpo.descricao}</p>
+              <p className="text-xs text-critico">Motivo: {r.erro}</p>
+              <div className="mt-1.5 flex gap-3 text-xs font-semibold">
+                <button className="underline" onClick={() => fila.reenviar(r)}>tentar de novo</button>
+                <button className="text-stone-500 underline" onClick={() => fila.descartar(r)}>descartar</button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
       <main className="mx-auto max-w-lg px-4 py-4">
@@ -137,8 +157,8 @@ function Numero({ rotulo, un, valor, onChange, dica }: { rotulo: string; un: str
 
 function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void }) {
   const [params, setParams] = useSearchParams()
-  const hoje = new Date().toISOString().slice(0, 10)
-  const ontem = new Date(Date.now() - 864e5).toISOString().slice(0, 10)
+  const hoje = hojeLocal()
+  const ontem = diasAtras(1)
   const [loteId, setLoteId] = useState<number | null>(() => Number(params.get('lote')) || lerJSON<number | null>('campo_lote', null))
   const [data, setData] = useState(hoje)
   const [v, setV] = useState<Record<string, string>>({})
@@ -183,7 +203,7 @@ function Registrar({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void 
   useEffect(() => {   // o que já foi anotado no dia (pré-preenche) e o último valor de antes (confere digitação)
     if (!loteId) return
     gravarJSON('campo_lote', loteId)
-    api.get<Registro[]>(`/lotes/${loteId}/registros?desde=${new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10)}`)
+    api.get<Registro[]>(`/lotes/${loteId}/registros?desde=${diasAtras(14)}`)
       .then((lista) => {
         setRegs(lista)
         const ult: Record<string, number> = {}
@@ -489,7 +509,7 @@ function Avisos({ alertas, lotes, onMudou }: { alertas: Alerta[]; lotes: Lote[];
 
 // ------------------------------------------------------------------ trato do dia (checklist do tratador)
 function Trato({ lotes, onEnviado }: { lotes: Lote[]; onEnviado: () => void }) {
-  const hoje = new Date().toISOString().slice(0, 10)
+  const hoje = hojeLocal()
   const [loteId, setLoteId] = useState<number | null>(() => lerJSON<number | null>('campo_lote', null))
   const [p, setP] = useState<any>(null)
   const [aviso, setAviso] = useState('')

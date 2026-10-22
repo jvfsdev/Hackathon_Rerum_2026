@@ -175,6 +175,13 @@ def test_registro_em_partes_nao_apaga_o_que_ja_foi_anotado_e_apagar_reprocessa(s
     assert litros.valor == 760 and litros.texto is None
     with pytest.raises(Exception):
         fazendas.registrar(lote.id, RegistroIn(data=hoje, valores={"vacas": 2}, somar=["vacas"]))
+    # valores impossíveis são recusados sem gravar nada (nem os valores válidos do mesmo envio)
+    for ruim in ({"litros": -500}, {"vacas": 0}, {"vacas": 18.5}, {"escore_cocho": 7}, {"xyz": 1},
+                 {"litros": 5000}, {"concentrado_kg_vaca": 3, "litros": -1}):
+        with pytest.raises(Exception):
+            fazendas.registrar(lote.id, RegistroIn(data=hoje, valores=ruim))
+    assert not s.exec(select(Registro).where(Registro.lote_id == lote.id, Registro.data == hoje,
+                                             Registro.indicador == "concentrado_kg_vaca")).first()
     fazendas.apagar_registro(lote.id, hoje, "escore_cocho")
     assert not s.exec(select(Registro).where(Registro.lote_id == lote.id, Registro.data == hoje,
                                              Registro.indicador == "escore_cocho")).first()
@@ -192,3 +199,20 @@ class _Mesma:
 
     def __exit__(self, *a):
         return False
+
+
+def test_mastite_primeiro_tambem_suprime_os_avisos_da_verificacao_da_dieta(sessao_memoria):
+    s = sessao_memoria
+    lote, _ = lote_sintetico(s)
+    hoje = date.today()
+    ep = AlertaDB(lote_id=lote.id, regra="VER-01", problema="VER-01", origem="verificacao", nivel="atencao",
+                  titulo="Déficit energético", categoria="dieta", aberto_em=hoje, ultima_ocorrencia=hoje, modulo="verificacao")
+    s.add(ep)
+    s.commit()
+    sup = {"dieta": {"tipo": "suprimir", "regra": "META-01", "motivo": "tratar mastite antes de mudar a dieta", "para": "informativo"}}
+    alertas.aplicar_meta_na_verificacao(s, lote.id, sup)
+    s.refresh(ep)
+    assert ep.suprimido and ep.nota.startswith("META-01")
+    alertas.aplicar_meta_na_verificacao(s, lote.id, {})          # mastite resolvida: volta ao primeiro plano
+    s.refresh(ep)
+    assert not ep.suprimido and ep.nota is None

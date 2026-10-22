@@ -1,5 +1,10 @@
 # Histórico da base de conhecimento
 
+## 1.6.1 — 21/10/2026
+- ACP-01 e ACP-01R (NUL alto) compartilham o problema `nul_alto`: um aviso só, o mais grave (caso T8 ajustado).
+- Meta-regras do acompanhamento (ex.: META-01 "mastite primeiro") passam a valer também para os avisos da verificação
+  da dieta ativa (`alertas.aplicar_meta_na_verificacao`).
+
 ## 1.6.0 — 21/10/2026
 - Módulo **P (previsão)**: projeção de 7 a 90 dias (app/previsao.py) pela curva ajustada ao lote, com faixa de 90%
   (`@params.prev_z_faixa` × sigma robusto dos desvios), calor previsto (Open-Meteo, 16 dias), secagem em

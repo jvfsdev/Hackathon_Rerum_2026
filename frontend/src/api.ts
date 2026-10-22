@@ -32,6 +32,7 @@ export interface Resultado {
   kb_version: string; fatos: Record<string, Fato>; traco: EntradaTraco[]; alertas: Alerta[]
   supressoes: Record<string, any>; explicacoes: Record<string, NoComo>; sessao_id?: number
   episodios?: Record<string, { id: number; estado: EstadoAlerta }>
+  meta_dieta?: { regra: string; motivo: string }       // meta-regra do acompanhamento segurando os avisos de dieta
 }
 
 /** Junta aos alertas de uma execução o id/estado do episódio persistido (para aceitar/recusar). */
@@ -262,4 +263,15 @@ export function porDia(regs: Registro[]): [string, Record<string, Registro>][] {
 export const paraCampo = (v: number) => String(Math.round(v * 100) / 100)
 export const mudou = (gravado: number | undefined, novo: number) => gravado === undefined || Math.abs(gravado - novo) > 0.006
 export const hora = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '')
+
+// ---------- datas no fuso do aparelho (toISOString é UTC: às 21h em Brasília já seria "amanhã") ----------
+/** AAAA-MM-DD da data local. */
+export function diaLocal(d: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+export const hojeLocal = () => diaLocal()
+/** Soma dias a uma data AAAA-MM-DD (meio-dia local: sem tropeçar em horário de verão). */
+export const somarDias = (iso: string, n: number) => { const d = new Date(iso + 'T12:00'); d.setDate(d.getDate() + n); return diaLocal(d) }
+export const diasAtras = (n: number) => somarDias(hojeLocal(), -n)
 

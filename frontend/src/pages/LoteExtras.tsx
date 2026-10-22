@@ -2,10 +2,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Area, CartesianGrid, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { api, dataBR, fmt, numero, peso, reais, tecnico, textoAlerta, type Alerta, type Alimento, type Dieta, type ItemDieta, type Lote } from '../api'
+import { api, dataBR, fmt, numero, peso, reais, tecnico, textoAlerta, type Alerta, type Alimento, type Dieta, type ItemDieta, type Lote, hojeLocal, somarDias } from '../api'
 import { AlertaCorpo, Carregando, Erro, NivelBadge, Painel } from '../components/ui'
 
-const hojeISO = () => new Date().toISOString().slice(0, 10)
+const hojeISO = hojeLocal
 
 // ------------------------------------------------------------------ simulador "e se?"
 export function AbaSimular({ lote, dieta }: { lote: Lote; dieta: Dieta | null }) {
@@ -59,7 +59,7 @@ export function AbaSimular({ lote, dieta }: { lote: Lote; dieta: Dieta | null })
   const a = r?.atual, b = r?.simulado, vacas = r?.vacas ?? lote.n_vacas
   const linhas: [string, (x: any) => number | null | undefined, (v: number) => string, 'mais' | 'menos' | ''][] = [
     ['Leite previsto por vaca', (x) => x.leite_previsto, (v) => `${numero(v)} L`, 'mais'],
-    ['Leite que a comida sustenta', (x) => x.leite_permitido, (v) => `${numero(v)} L`, 'mais'],
+    ['Leite que a comida sustenta', (x) => x.leite_permitido, (v) => (a && v < 0.5 * a.leite_meta ? 'bem menos que hoje' : `${numero(v)} L`), 'mais'],
     ['Custo da comida por vaca/dia', (x) => x.custo_vaca_dia, (v) => reais(v), 'menos'],
     ['Comida por litro de leite', (x) => x.custo_por_litro, (v) => reais(v), 'menos'],
     ['Dinheiro do leite por vaca/dia', (x) => x.receita_vaca_dia, (v) => reais(v), 'mais'],
@@ -232,7 +232,7 @@ export function PlanoTransicao({ dieta, nome }: { dieta: Dieta; nome: (id: strin
   const t = dieta.transicao!
   const hoje = hojeISO()
   const fim = t.plano[t.plano.length - 1].data
-  const depois = new Date(new Date(fim + 'T12:00').getTime() + 7 * 864e5).toISOString().slice(0, 10)
+  const depois = somarDias(fim, 7)
   if (hoje > depois) return null
   const ids = Array.from(new Set(t.plano.flatMap((e) => e.itens.map((i) => i.alimento))))
   const etapa = t.plano.find((e) => e.data === hoje)

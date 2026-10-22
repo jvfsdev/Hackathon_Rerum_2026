@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { CartesianGrid, ComposedChart, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { api, certeza, comEpisodios, dataBR, fmt, numero, OPCOES, reais, rotulo, tecnico, textoAlerta, UNIDADES, type Alerta, type Alimento, type Dieta, type ItemDieta, type ItemHistorico, type Lote, type Resultado, hora, NOME_INDICADOR, porDia, valorIndicador, type Registro, mudou, paraCampo } from '../api'
+import { api, certeza, comEpisodios, dataBR, fmt, numero, OPCOES, reais, rotulo, tecnico, textoAlerta, UNIDADES, type Alerta, type Alimento, type Dieta, type ItemDieta, type ItemHistorico, type Lote, type Resultado, hora, NOME_INDICADOR, porDia, valorIndicador, type Registro, mudou, paraCampo, hojeLocal, diasAtras } from '../api'
 import LoteForm from '../components/LoteForm'
 import { EscalaEscore } from '../components/Escala'
 import { CampoLitros, type ModoLitros } from '../components/Litros'
@@ -106,7 +106,13 @@ function ResumoProdutor({ r, linkDieta, loteId }: { r: Resultado; linkDieta?: st
           <p className="titulo text-2xl font-semibold leading-tight text-stone-900">{PARECER_PRODUTOR[parecer.valor]?.[0] ?? fmt(parecer.valor)}</p>
           <p className="text-sm text-stone-600">{PARECER_PRODUTOR[parecer.valor]?.[1]} <span className="text-stone-400">({certeza(parecer.cf)})</span></p>
           {motivos.length > 0 && <ul className="mt-2 ml-4 list-disc space-y-0.5 text-sm text-stone-800">{motivos.map((a) => <li key={a.regra}>{textoAlerta(a).titulo}</li>)}</ul>}
-          {parecer.valor !== 'adequada' && (
+          {r.meta_dieta && (
+            <p className="mt-2 rounded-lg bg-white/70 p-2 text-sm text-stone-700">
+              <b>Antes de mexer na dieta:</b> {r.meta_dieta.motivo}. Os avisos de dieta ficam em segundo plano até isso se resolver
+              {tecnico() ? ` (${r.meta_dieta.regra})` : ''}.
+            </p>
+          )}
+          {parecer.valor !== 'adequada' && !r.meta_dieta && (
             <div className="mt-3 flex flex-wrap gap-2">
               {linkDieta && <Link to={linkDieta} className="btn-primario">Pedir a dieta mais barata que resolve</Link>}
               {loteId && <span className="w-full"><AjusteMinimo loteId={loteId} /></span>}
@@ -131,7 +137,7 @@ function ResumoProdutor({ r, linkDieta, loteId }: { r: Resultado; linkDieta?: st
           {v('dieta.ms_kg') !== undefined ? <>
             <LinhaSimples rotulo="Comida oferecida" valor={`${numero(v('dieta.ms_kg'))} kg de matéria seca`} />
             {v('ver.razao_energia') !== undefined && <LinhaSimples rotulo="Energia" valor={`${fmt(v('ver.razao_energia'), 'ver.razao_energia')} do necessário`} />}
-            {permitido !== undefined && leiteMeta !== undefined && <LinhaSimples rotulo="Leite que a comida sustenta" valor={`${numero(permitido)} L (hoje ${numero(leiteMeta)} L)`} />}
+            {permitido !== undefined && leiteMeta !== undefined && <LinhaSimples rotulo="Leite que a comida sustenta" valor={textoLeitePermitido(permitido, leiteMeta, v('ver.razao_energia'))} />}
             <LinhaSimples rotulo="Custo da comida" valor={`${reais(v('dieta.custo_vaca_dia'))} por vaca/dia`} />
           </> : <p className="text-sm text-stone-500">Sem dieta cadastrada.</p>}
         </Painel>
@@ -145,6 +151,13 @@ function ResumoProdutor({ r, linkDieta, loteId }: { r: Resultado; linkDieta?: st
       <Gaveta aberta={!!aberto} onFechar={() => setAberto(null)} titulo="Entender o aviso">{aberto && <ExplicacaoAlerta alerta={aberto} />}</Gaveta>
     </div>
   )
+}
+
+/** Abaixo de metade do que o lote produz, o número da fórmula (que pode chegar a 0) não ajuda: as vacas estão comendo
+ * mais pasto do que a equação estima ou tirando do corpo. Mostra a situação em palavras. */
+export function textoLeitePermitido(permitido: number, hoje: number, razaoEnergia?: number) {
+  if (permitido < 0.5 * hoje) return `bem menos do que produz hoje (${numero(hoje)} L)${razaoEnergia ? `: a energia cobre ${Math.round(razaoEnergia * 100)}%` : ''}`
+  return `${numero(permitido)} L (hoje ${numero(hoje)} L)`
 }
 
 function LinhaSimples({ rotulo: r, valor, como }: { rotulo: string; valor: string; como?: any }) {
@@ -780,7 +793,7 @@ function AbaRegistro({ lote }: { lote: Lote }) {
   const { alertaId, alerta, concluir } = useAlertaDaAcao()
   const [params] = useSearchParams()
   const eventoSugerido = params.get('evento')
-  const hoje = new Date().toISOString().slice(0, 10)
+  const hoje = hojeLocal()
   const [data, setData] = useState(hoje)
   const [valores, setValores] = useState<Record<string, string>>({})
   const [regs, setRegs] = useState<Registro[]>([])
@@ -791,7 +804,7 @@ function AbaRegistro({ lote }: { lote: Lote }) {
   const somarLitros = !!doDia.litros && modoLitros === 'somar'
   // o formulário abre com o que já está anotado no dia; nº de vacas vem do último registro (ou do cadastro)
   useEffect(() => {
-    api.get<Registro[]>(`/lotes/${lote.id}/registros?desde=${new Date(Date.now() - 45 * 864e5).toISOString().slice(0, 10)}`).then((lista) => {
+    api.get<Registro[]>(`/lotes/${lote.id}/registros?desde=${diasAtras(45)}`).then((lista) => {
       setRegs(lista)
       const dia = Object.fromEntries(lista.filter((r) => r.data === data).map((r) => [r.indicador, paraCampo(r.valor)]))
       delete dia.litros            // o total do dia aparece abaixo do campo; o campo fica para a próxima ordenha

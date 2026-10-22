@@ -69,12 +69,13 @@
     alertas: [VER-04]
 
 - id: T8
-  descricao: NUL 22 mg/dL — excesso de proteína / falta de energia e risco reprodutivo
-  testa: ACP-01, ACP-01R
+  descricao: NUL 22 mg/dL — excesso de proteína / falta de energia e risco reprodutivo (um aviso só, o mais grave)
+  testa: ACP-01, ACP-01R, problema nul_alto
   modulos: [acompanhamento_mensal, meta]
   fatos: {laudo.nul: 22}
   espera:
-    alertas: [ACP-01, ACP-01R]
+    disparadas: [ACP-01, ACP-01R]
+    alertas: [ACP-01R]
 
 - id: T9
   descricao: Gordura 2,9%, proteína 3,3% (G:P 0,88) e fezes 2 — acidose com CF ≈ 0,88

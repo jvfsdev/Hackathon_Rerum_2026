@@ -32,7 +32,21 @@ FAIXAS = {
     "distancia_km": (0, 20), "altura_entrada": (0, 300), "altura_saida": (0, 300), "altura_media": (0, 300),
     "laudo_gordura": (1, 8), "laudo_proteina": (1, 6), "laudo_lactose": (3, 6), "laudo_nul": (0, 40),
     "laudo_ureia": (0, 90), "laudo_ccs": (1, 10000), "laudo_cbt": (1, 100000), "laudo_crioscopia": (-0.7, -0.4),
+    "trato_kg": (0, 500000),
 }
+LITROS_VACA_MAX = 80        # acima disso por vaca/dia é erro de digitação (recorde mundial ≈ 75 L/dia em vaca individual)
+
+
+def problema_valor(indicador: str, valor: float) -> str | None:
+    """Mesma checagem para registro digitado, fila do celular e planilha: indicador conhecido e valor plausível."""
+    if indicador not in FAIXAS:
+        return f"indicador desconhecido: {indicador}"
+    lo, hi = FAIXAS[indicador]
+    if indicador == "vacas" and valor != int(valor):
+        return "nº de vacas precisa ser inteiro"
+    if not lo <= valor <= hi:
+        return f"{indicador} = {valor:g} fora da faixa plausível ({lo:g} a {hi:g})"
+    return None
 MODELOS = {
     "diario": "data;vacas;litros;concentrado_kg_vaca;temp;ur;escore_cocho;sobras_pct;ms_silagem;ecc\n"
               "20/10/2026;40;864;4;22,5;65;3;;30,8;\n21/10/2026;40;858;4;23,1;63;;2,9;;2,75\n",

@@ -35,6 +35,7 @@
     - {fato: laudo.nul, op: ">", valor: "@params.nul_max"}
   entao:
     - alerta:
+        problema: nul_alto
         nivel: atencao
         categoria: dieta
         titulo: "NUL alto: {laudo.nul:.1f} mg/dL"
@@ -56,6 +57,7 @@
     - {fato: laudo.nul, op: ">=", valor: "@params.nul_reprodutivo"}
   entao:
     - alerta:
+        problema: nul_alto
         nivel: critico
         categoria: reproducao
         titulo: "NUL {laudo.nul:.1f} mg/dL: risco reprodutivo"

@@ -167,6 +167,13 @@ def salvar_bonificacao(fazenda_id: int, dados: BonificacaoIn):
         return {"tabela": faz.bonificacao}
 
 
+@router.get("/modelos/faixas")
+def faixas_registro():
+    """Faixas plausíveis por indicador (o celular guarda para validar mesmo sem conexão)."""
+    from ..importacao import FAIXAS, LITROS_VACA_MAX
+    return {"faixas": FAIXAS, "litros_vaca_max": LITROS_VACA_MAX}
+
+
 @router.get("/modelos/importacao/{tipo}")
 def modelo_importacao(tipo: str):
     from fastapi.responses import PlainTextResponse
@@ -296,12 +303,25 @@ def registrar(lote_id: int, dados: RegistroIn):
             raise HTTPException(422, "nenhum valor para registrar")
         if set(dados.somar) - SOMAVEIS:
             raise HTTPException(422, f"só dá para somar: {', '.join(sorted(SOMAVEIS))}")
+        from ..importacao import LITROS_VACA_MAX, problema_valor
+        dia = {r.indicador: r for r in s.exec(select(Registro).where(Registro.lote_id == lote_id, Registro.data == dados.data)).all()}
+        finais = {}
+        for ind, valor in dados.valores.items():                  # valida tudo antes de gravar qualquer coisa
+            final = valor + dia[ind].valor if ind in dados.somar and ind in dia else valor
+            erro = problema_valor(ind, final) or (problema_valor(ind, valor) if ind not in dados.somar else None)
+            if ind in dados.somar and valor <= 0:
+                erro = f"{ind}: a parcela a somar precisa ser maior que zero"
+            if erro:
+                raise HTTPException(422, erro)
+            finais[ind] = final
+        litros = finais.get("litros", dia["litros"].valor if "litros" in dia else None)
+        vacas = finais.get("vacas", dia["vacas"].valor if "vacas" in dia else None)
+        if litros and vacas and litros / vacas > LITROS_VACA_MAX:
+            raise HTTPException(422, f"{litros:g} L para {vacas:g} vacas dá {litros / vacas:.0f} L por vaca: confira os números")
         for ind, valor in dados.valores.items():
             existente = s.exec(select(Registro).where(Registro.lote_id == lote_id, Registro.data == dados.data,
                                                       Registro.indicador == ind)).first()
             somar = ind in dados.somar
-            if somar and valor <= 0:
-                raise HTTPException(422, f"{ind}: a parcela a somar precisa ser maior que zero")
             if existente:
                 # 2ª ordenha (ou 2º trato): soma ao total do dia e guarda as parcelas; senão substitui (correção)
                 if somar:

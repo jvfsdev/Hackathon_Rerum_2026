@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { api, dataBR, numero, peso, tecnico, type Alerta, type Alimento } from '../api'
+import { api, dataBR, numero, peso, tecnico, type Alerta, type Alimento, hojeLocal } from '../api'
 import { AlertaCorpo, CabecalhoPagina, Carregando, Erro, Painel } from '../components/ui'
 
 interface Item {
@@ -11,7 +11,7 @@ interface Item {
 export default function EstoquePagina() {
   const [dados, setDados] = useState<{ itens: Item[]; alertas: Alerta[]; sem_controle: any[] } | null>(null)
   const [alimentos, setAlimentos] = useState<Alimento[]>([])
-  const [mov, setMov] = useState({ item: '', tipo: 'contagem', kg: '', data: new Date().toISOString().slice(0, 10), obs: '' })
+  const [mov, setMov] = useState({ item: '', tipo: 'contagem', kg: '', data: hojeLocal(), obs: '' })
   const [historico, setHistorico] = useState<Record<string, any[]>>({})
   const [erro, setErro] = useState('')
   const [ok, setOk] = useState('')

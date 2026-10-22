@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { api, type Alimento } from '../api'
+import { api, type Alimento, hojeLocal } from '../api'
 import { Carregando, Erro, Painel } from '../components/ui'
 
 interface Linha {
@@ -208,7 +208,7 @@ export default function PrecosPagina({ fazendaId = 1 }: { fazendaId?: number }) 
   const [formulario, setFormulario] = useState<{ codigo?: string; inicial: FormInsumo } | null>(null)
   const [novos, setNovos] = useState<Record<string, string>>({})
   const [fonte, setFonte] = useState('')
-  const [data, setData] = useState(new Date().toISOString().slice(0, 10))
+  const [data, setData] = useState(hojeLocal())
   const [aberto, setAberto] = useState<string | null>(null)
   const [erro, setErro] = useState('')
   const [ok, setOk] = useState('')

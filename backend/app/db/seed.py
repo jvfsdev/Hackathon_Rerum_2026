@@ -65,33 +65,40 @@ def gerar():
         for lote in lotes.values():
             s.refresh(lote)
 
+        # insumo cadastrado pela fazenda, com análise do laboratório: o silo 2 (mais úmido) que entra na dieta v2 do Lote 1
+        silo2 = services.criar_alimento(s, faz, dict(nome="Silagem de milho — silo 2 (laudo)", tipo="volumoso", ms=26.0, pb=7.8,
+                                                     fdn=52.0, ndt=63.0, ee=2.8, mm=4.6, origem_dado="laboratorio",
+                                                     fonte="Laudo bromatológico 1043 (silo 2)", fdnd=55.0, preco_kg_mn=0.24)).codigo
+
         def dieta(lote, versao, itens, inicio, motivo, ms_ref=None, ativa=True, origem="usuario"):
             s.add(Dieta(lote_id=lote.id, versao=versao, itens=itens, inicio=inicio, motivo=motivo,
                         ms_silagem_ref=ms_ref, ativa=ativa, origem=origem))
 
-        dieta(lotes[1], 1, [{"alimento": "silagem_milho", "kg_mn": 32}, {"alimento": "milho_moido", "kg_mn": 4},
-                            {"alimento": "farelo_soja", "kg_mn": 2.6}, {"alimento": "nucleo_mineral", "kg_mn": 0.2}],
-              dia0, "Dieta inicial", ms_ref=30.9, ativa=False)
-        dieta(lotes[1], 2, [{"alimento": "silagem_milho", "kg_mn": 38}, {"alimento": "milho_moido", "kg_mn": 4},
-                            {"alimento": "farelo_soja", "kg_mn": 2.6}, {"alimento": "nucleo_mineral", "kg_mn": 0.2}],
-              dia(50), "Correção da MS da silagem nova (31 → 26%): 32 → 38 kg MN", ms_ref=26.0)
-        dieta(lotes[2], 1, [{"alimento": "silagem_sorgo", "kg_mn": 25}, {"alimento": "milho_moido", "kg_mn": 3},
-                            {"alimento": "farelo_soja", "kg_mn": 1.5}, {"alimento": "nucleo_mineral", "kg_mn": 0.15}],
+        conc_l1 = [{"alimento": "milho_moido", "kg_mn": 4.5}, {"alimento": "farelo_soja", "kg_mn": 3.0},
+                   {"alimento": "ureia", "kg_mn": 0.1}, {"alimento": "nucleo_mineral", "kg_mn": 0.2}]
+        dieta(lotes[1], 1, [{"alimento": "silagem_milho", "kg_mn": 32}] + conc_l1, dia0, "Dieta inicial (silo 1)",
+              ms_ref=30.9, ativa=False)
+        # silo 2 (26% de MS) aberto no dia 40 sem corrigir os kg: menos MS e energia, a ureia do leite sobe (laudo do dia 50)
+        dieta(lotes[1], 2, [{"alimento": silo2, "kg_mn": 38}] + conc_l1, dia(50),
+              "Correção da MS da silagem nova (31 → 26%): 32 → 38 kg MN do silo 2", ms_ref=26.0)
+        dieta(lotes[2], 1, [{"alimento": "silagem_sorgo", "kg_mn": 25}, {"alimento": "milho_moido", "kg_mn": 2.0},
+                            {"alimento": "farelo_soja", "kg_mn": 1.0}, {"alimento": "nucleo_mineral", "kg_mn": 0.15}],
               dia0, "Dieta inicial", ms_ref=30.8, ativa=False)
         # lote 2: troca de volumoso no dia 57 com transição planejada pelas regras TRN
-        v1_l2 = [{"alimento": "silagem_sorgo", "kg_mn": 25}, {"alimento": "milho_moido", "kg_mn": 3},
+        v2_l2 = [{"alimento": "silagem_sorgo", "kg_mn": 25}, {"alimento": "milho_moido", "kg_mn": 3},
                  {"alimento": "farelo_soja", "kg_mn": 1.5}, {"alimento": "nucleo_mineral", "kg_mn": 0.15}]
-        v2_l2 = [{"alimento": "silagem_milho", "kg_mn": 28}, {"alimento": "milho_moido", "kg_mn": 2.5},
+        dieta(lotes[2], 2, v2_l2, dia(30), "Teste: concentrado 3,0 → 4,5 kg/vaca", ms_ref=30.8, ativa=False)
+        v3_l2 = [{"alimento": "silagem_milho", "kg_mn": 32}, {"alimento": "milho_moido", "kg_mn": 2.5},
                  {"alimento": "farelo_soja", "kg_mn": 2.4}, {"alimento": "nucleo_mineral", "kg_mn": 0.15}]
-        s.add(Dieta(lote_id=lotes[2].id, versao=2, itens=v2_l2, inicio=dia(57), ativa=True, origem="usuario",
+        s.add(Dieta(lote_id=lotes[2].id, versao=3, itens=v3_l2, inicio=dia(57), ativa=True, origem="usuario",
                     motivo="Silo de sorgo acabou: troca para silagem de milho", ms_silagem_ref=30.9,
-                    transicao=services.planejar_transicao(lotes[2], v1_l2, v2_l2, services.catalogo(s, faz.id),
-                                                          dia(57), 1)))
+                    transicao=services.planejar_transicao(lotes[2], v2_l2, v3_l2, services.catalogo(s, faz.id),
+                                                          dia(57), 2)))
         dieta(lotes[3], 1, [{"alimento": "silagem_milho", "kg_mn": 35}, {"alimento": "milho_moido", "kg_mn": 6},
                             {"alimento": "farelo_soja", "kg_mn": 3.5}, {"alimento": "caroco_algodao", "kg_mn": 1.5},
                             {"alimento": "nucleo_mineral", "kg_mn": 0.25}], dia0, "Dieta de pós-parto", ms_ref=30.9)
-        dieta(lotes[4], 1, [{"alimento": "braquiaria", "kg_mn": 30}, {"alimento": "milho_moido", "kg_mn": 1.5},
-                            {"alimento": "farelo_soja", "kg_mn": 0.5}, {"alimento": "nucleo_mineral", "kg_mn": 0.1}],
+        dieta(lotes[4], 1, [{"alimento": "braquiaria", "kg_mn": 26}, {"alimento": "milho_moido", "kg_mn": 1.5},
+                            {"alimento": "farelo_soja", "kg_mn": 0.8}, {"alimento": "nucleo_mineral", "kg_mn": 0.15}],
               dia0, "Pasto + suplemento")
 
         eventos = [
@@ -106,7 +113,7 @@ def gerar():
             s.add(e)
 
         k = {1: 1.32, 2: 0.89, 3: 1.80, 4: 0.69}
-        conc = {1: 4.0, 2: 3.0, 3: 6.0, 4: 1.5}
+        conc = {1: 7.6, 2: 3.0, 3: 11.0, 4: 2.3}      # kg/vaca = soma dos concentrados da dieta em vigor
         regs = []
 
         def reg(lote, i, ind, valor, metodo=None):
@@ -161,7 +168,7 @@ def gerar():
                 if n == 4 and i % 7 == 5:          # régua no pasto (lotação contínua): altura média caindo
                     reg(lote, i, "altura_media", 27 - 0.15 * i)
                 if i % 7 == 3:
-                    ecc = {1: 2.75, 2: 3.0, 3: max(2.25, 3.5 - 0.035 * (i - 20)), 4: 3.25}[n]
+                    ecc = {1: 2.75, 2: 3.0, 3: max(2.25, 3.5 - 0.035 * (i - 20)), 4: 3.25 - 0.004 * i}[n]
                     reg(lote, i, "ecc", ecc)
                     reg(lote, i, "escore_fezes", 3.0)
             # laudos mensais (controle leiteiro por lote)
@@ -184,10 +191,6 @@ def gerar():
         s.add_all(regs)
         s.commit()
 
-        # insumo cadastrado pela fazenda, com análise do laboratório (silo novo do Lote 1)
-        services.criar_alimento(s, faz, dict(nome="Silagem de milho — silo 2 (laudo)", tipo="volumoso", ms=26.0, pb=7.8,
-                                             fdn=52.0, ndt=63.0, ee=2.8, mm=4.6, origem_dado="laboratorio",
-                                             fonte="Laudo bromatológico 1043 (silo 2)", fdnd=55.0, preco_kg_mn=0.24))
         # preços informados pela fazenda (os demais ficam no valor de referência)
         services.registrar_precos(s, faz, {"milho_moido": 1.30, "farelo_soja": 2.70}, dia(20), "cotação da cooperativa")
         services.registrar_precos(s, faz, {"milho_moido": 1.45, "leite": 2.45}, dia(55), "nota fiscal / extrato do laticínio")
@@ -236,6 +239,7 @@ def gerar():
         for lote in lotes.values():
             services.avaliar_lote(s, lote)        # alertas da dieta ativa
         # estoque: contagem no dia 52 e uma compra de milho no dia 55 (farelo de soja acabando)
+        s.add(MovimentoEstoque(fazenda_id=faz.id, item=silo2, data=dia(52), tipo="contagem", kg=25000, obs="silo 2 (régua)"))
         for item, kg in (("silagem_milho", 52000), ("silagem_sorgo", 6000), ("milho_moido", 4500),
                          ("farelo_soja", 2300), ("caroco_algodao", 900), ("nucleo_mineral", 500)):
             s.add(MovimentoEstoque(fazenda_id=faz.id, item=item, data=dia(52), tipo="contagem", kg=kg, obs="contagem semanal"))

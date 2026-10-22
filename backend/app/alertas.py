@@ -267,3 +267,19 @@ def historico_do(s: Session, alerta_id: int) -> list[HistoricoAlerta]:
 
 def lote_de(s: Session, ep: AlertaDB) -> Lote | None:
     return s.get(Lote, ep.lote_id)
+
+
+def aplicar_meta_na_verificacao(s: Session, lote_id: int, supressoes: dict) -> None:
+    """As meta-regras do acompanhamento (ex.: "mastite primeiro" suprime avisos de dieta) valem também para os avisos
+    da verificação da dieta ativa: a recomendação é a mesma ("não mexer na dieta agora"), venha de onde vier.
+    Quando a meta-regra deixa de valer, o aviso volta ao primeiro plano."""
+    for ep in s.exec(select(AlertaDB).where(AlertaDB.lote_id == lote_id, AlertaDB.origem == "verificacao",
+                                            AlertaDB.estado.in_(ATIVOS))).all():
+        sup = supressoes.get(ep.categoria)
+        if sup and sup.get("tipo") == "suprimir":
+            ep.suprimido, ep.nota = True, f"{sup['regra']}: {sup['motivo']}"
+        elif ep.suprimido and (ep.nota or "").startswith("META-"):
+            ep.suprimido, ep.nota = False, None
+        s.add(ep)
+    s.commit()
+

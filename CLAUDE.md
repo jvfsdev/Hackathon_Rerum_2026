@@ -65,6 +65,15 @@ cd frontend && npm install && npm run dev   # UI em :5173  (npm run dev:rede par
 - **Catálogo de alimentos da fazenda** = base (`foods.yaml`, só leitura) + insumos cadastrados (`AlimentoFazenda`, código `f{fazenda}_{slug}`, CF pela origem do dado: laboratório 1,0 / tabela 0,8 / estimado 0,6). Em fluxo de fazenda use `services.catalogo(s, fazenda_id)`, nunca `kb().alimentos`. Insumo desativado sai das listas, mas dietas antigas continuam válidas.
 - **Preços de referência** vêm de fontes públicas (`app/referencias/fontes.py`: Cepea milho e leite MG, Deral-PR/IPEADATA farelo de soja), coletados 1x/dia pelo agendador (desligue com `LEITE_SEM_COLETA=1`). Falha de fonte nunca apaga valor; valor implausível é descartado. Cepea é CC BY-NC 4.0: sempre exibir "Fonte: Cepea/Esalq-USP". Itens sem fonte pública ficam com o valor de demonstração de `foods.yaml`.
 - **Modo campo** (`frontend/src/pages/Campo.tsx`, rota `/campo`): registro rápido + avisos para o celular; no celular a página inicial redireciona para ele. Sem conexão, registros/eventos vão para a fila `campo_fila` no localStorage e são reenviados em ordem quando a API volta (evento `online` e a cada 60 s). "Sem conexão" = falha de fetch ou 5xx sem corpo (`ErroApi.semConexao`).
+- **Fila offline** (`frontend/src/lib/fila.ts`): ordem garantida, para no primeiro item sem conexão, recusa do servidor
+  vai para "recusados" (nunca some), uma sincronização por vez. Mudou a fila? Rode `npm run test:fila` (7 cenários).
+- **Datas no front:** nunca `toISOString().slice(0, 10)` (é UTC: às 21h em Brasília já é amanhã). Use `hojeLocal()`,
+  `diasAtras()` e `somarDias()` de `src/api.ts`.
+- **Registro diário:** valores validados pelas mesmas faixas da importação (`importacao.FAIXAS`, `problema_valor`) e
+  litros/vaca ≤ `LITROS_VACA_MAX`; só os indicadores enviados são tocados; litros e trato podem ser **somados**
+  (`somar: ["litros"]`, 2ª ordenha) e guardam as parcelas em `Registro.texto`.
+- **Meta-regras valem para a verificação:** "mastite primeiro" (META-01) também põe em segundo plano os avisos da dieta
+  ativa (`alertas.aplicar_meta_na_verificacao`).
 - **Importação CSV** (`app/importacao.py`): nomes de coluna em `ALIASES`, faixa plausível por indicador em `FAIXAS`; sempre prévia antes de gravar. **Bonificação do laticínio**: `Fazenda.bonificacao` (faixas por parâmetro, R$/L), entra no preço efetivo do leite e no IOFC.
 - Preço em `foods.yaml` é só **referência de demonstração**. O preço que vale é o da fazenda (`PrecoAlimento`, histórico com data e fonte; vigente = mais recente), aplicado por `services.alimento_com_preco` na verificação, na formulação e no painel. Nunca leia `preco_kg_mn` direto da base num fluxo de fazenda.
 - **Linguagem do produtor:** todo alerta novo traz `titulo_produtor`, `causa_produtor` e `acao_produtor` (sem jargão; números

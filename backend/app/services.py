@@ -331,6 +331,17 @@ def avaliar_lote(s: Session, lote: Lote, itens: list[dict] | None = None) -> dic
         resultado = alertas_resultado(out)
         alertas.sincronizar(s, kb(), lote.id, date.today(), resultado, out["sessao_id"], "verificacao",
                             modulos={"verificacao"}, causa_extra=f"dieta ativa v{dieta.versao} ({dieta.motivo})")
+        ultima = s.exec(select(SessaoInferencia).where(SessaoInferencia.lote_id == lote.id,
+                                                       SessaoInferencia.tipo == "acompanhamento")
+                        .order_by(SessaoInferencia.data_ref.desc(), SessaoInferencia.id.desc())).first()
+        sup = ultima.resultado.get("supressoes", {}) if ultima else {}
+        alertas.aplicar_meta_na_verificacao(s, lote.id, sup)
+        # a resposta mostra o mesmo que os episódios: avisos de dieta em segundo plano enquanto a meta-regra valer
+        for a in out["alertas"]:
+            m = sup.get(a["categoria"])
+            if m and m.get("tipo") == "suprimir" and a["status"] == "ativo":
+                a["status"], a["nota"] = "suprimido", f"{m['regra']}: {m['motivo']}"
+                out["meta_dieta"] = {"regra": m["regra"], "motivo": m["motivo"]}
         out["episodios"] = episodios_por_regra(s, lote.id, "verificacao")
     return out
 
@@ -660,6 +671,7 @@ def monitorar(s: Session, lote: Lote, d: date, h: HistoricoLote | None = None, p
         out["sessao_id"] = _salvar_sessao(s, lote.id, "acompanhamento", out, d)
         alertas.reverter_desde(s, lote.id, d)
         alertas.sincronizar(s, base, lote.id, d, resultado, out["sessao_id"], "acompanhamento")
+        alertas.aplicar_meta_na_verificacao(s, lote.id, resultado.supressoes)
         out["episodios"] = episodios_por_regra(s, lote.id, "acompanhamento")
     return out
 

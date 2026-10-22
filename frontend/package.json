@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:rede": "vite --host",
+    "test:fila": "node scripts/testar-fila.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
